@@ -28,14 +28,17 @@ pip install -e .
 # 3. Install the headless browser used by the validator
 playwright install chromium
 
-# 4. Start a llama.cpp OpenAI-compatible server in another terminal, e.g.:
+# 4. Create your local model registry from the example
+cp config/models.example.yaml config/models.yaml   # then edit to taste
+
+# 5. Start a llama.cpp OpenAI-compatible server in another terminal, e.g.:
 #    llama-server -m /path/to/model.gguf --host 127.0.0.1 --port 8080
 #    (default api_base in config/models.yaml is http://localhost:8080/v1)
 
-# 5. Run the bench
+# 6. Run the bench
 llm-check run
 
-# 6. Open the printed dashboard path in your browser
+# 7. Open the printed dashboard path in your browser
 ```
 
 In future terminals, just `source .venv/bin/activate` before running `llm-check`. Or call the binary directly without activating: `./.venv/bin/llm-check run`.
@@ -60,7 +63,7 @@ Drop a plain `.txt` file in `prompts/`. The filename (without `.txt`) becomes th
 
 ## Adding a model
 
-Edit `config/models.yaml`:
+Edit `config/models.yaml` (create it once with `cp config/models.example.yaml config/models.yaml`; the real file is gitignored):
 
 ```yaml
 models:
@@ -152,7 +155,8 @@ Keyboard: `1` / `2` / `3` switch tabs, `/` focuses the active tab's filter, `Esc
 ## Folder reference
 
 ```
-config/models.yaml      # models to test
+config/models.example.yaml  # template model registry (tracked)
+config/models.yaml          # your model registry (gitignored; copy from example)
 prompts/*.txt           # the prompt suite
 src/llm_check/          # bench source
 runs/                   # outputs (gitignored)

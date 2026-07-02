@@ -17,6 +17,9 @@ venv/
 # Bench output
 runs/
 
+# Local model registry (copy from config/models.example.yaml)
+config/models.yaml
+
 # OS / editor
 .DS_Store
 .idea/

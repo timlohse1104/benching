@@ -11,7 +11,8 @@ Local models (Ollama, LM Studio, llama.cpp, vLLM) are first-class and need no AP
 ## Repo layout
 
 ```
-config/models.yaml              # model registry
+config/models.example.yaml      # tracked template model registry
+config/models.yaml              # local model registry (gitignored; copy from example)
 prompts/*.txt                   # one prompt per file; filename stem = prompt id
 src/llm_check/
   cli.py                        # argparse entry: run / validate / list

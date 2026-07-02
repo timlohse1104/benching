@@ -32,7 +32,13 @@ def _load_inputs(workspace: Path) -> tuple[BenchConfig, list[Prompt]]:
     load_env(workspace)
     cfg_path = workspace / "config" / "models.yaml"
     if not cfg_path.exists():
-        raise SystemExit(f"Missing config: {cfg_path}")
+        example = workspace / "config" / "models.example.yaml"
+        hint = (
+            f"\nCopy the example to get started: cp {example} {cfg_path}"
+            if example.exists()
+            else ""
+        )
+        raise SystemExit(f"Missing config: {cfg_path}{hint}")
     prompts_dir = workspace / "prompts"
     if not prompts_dir.exists():
         raise SystemExit(f"Missing prompts directory: {prompts_dir}")
