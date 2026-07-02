@@ -1,0 +1,14 @@
+Build a self-contained HTML page containing an iterative 2d tower defense game that has aspects of a rogue-like and replayability.
+
+Requirements:
+- style should be neon and low-poly.
+- one well designed level with a buildable grid
+- endless waves of enemies that are getting stronger wave by wave
+- at least 5 different enemies variants
+- at least 3 different upgradable turrets to build
+- turrets are endlessly upgradeable
+- a boss in each wave
+- skill tree that is upgradable between runs
+- a special feature (you decide what it is)
+
+Come up with an original idea and be creative.

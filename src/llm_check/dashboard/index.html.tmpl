@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>llm-check dashboard</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="title">llm-check</div>
+  <nav class="tabs">
+    <button data-tab="overview" class="tab active">Overview</button>
+    <button data-tab="compare" class="tab">Compare</button>
+    <button data-tab="errors" class="tab">Errors</button>
+  </nav>
+  <div class="meta" id="run-meta"></div>
+</header>
+
+<main>
+  <section id="tab-overview" class="tab-panel active">
+    <div class="toolbar">
+      <input type="search" id="overview-filter" placeholder="Filter by prompt, model, status, error..." />
+      <div class="legend">
+        <span class="badge badge-ok">ok</span>
+        <span class="badge badge-warnings">warnings</span>
+        <span class="badge badge-broken">broken</span>
+        <span class="badge badge-failed">failed</span>
+      </div>
+    </div>
+    <div id="overview-matrix"></div>
+  </section>
+
+  <section id="tab-compare" class="tab-panel">
+    <div class="toolbar compare-toolbar">
+      <label>Prompt
+        <select id="compare-prompt"></select>
+      </label>
+      <label>Model A
+        <select id="compare-a"></select>
+      </label>
+      <label>Model B
+        <select id="compare-b"></select>
+      </label>
+      <button id="compare-swap" type="button">Swap</button>
+      <button id="compare-scroll-lock" type="button" aria-pressed="false"
+        title="Scroll both panes together. While locked, each output is rendered on a tall canvas and scrolled from the outside.">Scroll lock: off</button>
+    </div>
+    <div class="compare-grid">
+      <div class="compare-pane" data-side="a">
+        <div class="compare-head"></div>
+        <div class="frame-scroll">
+          <iframe sandbox="allow-scripts" title="Model A output"></iframe>
+        </div>
+        <details class="compare-details"><summary>Validator details</summary><div class="details-body"></div></details>
+      </div>
+      <div class="compare-pane" data-side="b">
+        <div class="compare-head"></div>
+        <div class="frame-scroll">
+          <iframe sandbox="allow-scripts" title="Model B output"></iframe>
+        </div>
+        <details class="compare-details"><summary>Validator details</summary><div class="details-body"></div></details>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-errors" class="tab-panel">
+    <div class="toolbar">
+      <input type="search" id="errors-filter" placeholder="Filter errors..." />
+    </div>
+    <div id="errors-list"></div>
+  </section>
+</main>
+
+<div class="modal" id="modal" hidden>
+  <div class="modal-inner">
+    <header>
+      <span id="modal-title"></span>
+      <button id="modal-close" type="button">close</button>
+    </header>
+    <iframe id="modal-frame" sandbox="allow-scripts" title="Output preview"></iframe>
+  </div>
+</div>
+
+<script>
+  // The run data is embedded at build time by reporter.py
+  window.RESULTS = /*__RESULTS_JSON__*/null;
+</script>
+<script src="assets/app.js"></script>
+</body>
+</html>

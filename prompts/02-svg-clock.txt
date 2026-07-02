@@ -1,0 +1,11 @@
+Build a self-contained HTML page showing a working analog clock rendered in SVG.
+
+Requirements:
+- Single .html file. Inline CSS and JS only. No external resources.
+- One SVG analog clock, centered on the page, at least 320x320.
+- Hour, minute, and second hands. The second hand updates every 1 second.
+- Tick marks for every hour (longer) and every minute (shorter).
+- Display the current time digitally below the clock (HH:MM:SS, 24h).
+- Use a clean light-on-dark theme.
+- Must be valid HTML5. Must not throw any JavaScript errors when loaded.
+- Output ONLY the HTML. No markdown fences, no commentary, no explanation.

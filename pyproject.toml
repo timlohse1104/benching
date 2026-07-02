@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llm-check"
+version = "0.1.0"
+description = "Local-first LLM test bench: prompts in, self-contained HTML out, dashboard included."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "litellm>=1.50",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+    "html5lib>=1.1",
+    "beautifulsoup4>=4.12",
+    "playwright>=1.45",
+    "rich>=13.7",
+    "aiofiles>=23.2",
+    "httpx>=0.27",
+]
+
+[project.scripts]
+llm-check = "llm_check.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+llm_check = ["dashboard/*"]
