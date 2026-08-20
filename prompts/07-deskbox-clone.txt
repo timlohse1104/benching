@@ -1,0 +1,18 @@
+Build a self-contained HTML page that recreates the marketing homepage of "desk.box" (deskbox-office.de) as faithfully as possible from the description below.
+
+Context: desk.box is a German office software for agriculture ("Die smarte Bürosoftware für die Landwirtschaft"). Reproduce the German copy verbatim where quoted. Match the layout, section order, and visual hierarchy of a modern SaaS landing page.
+
+Requirements:
+- Single .html file. Inline CSS and JS only. No external resources (no external images, fonts, or scripts). Replace every image, logo, screenshot, and video with an inline SVG placeholder or a CSS-styled box that carries a matching label.
+- Sticky top header with: a "desk.box" wordmark logo (left), a navigation bar with items "Funktionen", "Preise", "Service" (each with a dropdown caret), a "Login" link, and a prominent "Jetzt testen" call-to-action button.
+- Hero section: headline "desk.box – Die smarte Bürosoftware für die Landwirtschaft", three trust badges ("GoBD zertifiziert", "Server in Deutschland", "E-Rechnung"), a paragraph of body copy, and two buttons "Kostenlos beraten lassen" and "Jetzt kostenlos testen". Include a placeholder image of a person on one side and a product-screenshot placeholder with a "Video abspielen" play button overlay.
+- A row of at least eight feature bullets, each with a small inline-SVG icon, e.g. "Direkte Schnittstelle zu deinem Steuerbüro", "E-Rechnung inklusive", "Vollständiges Banking", "Intelligente Volltextsuche durch alle Dokumente", "Alle deine Betriebe auf einen Blick", "Einfacher Workflow", "Alle Dokumente in deiner Hosentasche", "Sichere und gesetzeskonforme Archivierung".
+- A "Das bietet dir desk.box" section with five feature cards: Schreibtisch, Banking, Aktenschrank, Faktura, Adressbuch — each with an icon placeholder, a short German description, and a "Mehr erfahren" link.
+- A customer-testimonials section with at least four named quotes (e.g. "Nico Ahlmann, Hof Ahlmann Groß Tessin").
+- A blog/news teaser grid with at least three cards (image placeholder, headline, teaser text, "Weiterlesen" link).
+- A "60 Tage kostenlos testen" call-to-action band with a "Jetzt registrieren" button.
+- A footer with: the desk.box logo, two certification badge placeholders, contact details (phone "+49(0)431 / 530 154 18", email "support(at)deskbox-office.de", "Supportzeiten: Mo bis Fr: 08:00 - 16:00 Uhr"), social links (LinkedIn, Instagram, YouTube, Facebook, WhatsApp), footer navigation, and the copyright line "© 2026 stadt.werk konzeption.text.gestaltung GmbH".
+- The nav dropdowns must open on hover or click via inline JS. The layout must be responsive and collapse the nav into a hamburger menu on narrow viewports.
+- Use only system fonts. Choose a clean, professional color palette consistent with a business SaaS product.
+- Must be valid HTML5. Must not throw any JavaScript errors when loaded.
+- Output ONLY the HTML. No markdown fences, no commentary, no explanation.

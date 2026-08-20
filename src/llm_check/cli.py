@@ -207,7 +207,7 @@ def build_parser() -> argparse.ArgumentParser:
         "run_dir",
         nargs="?",
         default=None,
-        help="Path to a runs/<timestamp>__<model> directory, or runs/ itself. Defaults to ./runs.",
+        help="Path to a runs/<model>__<device> directory, or runs/ itself. Defaults to ./runs.",
     )
     p_val.set_defaults(func=cmd_validate)
 

@@ -1,0 +1,14 @@
+Build a self-contained HTML page implementing a drawing/paint application on a Canvas.
+
+Requirements:
+- Single .html file. Inline CSS and JS only. No external resources.
+- A main <canvas> drawing surface, at least 800x600, on a clearly bordered stage.
+- Freehand brush drawing with smooth lines that follow the mouse (and touch, if feasible).
+- A toolbar with: brush tool, eraser tool, an adjustable brush size (slider), a color picker, and a small preset color palette.
+- Undo and Redo buttons that step through the drawing history correctly.
+- A Clear button that empties the canvas (with the current background).
+- A "Save as PNG" button that exports the current canvas as a downloadable .png via a data URL.
+- Show the current brush size and selected color somewhere in the UI.
+- Use a clean, uncluttered light theme for the tool chrome.
+- Must be valid HTML5. Must not throw any JavaScript errors when loaded.
+- Output ONLY the HTML. No markdown fences, no commentary, no explanation.

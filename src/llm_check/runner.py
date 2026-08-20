@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
+import shutil
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -210,6 +212,24 @@ async def _run_one(
     return cell
 
 
+def _slug(value: str) -> str:
+    """Filesystem-safe slug: keep [A-Za-z0-9._-], collapse everything else to '-'."""
+    s = re.sub(r"[^A-Za-z0-9._-]+", "-", value.strip())
+    return s.strip("-") or "x"
+
+
+def _run_dir_name(model: ModelConfig) -> str:
+    """Stable per-model+device run-dir name: `{model_id}__{kind}` (or `{model_id}`).
+
+    `kind` is the free-form device/host label. Re-running the same model+device
+    combination reuses (and overwrites) the same directory.
+    """
+    base = _slug(model.id)
+    if model.kind:
+        return f"{base}__{_slug(model.kind)}"
+    return base
+
+
 async def run_matrix(
     config: BenchConfig,
     prompts: list[Prompt],
@@ -272,11 +292,15 @@ async def run_matrix(
             # 1 for local OpenAI-compatible servers, large for noop.
             endpoint_sem[key] = asyncio.Semaphore(1 if m.api_base else 1024)
 
-    # One run-dir PER model. All cells of that model land in
-    # runs/<timestamp>__<model_id>/{outputs,thumbnails}.
+    # One run-dir PER model+device combination. All cells of that model land in
+    # runs/<model_id>__<kind>/{outputs,thumbnails}. Re-running the same
+    # combination overwrites the directory (wipe first so a smaller prompt set
+    # leaves no stale outputs behind).
     model_dirs: dict[str, Path] = {}
     for m in usable:
-        d = runs_root / f"{timestamp}__{m.id}"
+        d = runs_root / _run_dir_name(m)
+        if d.exists():
+            shutil.rmtree(d)
         (d / "outputs").mkdir(parents=True, exist_ok=True)
         (d / "thumbnails").mkdir(parents=True, exist_ok=True)
         model_dirs[m.id] = d

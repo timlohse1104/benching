@@ -1,0 +1,12 @@
+Build a self-contained HTML page with an interactive particle simulation rendered on a Canvas.
+
+Requirements:
+- Single .html file. Inline CSS and JS only. No external resources.
+- A full-window <canvas> that continuously animates via requestAnimationFrame.
+- At least 300 particles that move with simple physics (velocity + gravity or drift) and wrap or bounce at the edges.
+- Mouse interaction: particles are attracted to or repelled from the cursor while the mouse moves over the canvas.
+- A small on-screen control panel to adjust at least two parameters live (e.g. particle count, gravity, attraction strength).
+- A live FPS counter shown in a corner.
+- Use a clean dark theme with subtly colored particles.
+- Must be valid HTML5. Must not throw any JavaScript errors when loaded.
+- Output ONLY the HTML. No markdown fences, no commentary, no explanation.

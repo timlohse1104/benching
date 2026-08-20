@@ -1,0 +1,14 @@
+Build a self-contained HTML page implementing a Markdown editor with a live preview.
+
+Requirements:
+- Single .html file. Inline CSS and JS only. No external resources (no CDN, no external Markdown library). Implement the Markdown-to-HTML conversion yourself in vanilla JS.
+- A two-pane split layout: a raw Markdown <textarea> on the left, a rendered HTML preview on the right. The preview updates live as you type.
+- Support at least these Markdown features: headings (#..######), bold, italic, inline code, fenced code blocks, unordered and ordered lists, blockquotes, links, images, and horizontal rules.
+- Escape raw HTML in the input so the preview cannot execute injected scripts (basic XSS safety).
+- Prefill the editor with a sample Markdown document that demonstrates every supported feature.
+- A live word count and character count shown somewhere in the UI.
+- A "Copy HTML" button that copies the generated HTML source to the clipboard.
+- A responsive layout that stacks the two panes vertically on narrow viewports.
+- Use a clean, readable theme with monospaced font in the editor and proportional font in the preview.
+- Must be valid HTML5. Must not throw any JavaScript errors when loaded.
+- Output ONLY the HTML. No markdown fences, no commentary, no explanation.

@@ -1,0 +1,14 @@
+Build a self-contained HTML page with a 2D physics sandbox of bouncing balls on a Canvas.
+
+Requirements:
+- Single .html file. Inline CSS and JS only. No external resources.
+- A full-window <canvas> animated via requestAnimationFrame.
+- Balls of varying radius that fall under gravity, bounce off the walls and floor with energy loss (restitution), and collide with each other (circle-circle collision response).
+- Click on the canvas to spawn a new ball; click-drag to fling it with an initial velocity based on the drag vector.
+- A control panel to adjust at least three parameters live: gravity, restitution (bounciness), and friction.
+- Buttons to reset the scene and to toggle collisions between balls on/off.
+- Balls have distinct colors; show a live count of active balls.
+- Keep the simulation stable with dozens of balls (no runaway energy or tunneling through walls).
+- Use a clean dark theme.
+- Must be valid HTML5. Must not throw any JavaScript errors when loaded.
+- Output ONLY the HTML. No markdown fences, no commentary, no explanation.

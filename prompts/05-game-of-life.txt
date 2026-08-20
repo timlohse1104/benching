@@ -1,0 +1,14 @@
+Build a self-contained HTML page implementing Conway's Game of Life on a Canvas.
+
+Requirements:
+- Single .html file. Inline CSS and JS only. No external resources.
+- A grid of at least 60x40 cells rendered on a <canvas>, with clearly visible cell borders.
+- Standard Conway rules (B3/S23), stepped on a fixed tick via requestAnimationFrame or setInterval.
+- Controls: Start/Pause, Step (advance one generation), Clear, and Randomize.
+- A speed slider that changes the simulation tick rate live.
+- Click or drag on the grid to toggle cells while paused.
+- At least two preset patterns selectable from a dropdown (e.g. Glider, Pulsar) that load onto the grid.
+- Show a live generation counter and the current population count.
+- Use a clean dark theme with clearly contrasting alive cells.
+- Must be valid HTML5. Must not throw any JavaScript errors when loaded.
+- Output ONLY the HTML. No markdown fences, no commentary, no explanation.
