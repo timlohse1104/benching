@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>L-System Fractal Tree</title>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 100%);
+            color: #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+            justify-content: center;
+        }
+        canvas {
+            width: 650px;
+            height: 650px;
+            background: #faf5e8;
+            border-radius: 8px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.4);
+            display: block;
+        }
+        .panel {
+            width: 280px;
+            background: rgba(25,30,50,0.85);
+            border-radius: 8px;
+            padding: 20px;
+            backdrop-filter: blur(8px);
+            border: 1px solid #3a4a6a;
+        }
+        h2 {
+            margin: 0 0 12px 0;
+            font-size: 1rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #e94560;
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        label {
+            font-size: 0.8rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        span {
+            color: #ff6b6b;
+            min-width: 2em;
+            text-align: right;
+        }
+        input[type=range] {
+            width: 100%;
+            cursor: pointer;
+        }
+        button {
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.3s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            background: linear-gradient(135deg, #ee5a24, #ff6b6b);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="canvas" aria-label="fractal tree canvas"></canvas>
+        <div class="panel">
+            <h2>Fractal Tree Controls</h2>
+            <div class="controls">
+                <label>
+                    Depth:
+                    <span id="depthVal">5</span>
+                </label>
+                <input type="range" id="depth" min="1" max="7" value="5">
+
+                <label>
+                    Angle:
+                    <span id="angleVal">25</span>°
+                </label>
+                <input type="range" id="angle" min="10" max="45" value="25">
+
+                <label>
+                    Length Ratio:
+                    <span id="ratioVal">0.65</span>
+                </label>
+                <input type="range" id="ratio" min="0.5" max="0.9" step="0.01" value="0.65">
+
+                <label>
+                    Jitter:
+                    <span id="jitterVal">0</span>
+                </label>
+                <input type="range" id="jitter" min="0" max="0.5" step="0.01" value="0">
+
+                <button id="regenerate">Regenerate</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (() => {
+            'use strict';
+
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            const depthInput = document.getElementById('depth');
+            const angleInput = document.getElementById('angle');
+            const ratioInput = document.getElementById('ratio');
+            const jitterInput = document.getElementById('jitter');
+            const regenerateBtn = document.getElementById('regenerate');
+            const depthVal = document.getElementById('depthVal');
+            const angleVal = document.getElementById('angleVal');
+            const ratioVal = document.getElementById('ratioVal');
+            const jitterVal = document.getElementById('jitterVal');
+
+            let recursionDepth = 5;
+            let branchAngle = 25;
+            let lengthRatio = 0.65;
+            let jitterAmount = 0;
+            let growthProgress = 0;
+            let animationId = null;
+            let isAnimating = false;
+            let segments = [];
+            let jitterSeed = 1;
+
+            const canvasWidth = parseInt(getComputedStyle(canvas).width);
+            const canvasHeight = parseInt(getComputedStyle(canvas).height);
+
+            function setSeed() {
+                jitterSeed = Math.floor(Math.random() * 10000) + 1;
+                jitterVal.textContent = jitterAmount.toFixed(1);
+            }
+
+            const randomJitter = () => {
+                jitterSeed = (jitterSeed * 9301 + 49297) % 233280;
+                return (jitterSeed / 233280 - 0.5) * jitterAmount * 2;
+            };
+
+            function getBranchColor(depth, maxDepth) {
+                const t = depth / maxDepth;
+                const c1 = { r: 139, g: 69, b: 19 };
+                const c2 = { r: 34, g: 139, b: 34 };
+                const r = Math.round(c1.r + (c2.r - c1.r) * t);
+                const g = Math.round(c1.g + (c2.g - c1.g) * t);
+                const b = Math.round(c1.b + (c2.b - c1.b) * t);
+                return `rgb(${r},${g},${b})`;
+            }
+
+            function generateLSystem(axiom, rules, iterations) {
+                let string = axiom;
+                for (let i = 0; i < iterations; i++) {
+                    let next = '';
+                    for (const char of string) {
+                        next += rules[char] || char;
+                    }
+                    string = next;
+                }
+                return string;
+            }
+
+            function interpretLSystem(str, angleDeg, lengthRatio) {
+                const angleRad = angleDeg * Math.PI / 180;
+                const segs = [];
+                const stack = [];
+                let pos = { x: canvasWidth / 2, y: canvasHeight - 40 };
+                let currentAngle = -Math.PI / 2;
+                let currentDepth = 0;
+
+                for (const char of str) {
+                    switch (char) {
+                        case 'F':
+                            const segLen = 6 * Math.pow(lengthRatio, currentDepth);
+                            const jitterAngle = randomJitter();
+                            const endX = pos.x + segLen * Math.cos(currentAngle + jitterAngle);
+                            const endY = pos.y + segLen * Math.sin(currentAngle + jitterAngle);
+                            segs.push({
+                                x1: pos.x,
+                                y1: pos.y,
+                                x2: endX,
+                                y2: endY,
+                                depth: currentDepth
+                            });
+                            pos.x = endX;
+                            pos.y = endY;
+                            break;
+                        case '+':
+                            currentAngle -= angleRad;
+                            break;
+                        case '-':
+                            currentAngle += angleRad;
+                            break;
+                        case '[':
+                            stack.push({ x: pos.x, y: pos.y, angle: currentAngle, depth: currentDepth });
+                            currentDepth++;
+                            break;
+                        case ']':
+                            const saved = stack.pop();
+                            pos.x = saved.x;
+                            pos.y = saved.y;
+                            currentAngle = saved.angle;
+                            currentDepth = saved.depth;
+                            break;
+                    }
+                }
+                return segs;
+            }
+
+            function drawSegments(progress) {
+                ctx.save();
+                ctx.fillStyle = '#0f0f23';
+                ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+
+                segments.forEach(seg => {
+                    if (seg.depth / recursionDepth > progress) return;
+                    const color = getBranchColor(seg.depth, recursionDepth);
+                    ctx.strokeStyle = color;
+                    ctx.globalAlpha = 1;
+                    ctx.lineWidth = 2 - seg.depth / recursionDepth * 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(seg.x1, seg.y1);
+                    ctx.lineTo(seg.x2, seg.y2);
+                    ctx.stroke();
+                });
+
+                // draw leaves at tips
+                const leafColor = '#ffd93d';
+                segments
+                    .filter(s => s.depth >= recursionDepth - 1)
+                    .forEach(seg => {
+                        ctx.fillStyle = leafColor;
+                        ctx.beginPath();
+                        const radius = 3 - seg.depth / recursionDepth * 2;
+                        ctx.arc(seg.x2, seg.y2, Math.max(1, radius), 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+
+                ctx.globalAlpha = 1;
+                ctx.restore();
+            }
+
+            function regenerate() {
+                if (animationId) {
+                    cancelAnimationFrame(animationId);
+                    isAnimating = false;
+                    growthProgress = 0;
+                }
+                const axiom = 'F';
+                const rules = { 'F': 'F[+F][-F]F' };
+                const iterations = recursionDepth;
+                const str = generateLSystem(axiom, rules, iterations);
+                segments = interpretLSystem(str, branchAngle, lengthRatio);
+                setSeed();
+                growthProgress = 0;
+                drawSegments(0);
+            }
+
+            function animate() {
+                if (!isAnimating) return;
+                growthProgress += 0.006;
+                if (growthProgress > 1) growthProgress = 1;
+                drawSegments(growthProgress);
+                if (growthProgress < 1) {
+                    animationId = requestAnimationFrame(animate);
+                }
+            }
+
+            depthInput.addEventListener('input', (e) => {
+                recursionDepth = parseInt(e.target.value);
+                depthVal.textContent = recursionDepth;
+                if (!isAnimating) regenerate();
+            });
+            angleInput.addEventListener('input', (e) => {
+                branchAngle = parseInt(e.target.value);
+                angleVal.textContent = branchAngle;
+                if (!isAnimating) regenerate();
+            });
+            ratioInput.addEventListener('input', (e) => {
+                lengthRatio = parseFloat(e.target.value);
+                ratioVal.textContent = lengthRatio.toFixed(2);
+                if (!isAnimating) regenerate();
+            });
+            jitterInput.addEventListener('input', (e) => {
+                jitterAmount = parseFloat(e.target.value);
+                jitterVal.textContent = jitterAmount.toFixed(1);
+                if (!isAnimating) regenerate();
+            });
+
+            regenerateBtn.addEventListener('click', () => {
+                isAnimating = false;
+                if (animationId) {
+                    cancelAnimationFrame(animationId);
+                    animationId = null;
+                }
+                regenerate();
+                setTimeout(() => {
+                    isAnimating = true;
+                    animate();
+                }, 200);
+            });
+
+            window.addEventListener('resize', () => {
+                const cw = parseInt(getComputedStyle(canvas).width);
+                const ch = parseInt(getComputedStyle(canvas).height);
+                if (cw !== canvasWidth || ch !== canvasHeight) {
+                    regenerate();
+                }
+            });
+
+            regenerate();
+            setTimeout(() => {
+                isAnimating = true;
+                animate();
+            }, 500);
+
+        })();
+    </script>
+</body>
+</html>

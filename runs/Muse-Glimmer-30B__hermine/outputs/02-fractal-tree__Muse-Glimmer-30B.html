@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>L-System Fractal Tree</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#0b0e1a;font-family:system-ui,Segoe UI,Roboto,sans-serif;color:#e8eefc}
+canvas{display:block}
+#panel{position:absolute;top:16px;left:16px;padding:16px 18px;border-radius:16px;background:rgba(20,24,40,0.65);backdrop-filter:blur(10px);box-shadow:0 8px 30px rgba(0,0,0,0.4);min-width:260px}
+#panel h2{margin:0 0 12px;font-size:16px;font-weight:600;letter-spacing:.3px}
+label{display:block;margin:10px 0;font-size:13px}
+input[type=range]{width:180px;vertical-align:middle}
+span.val{min-width:44px;display:inline-block;text-align:right;font-variant-numeric:tabular-nums}
+button{margin-top:12px;padding:8px 12px;border:none;border-radius:10px;background:#6aa9ff;color:#08203a;font-weight:600;cursor:pointer}
+button:hover{background:#85bfff}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="panel">
+<h2>Fractal L-System Tree</h2>
+<label>Depth <input id="depth" type="range" min="2" max="7" value="5"><span id="depthVal" class="val">5</span></label>
+<label>Branch Angle <input id="angle" type="range" min="10" max="45" value="25"><span id="angleVal" class="val">25°</span></label>
+<label>Length Ratio <input id="ratio" type="range" min="0.6" max="0.85" step="0.01" value="0.7"><span id="ratioVal" class="val">0.70</span></label>
+<label>Jitter <input id="jitter" type="range" min="0" max="0.3" step="0.01" value="0.08"><span id="jitterVal" class="val">0.08</span></label>
+<button id="regen">Regenerate</button>
+</div>
+<script>
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const depthEl=document.getElementById('depth');
+const angleEl=document.getElementById('angle');
+const ratioEl=document.getElementById('ratio');
+const jitterEl=document.getElementById('jitter');
+const depthVal=document.getElementById('depthVal');
+const angleVal=document.getElementById('angleVal');
+const ratioVal=document.getElementById('ratioVal');
+const jitterVal=document.getElementById('jitterVal');
+document.getElementById('regen').onclick=()=>{params.seed=Date.now();regenerate();};
+
+function resize(){canvas.width=innerWidth;canvas.height=innerHeight}
+addEventListener('resize',resize);resize();
+
+let params={depth:5,angle:25,ratio:0.7,jitter:0.08,seed:Date.now()};
+let lsys='';
+const rules={F:'F[+F]F[-F]'};
+
+function generateLSystem(depth){
+  let s='F';
+  for(let i=0;i<depth;i++){
+    let n='';
+    for(const ch of s) n+=rules[ch]||ch;
+    s=n;
+  }
+  return s;
+}
+
+function lerpColor(a,b,t){
+  return `rgb(${Math.round(a.r+(b.r-a.r)*t)},${Math.round(a.g+(b.g-a.g)*t)},${Math.round(a.b+(b.b-a.b)*t)})`;
+}
+const trunk={r:90,g:60,b:40};
+const tip={r:220,g:190,b:150};
+
+function rng(seed){return function(){seed=(seed*9301+49297)%233280;return seed/233280};}
+let rngSeed=params.seed;
+
+function draw(progress){
+  const w=canvas.width,h=canvas.height;
+  const grad=ctx.createRadialGradient(w*0.5,h*0.3,0,w*0.5,h*0.5,w);
+  grad.addColorStop(0,'#1e2747');grad.addColorStop(1,'#0b0e1a');
+  ctx.fillStyle=grad;ctx.fillRect(0,0,w,h);
+
+  ctx.save();
+  ctx.translate(w/2,h*0.92);
+  const baseLen=Math.min(140,h*0.12);
+  const angleRad=params.angle*Math.PI/180;
+  const maxDepth=params.depth;
+  const total=lsys.length;
+  const maxIdx=Math.floor(progress*total);
+  const frac=progress*total-maxIdx;
+
+  let x=0,y=0,ang=-Math.PI/2,depth=0;
+  const stack=[];
+  rngSeed=params.seed;
+  const rand=rngSeed; // placeholder
+  let seed=params.seed;
+  const randFn=()=>{seed=(seed*9301+49297)%233280;return seed/233280};
+
+  for(let i=0;i<=maxIdx && i<total;i++){
+    const ch=lsys[i];
+    const partial=(i===maxIdx)?frac:1;
+    if(ch==='F'){
+      const len=baseLen*Math.pow(params.ratio,depth);
+      const dx=Math.cos(ang)*len*partial;
+      const dy=Math.sin(ang)*len*partial;
+      const t=Math.min(1,depth/maxDepth);
+      ctx.strokeStyle=lerpColor(trunk,tip,t);
+      ctx.lineWidth=Math.max(1,10*Math.pow(0.75,depth));
+      ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(x,y);x+=dx;y+=dy;ctx.lineTo(x,y);ctx.stroke();
+      if(depth>=maxDepth-1 && partial>0.3){
+        ctx.fillStyle='#ffd6e8';
+        ctx.beginPath();ctx.arc(x,y,2.5+Math.random()*1.5,0,Math.PI*2);ctx.fill();
+      }
+    }else if(ch==='+'){
+      const j=1+(randFn()-0.5)*params.jitter*2;
+      ang+=angleRad*j;
+    }else if(ch==='-'){
+      const j=1+(randFn()-0.5)*params.jitter*2;
+      ang-=angleRad*j;
+    }else if(ch==='['){
+      stack.push({x,y,ang,depth});depth++;
+    }else if(ch===']'){
+      const st=stack.pop();x=st.x;y=st.y;ang=st.ang;depth=st.depth;
+    }
+  }
+  ctx.restore();
+}
+
+let start=null;
+const duration=4000;
+function animate(ts){
+  if(!start) start=ts;
+  const elapsed=ts-start;
+  const p=Math.min(1,elapsed/duration);
+  draw(p);
+  if(p<1) requestAnimationFrame(animate);
+}
+
+function updateLabels(){
+  depthVal.textContent=params.depth;
+  angleVal.textContent=params.angle+'°';
+  ratioVal.textContent=params.ratio.toFixed(2);
+  jitterVal.textContent=params.jitter.toFixed(2);
+}
+function regenerate(){
+  params.depth=+depthEl.value;
+  params.angle=+angleEl.value;
+  params.ratio=+ratioEl.value;
+  params.jitter=+jitterEl.value;
+  updateLabels();
+  lsys=generateLSystem(params.depth);
+  start=null;
+  requestAnimationFrame(animate);
+}
+depthEl.oninput=angleEl.oninput=ratioEl.oninput=jitterEl.oninput=regenerate;
+regenerate();
+</script>
+</body>
+</html>

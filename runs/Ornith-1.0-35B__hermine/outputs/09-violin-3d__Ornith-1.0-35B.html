@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Interactive Violin</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a0a12;font-family:'Georgia',serif}
+canvas{display:block;width:100%;height:100%;cursor:grab}
+canvas:active{cursor:grabbing}
+#hint{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);color:rgba(255,220,180,0.7);font-size:13px;text-align:center;pointer-events:none;transition:opacity 2s;letter-spacing:0.5px;text-shadow:0 1px 4px rgba(0,0,0,0.8)}
+#startOverlay{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:rgba(10,10,18,0.85);z-index:10;cursor:pointer;transition:opacity 0.6s}
+#startOverlay.hidden{opacity:0;pointer-events:none}
+#startOverlay span{color:#e8c89a;font-size:22px;letter-spacing:2px;text-shadow:0 0 30px rgba(200,150,80,0.4);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:0.7}50%{opacity:1}}
+#strings{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);display:flex;gap:18px;z-index:5}
+#strings span{color:rgba(255,220,180,0.45);font-size:11px;letter-spacing:1px;transition:color 0.3s,text-shadow 0.3s}
+#strings span.active{color:#ffd700;text-shadow:0 0 12px rgba(255,215,0,0.6)}
+</style>
+</head>
+<body>
+<div id="startOverlay"><span>Click anywhere to play</span></div>
+<div id="hint">Drag to orbit · Scroll to zoom · Click strings to play</div>
+<div id="strings">
+<span id="sG">G</span>
+<span id="sD">D</span>
+<span id="sA">A</span>
+<span id="sE">E</span>
+</div>
+<canvas id="gl"></canvas>
+<script>
+"use strict";
+var canvas=document.getElementById("gl"),gl=canvas.getContext("webgl",{antialias:true,alpha:false});
+if(!gl){document.body.innerHTML="<p style='color:white;text-align:center;margin-top:40vh'>WebGL not supported</p>";throw"no webgl"}
+
+// === Matrix Math ===
+var M4={
+create:function(){var m=new Float32Array(16);m[0]=m[5]=m[10]=m[15]=1;return m},
+perspective:function(fov,asp,near,far){var m=new Float32Array(16),f=1/Math.tan(fov/2),nf=1/(near-far);m[0]=f/asp;m[5]=f;m[10]=(far+near)*nf;m[11]=-1;m[14]=2*far*near*nf;return m},
+lookAt:function(eye,center,up){var m=new Float32Array(16),zx=eye[0]-center[0],zy=eye[1]-center[1],zz=eye[2]-center[2];var l=1/Math.sqrt(zx*zx+zy*zy+zz*zz);zx*=l;zy*=l;zz*=l;var xx=up[1]*zz-up[2]*zy,xy=up[2]*zx-up[0]*zz,xz=up[0]*zy-up[1]*zx;l=Math.sqrt(xx*xx+xy*xy+xz*xz);if(l){l=1/l;xx*=l;xy*=l;xz*=l}else{xx=xy=xz=0}var yx=zy*xz-zz*xy,yy=zz*xx-zx*xz,yz=zx*xy-zy*xx;m[0]=xx;m[1]=yx;m[2]=zx;m[3]=0;m[4]=xy;m[5]=yy;m[6]=zy;m[7]=0;m[8]=xz;m[9]=yz;m[10]=zz;m[11]=0;m[12]=-(xx*eye[0]+xy*eye[1]+xz*eye[2]);m[13]=-(yx*eye[0]+yy*eye[1]+yz*eye[2]);m[14]=-(zx*eye[0]+zy*eye[1]+zz*eye[2]);m[15]=1;return m},
+multiply:function(a,b){var m=new Float32Array(16);for(var i=0;i<4;i++)for(var j=0;j<4;j++){m[j*4+i]=0;for(var k=0;k<4;k++)m[j*4+i]+=a[k*4+i]*b[j*4+k]}return m},
+translate:function(m,v){var t=M4.create();t[12]=v[0];t[13]=v[1];t[14]=v[2];return M4.multiply(m,t)},
+rotateY:function(m,a){var c=Math.cos(a),s=Math.sin(a),r=M4.create();r[0]=c;r[8]=s;r[2]=-s;r[10]=c;return M4.multiply(m,r)},
+rotateX:function(m,a){var c=Math.cos(a),s=Math.sin(a),r=M4.create();r[5]=c;r[9]=-s;r[6]=s;r[10]=c;return M4.multiply(m,r)},
+scale:function(m,v){var s=M4.create();s[0]=v[0];s[5]=v[1];s[10]=v[2];return M4.multiply(m,s)},
+invert:function(a){var m=new Float32Array(16);var a00=a[0],a01=a[1],a02=a[2],a03=a[3],a10=a[4],a11=a[5],a12=a[6],a13=a[7],a20=a[8],a21=a[9],a22=a[10],a23=a[11],a30=a[12],a31=a[13],a32=a[14],a33=a[15];var b00=a00*a11-a01*a10,b01=a00*a12-a02*a10,b02=a00*a13-a03*a10,b03=a01*a12-a02*a11,b04=a01*a13-a03*a11,b05=a02*a13-a03*a12,b06=a20*a31-a21*a30,b07=a20*a32-a22*a30,b08=a20*a33-a23*a30,b09=a21*a32-a22*a31,b10=a21*a33-a23*a31,b11=a22*a33-a23*a32;var d=b00*b11-b01*b10+b02*b09+b03*b08-b04*b07+b05*b06;if(!d)return null;d=1.0/d;m[0]=(a11*b11-a12*b10+a13*b09)*d;m[1]=(a02*b10-a01*b11-a03*b09)*d;m[2]=(a31*b05-a32*b04+a33*b03)*d;m[3]=(a22*b04-a21*b05-a23*b03)*d;m[4]=(a12*b08-a10*b11-a13*b07)*d;m[5]=(a00*b11-a02*b08+a03*b07)*d;m[6]=(a32*b02-a30*b05-a33*b01)*d;m[7]=(a20*b05-a22*b02+a23*b01)*d;m[8]=(a10*b10-a11*b08+a13*b06)*d;m[9]=(a01*b08-a00*b10-a03*b06)*d;m[10]=(a30*b04-a31*b02+a33*b00)*d;m[11]=(a21*b02-a20*b04-a23*b00)*d;m[12]=(a11*b07-a10*b09-a12*b06)*d;m[13]=(a00*b09-a01*b07+a02*b06)*d;m[14]=(a31*b01-a30*b03-a32*b00)*d;m[15]=(a20*b03-a21*b01+a22*b00)*d;return m},
+transformVec3:function(m,v){var x=v[0],y=v[1],z=v[2];return[x*m[0]+y*m[4]+z*m[8]+m[12],x*m[1]+y*m[5]+z*m[9]+m[13],x*m[2]+y*m[6]+z*m[10]+m[14]]},
+transformDir:function(m,v){var x=v[0],y=v[1],z=v[2];return[x*m[0]+y*m[4]+z*m[8],x*m[1]+y*m[5]+z*m[9],x*m[2]+y*m[6]+z*m[10]]}
+};
+
+// === Shaders ===
+var vsSource=`
+attribute vec3 aPos;
+attribute vec3 aNorm;
+uniform mat4 uModel;
+uniform mat4 uView;
+uniform mat4 uProj;
+uniform mat3 uNormMat;
+uniform vec3 uVib; // string vibration: x=amp, y=freq, z=phase
+uniform float uIsString;
+uniform float uStrIdx;
+varying vec3 vNorm;
+varying vec3 vWorldPos;
+varying float vStrIdx;
+void main(){
+    vec3 p=aPos;
+    if(uIsString>0.5){
+        float t=(aPos.y+1.0)*0.5;
+        float wave=uVib.x*sin(uVib.y*t+uVib.z);
+        float side=sign(aPos.x);
+        p.x+=wave*side*0.015;
+        p.z+=wave*0.008;
+    }
+    vec4 wp=uModel*vec4(p,1.0);
+    vWorldPos=wp.xyz;
+    vNorm=normalize(uNormMat*aNorm);
+    vStrIdx=uStrIdx;
+    gl_Position=uProj*uView*wp;
+}`;
+
+var fsSource=`
+precision mediump float;
+varying vec3 vNorm;
+varying vec3 vWorldPos;
+varying float vStrIdx;
+uniform vec3 uColor;
+uniform vec3 uLightDir1;
+uniform vec3 uLightDir2;
+uniform vec3 uLightDir3;
+uniform vec3 uLightCol1;
+uniform vec3 uLightCol2;
+uniform vec3 uLightCol3;
+uniform vec3 uEye;
+uniform float uIsString;
+uniform float uGlow;
+uniform float uTime;
+void main(){
+    vec3 N=normalize(vNorm);
+    vec3 V=normalize(uEye-vWorldPos);
+    vec3 col=uColor;
+    
+    // Wood grain effect
+    float grain=sin(vWorldPos.y*12.0+vWorldPos.x*8.0)*0.5+0.5;
+    grain=mix(0.85,1.0,grain);
+    col*=grain;
+    
+    // Subsurface scattering approximation
+    float sss=pow(max(0.0,dot(V,-N)),0.5)*0.15;
+    
+    vec3 finalCol=vec3(0.02);
+    
+    // Ambient
+    finalCol+=col*0.08;
+    
+    // Three-point lighting
+    for(int i=0;i<3;i++){
+        vec3 L;float lc;
+        if(i==0){L=uLightDir1;lc=1.0;}
+        else if(i==1){L=uLightDir2;lc=1.0;}
+        else{L=uLightDir3;lc=0.6;}
+        
+        vec3 H=normalize(L+V);
+        float diff=max(0.0,dot(N,L));
+        float spec=pow(max(0.0,dot(N,H)),60.0);
+        finalCol+=col*(lc*uLightCol1*diff+spec*uLightCol1*0.8);
+    }
+    
+    // Rim light
+    float rim=pow(1.0-max(0.0,dot(N,V)),3.0);
+    finalCol+=vec3(0.15,0.1,0.08)*rim;
+    
+    // String glow
+    if(uIsString>0.5){
+        float pulse=0.7+0.3*sin(uTime*8.0+vStrIdx*1.5);
+        finalCol+=vec3(1.0,0.9,0.6)*(uGlow*pulse*0.5);
+        finalCol+=vec3(0.2,0.15,0.05)*uGlow;
+    }
+    
+    finalCol+=sss;
+    
+    // Tone mapping
+    finalCol=finalCol/(finalCol+vec3(1.0));
+    finalCol=pow(finalCol,vec3(1.0/2.2));
+    
+    gl_FragColor=vec4(finalCol,1.0);
+}`;
+
+function compileShader(src,type){
+    var s=gl.createShader(type);
+    gl.shaderSource(s,src);
+    gl.compileShader(s);
+    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){console.error(gl.getShaderInfoLog(s));return null}
+    return s;
+}
+var vs=compileShader(vsSource,gl.VERTEX_SHADER),fs=compileShader(fsSource,gl.FRAGMENT_SHADER);
+var prog=gl.createProgram();
+gl.attachShader(prog,vs);gl.attachShader(prog,fs);
+gl.linkProgram(prog);
+if(!gl.getProgramParameter(prog,gl.LINK_STATUS))console.error(gl.getProgramInfoLog(prog));
+var loc={
+    aPos:gl.getAttribLocation(prog,"aPos"),
+    aNorm:gl.getAttribLocation(prog,"aNorm"),
+    uModel:gl.getUniformLocation(prog,"uModel"),
+    uView:gl.getUniformLocation(prog,"uView"),
+    uProj:gl.getUniformLocation(prog,"uProj"),
+    uNormMat:gl.getUniformLocation(prog,"uNormMat"),
+    uVib:gl.getUniformLocation(prog,"uVib"),
+    uIsString:gl.getUniformLocation(prog,"uIsString"),
+    uStrIdx:gl.getUniformLocation(prog,"uStrIdx"),
+    uColor:gl.getUniformLocation(prog,"uColor"),
+    uLightDir1:gl.getUniformLocation(prog,"uLightDir1"),
+    uLightDir2:gl.getUniformLocation(prog,"uLightDir2"),
+    uLightDir3:gl.getUniformLocation(prog,"uLightDir3"),
+    uLightCol1:gl.getUniformLocation(prog,"uLightCol1"),
+    uLightCol2:gl.getUniformLocation(prog,"uLightCol2"),
+    uLightCol3:gl.getUniformLocation(prog,"uLightCol3"),
+    uEye:gl.getUniformLocation(prog,"uEye"),
+    uGlow:gl.getUniformLocation(prog,"uGlow"),
+    uTime:gl.getUniformLocation(prog,"uTime")
+};
+
+// === Geometry Helpers ===
+function createBuffer(data){
+    var b=gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER,b);
+    gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);
+    return b;
+}
+function createIndexBuffer(data){
+    var b=gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,b);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,data,gl.STATIC_DRAW);
+    return b;
+}
+function makeMesh(posArr,normArr,idxArr){
+    return{
+        posBuf:createBuffer(new Float32Array(posArr)),
+        normBuf:createBuffer(new Float32Array(normArr)),
+        idxBuf:createIndexBuffer(new Uint16Array(idxArr)),
+        count:idxArr.length
+    };
+}
+function drawMesh(mesh,modelMatrix){
+    gl.uniformMatrix4fv(loc.uModel,false,modelMatrix);
+    var inv=M4.invert(modelMatrix);
+    if(!inv)return;
+    var nMat=new Float32Array(9);
+    nMat[0]=inv[0];nMat[1]=inv[1];nMat[2]=inv[2];
+    nMat[3]=inv[4];nMat[4]=inv[5];nMat[5]=inv[6];
+    nMat[6]=inv[8];nMat[7]=inv[9];nMat[8]=inv[10];
+    gl.uniformMatrix3fv(loc.uNormMat,false,nMat);
+    gl.bindBuffer(gl.ARRAY_BUFFER,mesh.posBuf);
+    gl.vertexAttribPointer(loc.aPos,3,gl.FLOAT,false,0,0);
+    gl.bindBuffer(gl.ARRAY_BUFFER,mesh.normBuf);
+    gl.vertexAttribPointer(loc.aNorm,3,gl.FLOAT,false,0,0);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,mesh.idxBuf);
+    gl.drawElements(gl.TRIANGLES,mesh.count,gl.UNSIGNED_SHORT,0);
+}
+
+// === Generate Violin Parts ===
+function generateBody(){
+    var pos=[],norm=[],idx=[];
+    var segs=24,ring=16;
+    // Violin body outline: half-width at each y position
+    var outline=[
+        {y:-1.2,w:0.42,d:0.14},
+        {y:-1.0,w:0.52,d:0.16},
+        {y:-0.7,w:0.82,d:0.20},
+        {y:-0.4,w:0.95,d:0.23},
+        {y:-0.1,w:0.88,d:0.22},
+        {y:0.1,w:0.55,d:0.18},
+        {y:0.35,w:0.52,d:0.17},
+        {y:0.6,w:0.80,d:0.20},
+        {y:0.85,w:0.85,d:0.21},
+        {y:1.05,w:0.65,d:0.18},
+        {y:1.2,w:0.38,d:0.13}
+    ];
+    function lerpOutline(t){
+        var i=0;
+        while(i<outline.length-2&&outline[i+1].y<t)i++;
+        if(i>=outline.length-1)return outline[outline.length-1];
+        var a=outline[i],b=outline[Math.min(i+1,outline.length-1)];
+        var len=b.y-a.y;
+        if(len<0.001)return a;
+        var s=(t-a.y)/len;
+        s=s*s*(3-2*s);
+        return{y:a.y+(b.y-a.y)*s,w:a.w+(b.w-a.w)*s,d:a.d+(b.d-a.d)*s};
+    }
+    // Body with top dome
+    for(var i=0;i<=segs;i++){
+        var t=i/segs,y=-1.2+t*2.4;
+        var o=lerpOutline(y);
+        var dome=Math.cos(t*Math.PI)*0.04;
+        for(var j=0;j<=ring;j++){
+            var a=j/ring*Math.PI*2;
+            var cx=Math.cos(a),sz=Math.sin(a);
+            // Top half has dome
+            var topFactor=(sz>=0)?1.0:0.3;
+            var z=o.d*sz+dome*topFactor*(cx*cx);
+            var x=o.w*cx;
+            // Slight curvature in x for top plate
+            if(sz>=0)x+=cx*cx*0.01;
+            pos.push(x,y,z);
+            // Normal approximation
+            var nx=cx*0.8,ny=0.0,nz=sz*0.8;
+            if(sz>0){ny=0.3;nx*=0.7;nz*=0.7}
+            var nl=Math.sqrt(nx*nx+ny*ny+nz*nz);
+            norm.push(nx/nl,ny/nl,nz/nl);
+        }
+    }
+    // Indices
+    for(var i=0;i<segs;i++){
+        for(var j=0;j<ring;j++){
+            var a=i*(ring+1)+j,b=a+1,c=a+ring+1,d=c+1;
+            idx.push(a,b,d,a,d,c);
+        }
+    }
+    return makeMesh(pos,norm,idx);
+}
+
+function generateNeck(){
+    var pos=[],norm=[],idx=[];
+    // Neck: from y=-0.15 to y=0.95
+    var nw=0.12,nd=0.08;
+    var y1=-0.15,y2=0.95;
+    // 4 corners × 2 heights
+    var corners=[[-1,-1],[-1,1],[1,-1],[1,1]];
+    function addVert(x,y,z,nx,ny,nz){pos.push(x,y,z);norm.push(nx,ny,nz)}
+    // Bottom face
+    addVert(-nw,y1,-nd,0,-1,0);addVert(nw,y1,-nd,0,-1,0);
+    addVert(nw,y1,nd,0,-1,0);addVert(-nw,y1,nd,0,-1,0);
+    // Top face
+    addVert(-nw,y2,-nd,0,1,0);addVert(nw,y2,-nd,0,1,0);
+    addVert(nw,y2,nd,0,1,0);addVert(-nw,y2,nd,0,1,0);
+    var vi=0;
+    // Bottom
+    idx.push(vi,vi+1,vi+2,vi,vi+2,vi+3);vi+=4;
+    // Top
+    idx.push(vi,vi+2,vi+1,vi,vi+3,vi+2);vi+=4;
+    // Front (z=-)
+    idx.push(vi,vi+1,vi+2,vi,vi+2,vi+3);vi+=4;
+    // Back (z=+)
+    idx.push(vi,vi+2,vi+1,vi,vi+3,vi+2);vi+=4;
+    // Left (x=-)
+    idx.push(vi,vi+2,vi+1,vi,vi+3,vi+2);vi+=4;
+    // Right (x=+)
+    idx.push(vi,vi+1,vi+2,vi,vi+2,vi+3);vi+=4;
+    return makeMesh(pos,norm,idx);
+}
+
+function generateFingerboard(){
+    var pos=[],norm=[],idx=[];
+    var fw=0.15,fd=0.012;
+    var y1=-0.12,y2=0.97;
+    function v(x,y,z,nx,ny,nz){pos.push(x,y,z);norm.push(nx,ny,nz)}
+    // Bottom
+    v(-fw,y1,-fd,0,-1,0);v(fw,y1,-fd,0,-1,0);v(fw,y1,fd,0,-1,0);v(-fw,y1,fd,0,-1,0);
+    // Top
+    v(-fw,y2,-fd*0.5,0,1,0);v(fw,y2,-fd*0.5,0,1,0);v(fw,y2,fd*0.5,0,1,0);v(-fw,y2,fd*0.5,0,1,0);
+    var vi=0;
+    idx.push(vi,vi+1,vi+2,vi,vi+2,vi+3);vi+=4;
+    idx.push(vi,vi+2,vi+1,vi,vi+3,vi+2);vi+=4;
+    idx.push(vi,vi+1,vi+2,vi,vi+2,vi+3);vi+=4;
+    idx.push(vi,vi+2,vi+1,vi,vi+3,vi+2);vi+=4;
+    idx.push(vi,vi+2,vi+1,vi,vi+3,vi+2);vi+=4;
+    idx.push(vi,vi,vi+2,vi+1,vi+2,vi+3);vi+=4;
+    return makeMesh(pos,norm,idx);
+}
+
+function generateScroll(){
+    var pos=[],norm=[],idx=[];
+    var segs=12,ring=10;
+    // Scroll: spiral shape
+    for(var i=0;i<=segs;i++){
+        var t=i/segs;
+        var angle=t*Math.PI*3;
+        var radius=0.12*(1-t*0.3);
+        var y=0.95+t*0.35;
+        for(var j=0;j<=ring;j++){
+            var a=j/ring*Math.PI*2;
+            var x=radius*Math.cos(a)+Math.cos(angle)*0.02;
+            var z=radius*Math.sin(a)+Math.sin(angle)*0.02;
+            pos.push(x,y,z);
+            var nx=Math.cos(a),nz=Math.sin(a),ny=0;
+            norm.push(nx,ny,nz);
+        }
+    }
+    for(var i=0;i<segs;i++){
+        for(var j=0;j<ring;j++){
+            var a=i*(ring+1)+j,b=a+1,c=a+ring+1,d=c+1;
+            idx.push(a,b,d,a,d,c);
+        }
+    }
+    return makeMesh(pos,norm,idx);
+}
+
+function generatePegbox(){
+    var pos=[],norm=[],idx=[];
+    // Small box at the side of the scroll
+    var px=0.18,py=0.06,pz=0.05;
+    var cx=0.15,cy=1.12,cz=0;
+    function v(x,y,z,nx,ny,nz){pos.push(x,y,z);norm.push(nx,ny,nz)}
+    v(cx-px,cy-py,cz-pz,0,0,-1);v(cx+px,cy-py,cz-pz,0,0,-1);
+    v(cx+px,cy+py,cz-pz,0,0,-1);v(cx-px,cy+py,cz-pz,0,0,-1);
+    v(cx-px,cy-py,cz+pz,0,0,1);v(cx+px,cy-py,cz+pz,0,0,1);
+    v(cx+px,cy+py,cz+pz,0,0,1);v(cx-px,cy+py,cz+pz,0,0,1);
+    var vi=0;
+    idx.push(vi,vi+1,vi+2,vi,vi+2,vi+3);vi+=4;
+    idx.push(vi,vi+2,vi+1,vi,vi+3,vi+2);vi+=4;
+    idx.push(vi,vi+1,vi+2,vi,vi+2,vi+3);vi+=4;
+    idx.push(vi,vi+2,vi+1,vi,vi+3,vi+2);vi+=4;
+    idx.push(vi,vi+2,vi+1,vi,vi+3,vi+2);vi+=4;
+    idx.push(vi,vi,vi+2,vi+1,vi+2,vi+3);vi+=4;
+    return makeMesh(pos,norm,idx);
+}
+
+function generatePeg(idx){
+    var pos=[],norm=[],idxArr=[];
+    var angle=idx*Math.PI/2;
+    var px=Math.cos(angle)*0.22;
+    var py=1.12+Math.sin(angle)*0.02;
+    var pz=Math.sin(angle)*0.08;
+    var len=0.18,r=0.018;
+    // Simple cylinder for peg
+    var segs=6;
+    for(var i=0;i<=segs;i++){
+        var a=i/segs*Math.PI*2;
+        var ca=Math.cos(a),sa=Math.sin(a);
+        pos.push(px+r*ca,py,py+pz,r*sa,1,0,0);
+    }
+    // Just do a simple box
+    pos=[px-r,py-r,py+r,pz-r,px+r,py-r,py+r,pz-r,px+r,py+r,py+r,pz+r,px-r,py+r,py+r,pz+r];
+    // Normals
+    for(var i=0;i<4;i++){
+        norm.push(1,0,0);norm.push(-1,0,0);norm.push(0,1,0);norm.push(0,-1,0);
+    }
+    // Simplified: just a small sphere-like shape
+    pos=[px,py,py+pz];
+    norm=[0,0,1];
+    // Actually let me just make a simple box
+    pos=[];norm=[];
+    var s=0.015;
+    v3(px-s,py-s,(py+s),pz-s,0,0,-1);
+    v3(px+s,py-s,(py+s),pz-s,0,0,-1);
+    v3(px+s,py+s,(py+s),pz-s,0,0,-1);
+    v3(px-s,py+s,(py+s),pz-s,0,0,-1);
+    v3(px-s,py-s,(py+s),pz+s,0,0,1);
+    v3(px+s,py-s,(py+s),pz+s,0,0,1);
+    v3(px+s,py+s,(py+s),pz+s,0,0,1);
+    v3(px-s,py+s,(py+s),pz+s,0,0,1);
+    function v3(x,y,z,nx,ny,nz){pos.push(x,y,z);norm.push(nx,ny,nz)}
+    idxArr=[0,1,2,0,2,3,4,6,5,4,7,6,0,4,5,0,5,1,2,6,7,2,7,3,0,3,7,0,7,4,1,5,6,1,6,2];
+    return makeMesh(pos,norm,idxArr);
+}
+
+function generateBridge(){
+    var pos=[],norm=[],idx=[];
+    // Bridge: arched piece standing on the body
+    var bx=0,by=0.32,bz=-0.02;
+    var bw=0.28,bh=0.055,bd=0.025;
+    // Arched top
+    function v(x,y,z,nx,ny,nz){pos.push(x,y,z);norm.push(nx,ny,nz)}
+    // Bottom face
+    v(bx-bw,by,-bz-bd,0,-1,0);v(bx+bw,by,-bz-bd,0,-1,0);
+    v(bx+bw,by,-bz+bd,0,-1,0);v(bx-bw,by,-bz+bd,0,-1,0);
+    // Top face (arched)
+    v(bx-bw,by+bh,-bz-bd*0.3,0,0.3,0);v(bx+bw,by+bh,-bz-bd*0.3,0,0.3,0);
+    v(bx+bw,by+bh,-bz+bd*0.3,0,0.3,0);v(bx-bw,by+bh,-bz+bd*0.3,0,0.3,0);
+    // Middle (arch peak)
+    v(bx,by+bh+0.008,-bz,0,1,0);
+    var vi=0;
+    idx.push(vi,vi+1,vi+2,vi,vi+2,vi+3);vi+=4;
+    idx.push(vi,vi+2,vi+1,vi,vi+3,vi+2);vi+=4;
+    idx.push(vi,vi+1,vi+2,vi,vi+2,vi+3);vi+=4;
+    idx.push(vi,vi+2,vi+1,vi,vi+3,vi+2);vi+=4;
+    idx.push(vi,vi+2,vi+1,vi,vi+3,vi+2);vi+=4;
+    idx.push(vi,vi,vi+2,vi+1,vi+2,vi+3);vi+=4;
+    return makeMesh(pos,norm,idx);
+}
+
+function generateTailpiece(){
+    var pos=[],norm=[],idx=[];
+    var tx=0,ty=-0.18,tz=-0.01;
+    var tw=0.2,th=0.04,td=0.03;
+    function v(x,y,z,nx,ny,nz){pos.push(x,y,z);norm.push(nx,ny,nz)}
+    v(tx-tw,ty-th,tz-td,0,0,-1);v(tx+tw,ty-th,tz-td,0,0,-1);
+    v(tx+tw,ty+th,tz-td,0,0,-1);v(tx-tw,ty+th,tz-td,0,0,-1);
+    v(tx-tw,ty-th,tz+td,0,0,1);v(tx+tw,ty-th,tz+td,0,0,1);
+    v(tx+tw,ty+th,tz+td,0,0,1);v(tx-tw,ty+th,tz+td,0,0,1);
+    var vi=0;
+    idx.push(vi,vi+1,vi+2,vi,vi+2,vi+3);vi+=4;
+    idx.push(vi,vi+2,vi+1,vi,vi+3,vi+2);vi+=4;
+    idx.push(vi,vi+1,vi+2,vi,vi+2,vi+3);vi+=4;
+    idx.push(vi,vi+2,vi+1,vi,vi+3,vi+2);vi+=4;
+    idx.push(vi,vi+2,vi+1,vi,vi+3,vi+2);vi+=4;
+    idx.push(vi,vi,vi+2,vi+1,vi+2,vi+3);vi+=4;
+    return makeMesh(pos,norm,idx);
+}
+
+function generateString(startX,startY,startZ,endX,endY,endZ,thick){
+    var pos=[],norm=[],idx=[];
+    var segs=12,ring=6;
+    var dx=endX-startX,dy=endY-startY,dz=endZ-startZ;
+    var len=Math.sqrt(dx*dx+dy*dy+dz*dz);
+    // Direction along string
+    var lx=dx/len,ly=dy/len,lz=dz/len;
+    // Perpendicular vectors
+    var px=0,py=0,pz=1;
+    if(Math.abs(lz)<0.9){px=-ly;py=lx}catch(e){px=1;py=0}
+    var pl=Math.sqrt(px*px+py*py+pz*pz);px/=pl;py/=pl;pz/=pl;
+    // Cross
+    var qx=ly*pz-lz*py,qy=lz*px-lx*pz,qz=lx*py-ly*px;
+    
+    for(var i=0;i<=segs;i++){
+        var t=i/segs;
+        var x=startX+dx*t,y=startY+dy*t,z=startZ+dz*t;
+        for(var j=0;j<=ring;j++){
+            var a=j/ring*Math.PI*2;
+            var ca=Math.cos(a),sa=Math.sin(a);
+            pos.push(x+thick*(ca*px+sa*qx),y+thick*(ca*py+sa*qy),z+thick*(ca*pz+sa*qz));
+            var nx=ca*px+sa*qx,ny=ca*py+sa*qy,nz=ca*pz+sa*qz;
+            norm.push(nx,ny,nz);
+        }
+    }
+    for(var i=0;i<segs;i++){
+        for(var j=0;j<ring;j++){
+            var a=i*(ring+1)+j,b=a+1,c=a+ring+1,d=c+1;
+            idx.push(a,b,d,a,d,c);
+        }
+    }
+    return makeMesh(pos,norm,idx);
+}
+
+function generateFhole(x,y,z,dir){
+    // Simple f-hole as thin diamond shape
+    var pos=[],norm=[],idx=[];
+    var h=0.12,w=0.025;
+    var nx=0,ny=0,nz=dir;
+    if(dir===0){nx=1}
+    else if(dir===1){nz=1}
+    // Two triangles forming a diamond
+    pos.push(x,y+h,z,x+h*0.3,y,z,x,y-h,z);
+    pos.push(x-h*0.3,y,z,x+h*0.3,y,z,x,y+h,z);
+    for(var i=0;i<6;i++)norm.push(nx,ny,nz);
+    idx.push(0,1,2,3,4,5);
+    return makeMesh(pos,norm,idx);
+}
+
+// === Build Scene ===
+var bodyMesh=generateBody();
+var neckMesh=generateNeck();
+var fingerboardMesh=generateFingerboard();
+var scrollMesh=generateScroll();
+var pegboxMesh=generatePegbox();
+var bridgeMesh=generateBridge();
+var tailpieceMesh=generateTailpiece();
+var stringMeshes=[];
+var stringStarts=[],stringEnds=[];
+var stringFreqs=[196,293.66,440,659.25]; // G3, D4, A4, E5
+var stringNames=["G","D","A","E"];
+var stringGlow=[0,0,0,0];
+var stringVib=[
+    {amp:0,freq:0,phase:0},
+    {amp:0,freq:0,phase:0},
+    {amp:0,freq:0,phase:0},
+    {amp:0,freq:0,phase:0}
+];
+
+// String endpoints (tailpiece to bridge to pegbox)
+var stringOffsets=[-0.1, -0.035, 0.035, 0.1];
+for(var s=0;s<4;s++){
+    var sx=stringOffsets[s];
+    // Tailpiece end
+    stringStarts.push([sx,-0.15,-0.01]);
+    // Bridge notch
+    stringEnds.push([sx,0.33,-0.02]);
+    // Bridge to pegbox
+    var mesh=generateString(sx,-0.15,-0.01,sx,0.33,-0.02,0.006);
+    stringMeshes.push({mesh:mesh,thick:0.006+((3-s)*0.0015)});
+    // Upper string from bridge to pegbox
+    var mesh2=generateString(sx,0.33,-0.02,sx*0.6,1.05,-0.01,0.005);
+    stringMeshes.push({mesh:mesh2,thick:0.005+((3-s)*0.0012),upper:true});
+}
+
+var fholeL=generateFhole(-0.06,0.15,-0.16,0);
+var fholeR=generateFhole(0.06,0.15,-0.16,0);
+
+// === Interaction State ===
+var orbit={theta:0.3,phi:1.1,radius:4.5};
+var isDragging=false,lastMX=0,lastMY=0;
+var audioCtx=null,audioStarted=false;
+
+function initAudio(){
+    if(audioCtx)return;
+    audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    audioStarted=true;
+    document.getElementById("startOverlay").classList.add("hidden");
+}
+
+function playNote(stringIdx){
+    if(!audioCtx)return;
+    if(audioCtx.state==="suspended")audioCtx.resume();
+    
+    var freq=stringFreqs[stringIdx];
+    var now=audioCtx.currentTime;
+    
+    // CreateViolin-like tone with harmonics
+    var masterGain=audioCtx.createGain();
+    masterGain.gain.setValueAtTime(0,now);
+    masterGain.gain.linearRampToValueAtTime(0.3,now+0.05);
+    masterGain.gain.exponentialRampToValueAtTime(0.15,now+0.3);
+    masterGain.gain.exponentialRampToValueAtTime(0.001,now+2.5);
+    masterGain.connect(audioCtx.destination);
+    
+    // Fundamental
+    var osc1=audioCtx.createOscillator();
+    osc1.type="sawtooth";
+    osc1.frequency.setValueAtTime(freq,now);
+    // Slight vibrato
+    var vibrato=audioCtx.createOscillator();
+    vibrato.frequency.setValueAtTime(5.5,now);
+    var vibratoGain=audioCtx.createGain();
+    vibratoGain.gain.setValueAtTime(1.5,now);
+    vibrato.connect(vibratoGain);
+    vibratoGain.connect(osc1.frequency);
+    
+    // Harmonics (violin has strong odd harmonics)
+    var harm2=audioCtx.createOscillator();harm2.type="sawtooth";harm2.frequency.setValueAtTime(freq*2,now);
+    var harm3=audioCtx.createOscillator();harm3.type="sawtooth";harm3.frequency.setValueAtTime(freq*3,now);
+    var harm4=audioCtx.createOscillator();harm4.type="sawtooth";harm4.frequency.setValueAtTime(freq*4,now);
+    var harm5=audioCtx.createOscillator();harm5.type="sawtooth";harm5.frequency.setValueAtTime(freq*5,now);
+    
+    var g2=audioCtx.createGain(),g3=audioCtx.createGain(),g4=audioCtx.createGain(),g5=audioCtx.createGain();
+    g2.gain.setValueAtTime(0.25,now);
+    g3.gain.setValueAtTime(0.12,now);
+    g4.gain.setValueAtTime(0.06,now);
+    g5.gain.setValueAtTime(0.03,now);
+    
+    // Slight detune for richness
+    osc1.detune.setValueAtTime(2,now);
+    harm2.detune.setValueAtTime(-1,now);
+    harm3.detune.setValueAtTime(3,now);
+    
+    // Low-pass filter to simulate bow
+    var filter=audioCtx.createBiquadFilter();
+    filter.type="lowpass";
+    filter.frequency.setValueAtTime(3000,now);
+    filter.Q.setValueAtTime(1,now);
+    
+    osc1.connect(g2);g2.connect(filter);
+    harm2.connect(g2);
+    harm3.connect(g3);g3.connect(filter);
+    harm4.connect(g4);g4.connect(filter);
+    harm5.connect(g5);g5.connect(filter);
+    filter.connect(masterGain);
+    
+    // String resonance filter
+    var resFilter=audioCtx.createBiquadFilter();
+    resFilter.type="bandpass";
+    resFilter.frequency.setValueAtTime(freq,now);
+    resFilter.Q.setValueAtTime(5,now);
+    
+    osc1.connect(resFilter);
+    harm2.connect(resFilter);harm3.connect(resFilter);harm4.connect(resFilter);harm5.connect(resFilter);
+    resFilter.connect(masterGain);
+    
+    osc1.start(now);harm2.start(now);harm3.start(now);harm4.start(now);harm5.start(now);
+    vibrato.start(now);
+    
+    osc1.stop(now+2.5);harm2.stop(now+2.5);harm3.stop(now+2.5);harm4.stop(now+2.5);harm5.stop(now+2.5);
+    vibrato.stop(now+2.5);
+    
+    // Cleanup
+    setTimeout(function(){
+        masterGain.disconnect();
+    },3000);
+    
+    // Visual feedback
+    stringGlow[stringIdx]=1.0;
+    stringVib[stringIdx]={amp:1.0,freq:freq*2*Math.PI/len_approx(),phase:0};
+    document.getElementById("s"+stringNames[stringIdx]).classList.add("active");
+    setTimeout(function(){
+        document.getElementById("s"+stringNames[stringIdx]).classList.remove("active");
+    },500);
+}
+
+function len_approx(){return 0.65}
+
+// === Raycasting ===
+function getRay(mx,my){
+    var rect=canvas.getBoundingClientRect();
+    var nx=(mx-rect.left)/rect.width*2-1;
+    var ny=-((my-rect.top)/rect.height*2-1);
+    
+    var proj=M4.perspective(Math.PI/4,canvas.width/canvas.height,0.1,100);
+    var eyeX=Math.sin(orbit.theta)*Math.cos(orbit.phi)*orbit.radius;
+    var eyeY=Math.sin(orbit.phi)*orbit.radius;
+    var eyeZ=Math.cos(orbit.theta)*Math.cos(orbit.phi)*orbit.radius;
+    var view=M4.lookAt([eyeX,eyeY,eyeZ],[0,0.3,0],[0,1,0]);
+    
+    // Unproject
+    var invProj=M4.invert(proj);
+    var invView=M4.invert(view);
+    if(!invProj||!invView)return null;
+    
+    var nearPt=M4.transformVec3(invProj,[nx,ny,-1]);
+    nearPt[0]/=nearPt[3];nearPt[1]/=nearPt[3];nearPt[2]/=nearPt[3];
+    var farPt=M4.transformVec3(invProj,[nx,ny,1]);
+    farPt[0]/=farPt[3];farPt[1]/=farPt[3];farPt[2]/=farPt[3];
+    
+    var nearV=M4.transformVec3(invView,nearPt);
+    var farV=M4.transformVec3(invView,farPt);
+    
+    return{
+        origin:[nearV[0],nearV[1],nearV[2]],
+        dir:[farV[0]-nearV[0],farV[1]-nearV[1],farV[2]-nearV[2]]
+    };
+}
+
+function raySegmentDist(origin,dir,ax,ay,az,bx,by,bz){
+    var dx=bx-ax,dy=by-ay,dz=bz-az;
+    var ex=origin[0]-ax,ey=origin[1]-ay,ez=origin[2]-az;
+    var dDotE=dx*ex+dy*ey+dz*ez;
+    var dDotD=dx*dx+dy*dy+dz*dz;
+    if(dDotD<0.0001)return 1e10;
+    var t=dDotE/dDotD;
+    t=Math.max(0,Math.min(1,t));
+    var cx=ax+t*dx,cy=ay+t*dy,cz=az+t*dz;
+    var vx=cx-origin[0],vy=cy-origin[1],vz=cz-origin[2];
+    return Math.sqrt(vx*vx+vy*vy+vz*vz);
+}
+
+function hitTest(mx,my){
+    var ray=getRay(mx,my);
+    if(!ray)return-1;
+    var best=-1,bestDist=0.06; // threshold
+    for(var s=0;s<4;s++){
+        // Lower string
+        var d=raySegmentDist(ray.origin,ray.dir,
+            stringStarts[s][0],stringStarts[s][1],stringStarts[s][2],
+            stringEnds[s][0],stringEnds[s][1],stringEnds[s][2]);
+        if(d<bestDist){bestDist=d;best=s}
+        // Upper string
+        var sx=stringOffsets[s];
+        d=raySegmentDist(ray.origin,ray.dir,
+            sx,0.33,-0.02,sx*0.6,1.05,-0.01);
+        if(d<bestDist){bestDist=d;best=s}
+    }
+    return best;
+}
+
+// === Event Handlers ===
+canvas.addEventListener("mousedown",function(e){
+    initAudio();
+    if(e.button===0){isDragging=true;lastMX=e.clientX;lastMY=e.clientY}
+});
+canvas.addEventListener("mousemove",function(e){
+    if(isDragging){
+        orbit.theta+=(e.clientX-lastMX)*0.008;
+        orbit.phi+=(e.clientY-lastMY)*0.008;
+        orbit.phi=Math.max(-1.2,Math.min(1.2,orbit.phi));
+        lastMX=e.clientX;lastMY=e.clientY;
+    }
+});
+canvas.addEventListener("mouseup",function(e){
+    if(e.button===0){
+        if(!isDragging)return;
+        isDragging=false;
+        var dist=Math.sqrt((e.clientX-lastMX)*(e.clientX-lastMX)+(e.clientY-lastMY)*(e.clientY-lastMY));
+        if(dist<8){
+            var idx=hitTest(e.clientX,e.clientY);
+            if(idx>=0)playNote(idx);
+        }
+    }
+});
+canvas.addEventListener("wheel",function(e){
+    e.preventDefault();
+    orbit.radius*=e.deltaY>0?1.08:0.92;
+    orbit.radius=Math.max(2,Math.min(8,orbit.radius));
+},{passive:false});
+
+// Touch support
+canvas.addEventListener("touchstart",function(e){
+    e.preventDefault();initAudio();
+    if(e.touches.length===1){isDragging=true;lastMX=e.touches[0].clientX;lastMY=e.touches[0].clientY}
+},{passive:false});
+canvas.addEventListener("touchmove",function(e){
+    e.preventDefault();
+    if(isDragging&&e.touches.length===1){
+        orbit.theta+=(e.touches[0].clientX-lastMX)*0.008;
+        orbit.phi+=(e.touches[0].clientY-lastMY)*0.008;
+        orbit.phi=Math.max(-1.2,Math.min(1.2,orbit.phi));
+        lastMX=e.touches[0].clientX;lastMY=e.touches[0].clientY;
+    }
+},{passive:false});
+canvas.addEventListener("touchend",function(e){
+    if(isDragging&&e.changedTouches.length===1){
+        isDragging=false;
+        var t=e.changedTouches[0];
+        var idx=hitTest(t.clientX,t.clientY);
+        if(idx>=0)playNote(idx);
+    }
+});
+
+// Keyboard shortcuts
+document.addEventListener("keydown",function(e){
+    initAudio();
+    var keyMap={"a":0,"s":1,"d":2,"f":3};
+    var idx=keyMap[e.key.toLowerCase()];
+    if(idx!==undefined)playNote(idx);
+});
+
+// Start overlay
+document.getElementById("startOverlay").addEventListener("click",function(){
+    initAudio();
+    this.classList.add("hidden");
+});
+
+// Resize
+function resize(){
+    var w=window.innerWidth,h=window.innerHeight;
+    canvas.width=w;canvas.height=h;
+    gl.viewport(0,0,w,h);
+}
+window.addEventListener("resize",resize);
+resize();
+
+// === Render Loop ===
+var startTime=performance.now();
+function render(){
+    requestAnimationFrame(render);
+    var time=(performance.now()-startTime)/1000;
+    
+    gl.clearColor(0.03,0.03,0.06,1);
+    gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST);
+    gl.enable(gl.CULL_FACE);
+    gl.cullFace(gl.BACK);
+    
+    gl.useProgram(prog);
+    
+    // Camera
+    var eyeX=Math.sin(orbit.theta)*Math.cos(orbit.phi)*orbit.radius;
+    var eyeY=Math.sin(orbit.phi)*orbit.radius+0.3;
+    var eyeZ=Math.cos(orbit.theta)*Math.cos(orbit.phi)*orbit.radius;
+    var view=M4.lookAt([eyeX,eyeY,eyeZ],[0,0.3,0],[0,1,0]);
+    var proj=M4.perspective(Math.PI/5,canvas.width/canvas.height,0.1,100);
+    
+    gl.uniformMatrix4fv(loc.uView,false,view);
+    gl.uniformMatrix4fv(loc.uProj,false,proj);
+    gl.uniform3f(loc.uEye,eyeX,eyeY,eyeZ);
+    gl.uniform1f(loc.uTime,time);
+    
+    // Lighting
+    gl.uniform3f(loc.uLightDir1,0.5,0.8,0.3);
+    gl.uniform3f(loc.uLightDir2,-0.6,0.3,-0.5);
+    gl.uniform3f(loc.uLightDir3,0.1,-0.5,0.8);
+    gl.uniform3f(loc.uLightCol1,1.0,0.95,0.85);
+    gl.uniform3f(loc.uLightCol2,0.3,0.35,0.5);
+    gl.uniform3f(loc.uLightCol3,0.6,0.5,0.4);
+    
+    // Draw body
+    var bodyModel=M4.create();
+    gl.uniform1f(loc.uIsString,0);
+    gl.uniform3fv(loc.uColor,[0.65,0.38,0.15]);
+    drawMesh(bodyMesh,bodyModel);
+    
+    // Draw neck
+    var neckModel=M4.create();
+    drawMesh(neckMesh,neckModel);
+    
+    // Draw fingerboard
+    var fbModel=M4.create();
+    gl.uniform3fv(loc.uColor,[0.12,0.08,0.04]);
+    drawMesh(fingerboardMesh,fbModel);
+    
+    // Draw scroll
+    var scrollModel=M4.create();
+    gl.uniform3fv(loc.uColor,[0.55,0.32,0.12]);
+    drawMesh(scrollMesh,scrollModel);
+    
+    // Draw pegbox
+    var pbModel=M4.create();
+    drawMesh(pegboxMesh,pbModel);
+    
+    // Draw pegs
+    for(var p=0;p<4;p++){
+        var peg=generatePeg(p);
+        var pegModel=M4.create();
+        pegModel=M4.translate(pegModel,[0.18,1.12,0]);
+        gl.uniform3fv(loc.uColor,[0.15,0.12,0.08]);
+        drawMesh(peg,pegModel);
+    }
+    
+    // Draw bridge
+    var bridgeModel=M4.create();
+    gl.uniform3fv(loc.uColor,[0.75,0.55,0.3]);
+    drawMesh(bridgeMesh,bridgeModel);
+    
+    // Draw tailpiece
+    var tpModel=M4.create();
+    gl.uniform3fv(loc.uColor,[0.15,0.1,0.05]);
+    drawMesh(tailpieceMesh,tpModel);
+    
+    // Draw f-holes
+    gl.uniform3fv(loc.uColor,[0.05,0.03,0.01]);
+    drawMesh(fholeL,M4.create());
+    drawMesh(fholeR,M4.create());
+    
+    // Draw strings
+    for(var s=0;s<stringMeshes.length;s++){
+        var sm=stringMeshes[s];
+        var strModel=M4.create();
+        gl.uniform1f(loc.uIsString,1);
+        gl.uniform1f(loc.uStrIdx,s<4?s:s-4);
+        
+        // Decay glow
+        var strIdx=s<4?s:s-4;
+        if(stringGlow[strIdx]>0){
+            stringGlow[strIdx]*=0.97;
+            if(stringGlow[strIdx]<0.01)stringGlow[strIdx]=0;
+        }
+        
+        // Vibration
+        if(stringVib[strIdx].amp>0.01){
+            stringVib[strIdx].amp*=0.985;
+            stringVib[strIdx].phase+=stringVib[strIdx].freq*0.016;
+            if(stringVib[strIdx].amp<0.01)stringVib[strIdx].amp=0;
+        }
+        
+        gl.uniform3f(loc.uVib,stringVib[strIdx].amp,stringVib[strIdx].freq,stringVib[strIdx].phase);
+        gl.uniform1f(loc.uGlow,stringGlow[strIdx]);
+        gl.uniform3fv(loc.uColor,[0.85,0.82,0.75]);
+        drawMesh(sm.mesh,strModel);
+    }
+    
+    // Reset
+    gl.uniform1f(loc.uIsString,0);
+    gl.uniform1f(loc.uGlow,0);
+}
+render();
+</script>
+</body>
+</html>

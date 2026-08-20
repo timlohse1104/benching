@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analog Clock</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background-color: #1a1a2e;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: #e0e0e0;
+  }
+  .clock-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+  svg {
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+  }
+  .digital-display {
+    font-size: 1.6rem;
+    font-weight: 300;
+    letter-spacing: 4px;
+    color: #a0a0c0;
+  }
+  .digital-display span {
+    color: #7ec8e3;
+  }
+</style>
+</head>
+<body>
+<div class="clock-container">
+  <svg id="clock" width="360" height="360" viewBox="0 0 360 360">
+    <defs>
+      <radialGradient id="faceGrad" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#2a2a4a"/>
+        <stop offset="100%" stop-color="#1a1a2e"/>
+      </radialGradient>
+      <linearGradient id="hourGrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#c9b08c"/>
+        <stop offset="100%" stop-color="#8b7355"/>
+      </linearGradient>
+    </defs>
+    <circle cx="180" cy="180" r="170" fill="url(#faceGrad)" stroke="#3a3a5a" stroke-width="3"/>
+    <circle cx="180" cy="180" r="170" fill="none" stroke="#3a3a5a" stroke-width="1" stroke-dasharray="4 4" opacity="0.6"/>
+    <!-- Hour markers -->
+    <g id="hourMarkers"></g>
+    <!-- Minute markers -->
+    <g id="minuteMarkers"></g>
+    <!-- Hour hand -->
+    <line id="hourHand" x1="180" y1="180" x2="180" y2="110" stroke="url(#hourGrad)" stroke-width="6" stroke-linecap="round"/>
+    <!-- Minute hand -->
+    <line id="minuteHand" x1="180" y1="180" x2="180" y2="75" stroke="#e0e0e0" stroke-width="4" stroke-linecap="round"/>
+    <!-- Second hand -->
+    <line id="secondHand" x1="180" y1="180" x2="180" y2="75" stroke="#e8485c" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- Center dot -->
+    <circle cx="180" cy="180" r="7" fill="#e8485c"/>
+    <circle cx="180" cy="180" r="3" fill="#1a1a2e"/>
+  </svg>
+  <div class="digital-display" id="digitalDisplay">--:--:--</div>
+</div>
+
+<script>
+(function() {
+  const hourMarkers = document.getElementById('hourMarkers');
+  const minuteMarkers = document.getElementById('minuteMarkers');
+  const hourHand = document.getElementById('hourHand');
+  const minuteHand = document.getElementById('minuteHand');
+  const secondHand = document.getElementById('secondHand');
+  const digitalDisplay = document.getElementById('digitalDisplay');
+
+  const cx = 180, cy = 180, r = 170;
+  const handLength = { hour: 100, minute: 135, second: 140 };
+
+  // Draw hour markers
+  for (let i = 0; i < 12; i++) {
+    const angle = (i * 30 - 90) * Math.PI / 180;
+    const x1 = cx + r * Math.cos(angle);
+    const y1 = cy + r * Math.sin(angle);
+    const x2 = cx + (r - 12) * Math.cos(angle);
+    const y2 = cy + (r - 12) * Math.sin(angle);
+    const x3 = cx + (r - 8) * Math.cos(angle);
+    const y3 = cy + (r - 8) * Math.sin(angle);
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', x1);
+    line.setAttribute('y1', y1);
+    line.setAttribute('x2', x2);
+    line.setAttribute('y2', y2);
+    line.setAttribute('stroke', '#e8e8e8');
+    line.setAttribute('stroke-width', '3');
+    hourMarkers.appendChild(line);
+
+    // Number labels
+    const num = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    num.setAttribute('x', x3);
+    num.setAttribute('y', y3);
+    num.setAttribute('text-anchor', 'middle');
+    num.setAttribute('dominant-baseline', 'middle');
+    num.setAttribute('font-size', '14');
+    num.setAttribute('font-weight', '600');
+    num.setAttribute('fill', '#c9b08c');
+    const displayNum = i === 0 ? '12' : i.toString();
+    num.textContent = displayNum;
+    hourMarkers.appendChild(num);
+  }
+
+  // Draw minute markers
+  for (let i = 0; i < 60; i++) {
+    if (i % 5 === 0) {
+      const angle = (i * 6 - 90) * Math.PI / 180;
+      const x1 = cx + (r - 12) * Math.cos(angle);
+      const y1 = cy + (r - 12) * Math.sin(angle);
+      const x2 = cx + (r - 16) * Math.cos(angle);
+      const y2 = cy + (r - 16) * Math.sin(angle);
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', x1);
+      line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2);
+      line.setAttribute('y2', y2);
+      line.setAttribute('stroke', '#555');
+      line.setAttribute('stroke-width', '2');
+      minuteMarkers.appendChild(line);
+    } else {
+      const angle = (i * 6 - 90) * Math.PI / 180;
+      const x1 = cx + (r - 15) * Math.cos(angle);
+      const y1 = cy + (r - 15) * Math.sin(angle);
+      const x2 = cx + (r - 18) * Math.cos(angle);
+      const y2 = cy + (r - 18) * Math.sin(angle);
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', x1);
+      line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2);
+      line.setAttribute('y2', y2);
+      line.setAttribute('stroke', '#333');
+      line.setAttribute('stroke-width', '1');
+      minuteMarkers.appendChild(line);
+    }
+  }
+
+  function updateClock() {
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const seconds = now.getSeconds();
+    const ms = now.getMilliseconds();
+
+    // Second hand
+    const secDeg = seconds * 6 + ms * 0.006;
+    const secRad = (secDeg - 90) * Math.PI / 180;
+    secondHand.setAttribute('x1', cx);
+    secondHand.setAttribute('y1', cy);
+    secondHand.setAttribute('x2', cx + handLength.second * Math.cos(secRad));
+    secondHand.setAttribute('y2', cy + handLength.second * Math.sin(secRad));
+
+    // Minute hand
+    const minDeg = minutes * 6 + seconds * 0.1 + ms * 0.001;
+    const minRad = (minDeg - 90) * Math.PI / 180;
+    minuteHand.setAttribute('x1', cx);
+    minuteHand.setAttribute('y1', cy);
+    minuteHand.setAttribute('x2', cx + handLength.minute * Math.cos(minRad));
+    minuteHand.setAttribute('y2', cy + handLength.minute * Math.sin(minRad));
+
+    // Hour hand
+    const hourDeg = (hours % 12) * 30 + minutes * 0.5 + seconds * (0.5 / 60) + ms * (0.5 / 360000);
+    const hourRad = (hourDeg - 90) * Math.PI / 180;
+    hourHand.setAttribute('x1', cx);
+    hourHand.setAttribute('y1', cy);
+    hourHand.setAttribute('x2', cx + handLength.hour * Math.cos(hourRad));
+    hourHand.setAttribute('y2', cy + handLength.hour * Math.sin(hourRad));
+
+    // Digital display
+    const hh = String(hours).padStart(2, '0');
+    const mm = String(minutes).padStart(2, '0');
+    const ss = String(seconds).padStart(2, '0');
+    digitalDisplay.textContent = `<span>${hh}:${mm}:${ss}</span>`;
+  }
+
+  updateClock();
+  setInterval(updateClock, 1000);
+})();
+</script>
+</body>
+</html>

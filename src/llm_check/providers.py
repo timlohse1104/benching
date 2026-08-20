@@ -110,12 +110,43 @@ async def _complete_dry_run(model: ModelConfig, prompt_id: str, prompt_body: str
     )
 
 
+_litellm_rebuilt = False
+
+
+def _ensure_litellm_models_rebuilt() -> None:
+    """Work around a litellm 1.97.0 packaging bug.
+
+    `litellm.types.utils` imports `ChatCompletionReasoningItem` but not the
+    `ChatCompletionReasoningSummaryTextBlock` it forward-references, so under
+    pydantic 2.11+ the `Message` model can never be fully defined and even
+    constructing a `ModelResponse` raises PydanticUserError. We inject the
+    missing name into that module namespace and rebuild the model once.
+
+    No-op (and silently ignored) once a fixed litellm ships the import itself.
+    """
+    global _litellm_rebuilt
+    if _litellm_rebuilt:
+        return
+    try:
+        import litellm.types.utils as _u
+        from litellm.types.llms.openai import ChatCompletionReasoningSummaryTextBlock
+
+        if not hasattr(_u, "ChatCompletionReasoningSummaryTextBlock"):
+            setattr(_u, "ChatCompletionReasoningSummaryTextBlock", ChatCompletionReasoningSummaryTextBlock)
+            _u.Message.model_rebuild(force=True)
+    except Exception:  # noqa: BLE001 - best-effort shim; real errors surface at call time
+        pass
+    _litellm_rebuilt = True
+
+
 async def _complete_litellm(
     model: ModelConfig, defaults: Any, prompt_id: str, prompt_body: str
 ) -> CompletionResult:
     # Import locally so dry-run mode does not require litellm at import time
     # for environments that just want to test the bench harness.
     import litellm
+
+    _ensure_litellm_models_rebuilt()
 
     # For a local OpenAI-compatible server (llama.cpp, LM Studio, vLLM, ...) the
     # server knows the model by the name it reports on /v1/models. We pass that

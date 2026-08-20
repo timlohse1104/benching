@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas Paint App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .toolbar {
+            background-color: #ffffff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .tool-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+        .tool-btn, .action-btn {
+            padding: 10px 15px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .tool-btn.active, .action-btn.active {
+            background-color: #4a90d9;
+            color: white;
+            border-color: #4a90d9;
+        }
+        .tool-btn:hover, .action-btn:hover {
+            background-color: #e6f0ff;
+        }
+        .color-palette {
+            display: flex;
+            gap: 5px;
+        }
+        .color-swatch {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: transform 0.2s;
+        }
+        .color-swatch:hover {
+            transform: scale(1.1);
+        }
+        .color-swatch.selected {
+            border-color: #333;
+        }
+        .color-swatch.custom {
+            background-color: #808080;
+        }
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .control-label {
+        font-size: 14px;
+        color: #333;
+    }
+    .brush-size {
+        width: 100px;
+    }
+    .status-info {
+        display: flex;
+        gap: 20px;
+        font-size: 14px;
+        color: #666;
+    }
+    .stage {
+        border: 2px solid #333;
+        border-radius: 8px;
+        display: inline-block;
+    }
+    canvas {
+        display: block;
+        background-color: white;
+    }
+    .hidden {
+        display: none;
+    }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="toolbar">
+            <div class="tool-group">
+                <label class="control-label">Tool:</label>
+                <div class="tool-buttons">
+                    <button class="tool-btn active" data-tool="brush" title="Brush">✏️</button>
+                    <button class="tool-btn" data-tool="eraser" title="Eraser">🔘</button>
+                </div>
+            </div>
+            
+            <div class="tool-group">
+                <label class="control-label">Size:</label>
+                <input type="range" class="brush-size" id="brushSize" min="1" max="50" value="5">
+            </div>
+            
+            <div class="tool-group">
+                <label class="control-label">Color:</label>
+                <input type="color" id="colorPicker" value="#000000">
+            </div>
+            
+            <div class="tool-group">
+                <label class="control-label">Palette:</label>
+                <div class="color-palette">
+                    <div class="color-swatch" style="background-color: #ff0000;" data-color="#ff0000"></div>
+                    <div class="color-swatch" style="background-color: #00ff00;" data-color="#00ff00"></div>
+                    <div class="color-swatch" style="background-color: #0000ff;" data-color="#0000ff"></div>
+                    <div class="color-swatch" style="background-color: #ffff00;" data-color="#ffff00"></div>
+                    <div class="color-swatch" style="background-color: #ff00ff;" data-color="#ff00ff"></div>
+                    <div class="color-swatch" style="background-color: #00ffff;" data-color="#00ffff"></div>
+                    <div class="color-swatch custom" data-color="custom"></div>
+                </div>
+            </div>
+            
+            <div class="tool-group">
+                <button class="action-btn" id="undoBtn" title="Undo">↶</button>
+                <button class="action-btn" id="redoBtn" title="Redo">↷</button>
+                <button class="action-btn" id="clearBtn" title="Clear">🗑️</button>
+                <button class="action-btn" id="saveBtn" title="Save as PNG">💾</button>
+            </div>
+            
+            <div class="status-info">
+                <span>Size: <span id="sizeDisplay">5</span></span>
+                <span>Color: <span id="colorDisplay">#000000</span></span>
+            </div>
+        </div>
+        
+        <div class="stage">
+            <canvas id="paintCanvas" width="800" height="600"></canvas>
+        </div>
+    </div>
+    
+    <script>
+        (function() {
+            const canvas = document.getElementById('paintCanvas');
+            const ctx = canvas.getContext('2d');
+            const brushSizeSlider = document.getElementById('brushSize');
+            const colorPicker = document.getElementById('colorPicker');
+            const sizeDisplay = document.getElementById('sizeDisplay');
+            const colorDisplay = document.getElementById('colorDisplay');
+            const undoBtn = document.getElementById('undoBtn');
+            const redoBtn = document.getElementById('redoBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const saveBtn = document.getElementById('saveBtn');
+            const colorSwatches = document.querySelectorAll('.color-swatch');
+            
+            let currentTool = 'brush';
+            let brushSize = parseInt(brushSizeSlider.value);
+            let currentColor = colorPicker.value;
+            let isDrawing = false;
+            let lastX = 0;
+            let lastY = 0;
+            let history = [];
+            let historyIndex = -1;
+            
+            function initCanvas() {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                saveToHistory();
+            }
+            
+            function saveToHistory() {
+                history[++historyIndex] = canvas.toDataURL();
+                if (historyIndex > 0) {
+                    history = history.slice(0, historyIndex + 1);
+                }
+            }
+            
+            function undo() {
+                if (historyIndex > 0) {
+                    historyIndex--;
+                    restoreFromHistory();
+                }
+            }
+            
+            function redo() {
+                if (historyIndex < history.length - 1) {
+                    historyIndex++;
+                    restoreFromHistory();
+                }
+            }
+            
+            function restoreFromHistory() {
+                const img = new Image();
+                img.onload = function() {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0);
+                };
+                img.src = history[historyIndex];
+            }
+            
+            function clearCanvas() {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                history = [];
+                historyIndex = -1;
+            }
+            
+            function saveCanvas() {
+                const dataURL = canvas.toDataURL('image/png');
+                const a = document.createElement('a');
+                a.href = dataURL;
+                a.download = 'drawing.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+            
+            function getMousePos(e) {
+                const rect = canvas.getBoundingClientRect();
+                return {
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
+                };
+            }
+            
+            function drawLine(x1, y1, x2, y2) {
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.strokeStyle = currentTool === 'eraser' ? '#ffffff' : currentColor;
+                ctx.lineWidth = brushSize;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.stroke();
+                ctx.closePath();
+            }
+            
+            function startDrawing(e) {
+                isDrawing = true;
+                const pos = getMousePos(e);
+                lastX = pos.x;
+                lastY = pos.y;
+            }
+            
+            function draw(e) {
+                if (!isDrawing) return;
+                
+                const pos = getMousePos(e);
+                drawLine(lastX, lastY, pos.x, pos.y);
+                lastX = pos.x;
+                lastY = pos.y;
+            }
+            
+            function stopDrawing() {
+                isDrawing = false;
+            }
+            
+            function updateBrushSize() {
+                brushSize = parseInt(brushSizeSlider.value);
+                sizeDisplay.textContent = brushSize;
+            }
+            
+            function updateColor() {
+                currentColor = colorPicker.value;
+                colorDisplay.textContent = currentColor.toUpperCase();
+            }
+            
+            function selectTool(tool) {
+                currentTool = tool;
+                document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+                document.querySelector(`[data-tool="${tool}"]`).classList.add('active');
+            }
+            
+            function selectColor(color) {
+                currentColor = color;
+                colorDisplay.textContent = color.toUpperCase();
+                colorPicker.value = color;
+            }
+            
+            brushSizeSlider.addEventListener('input', updateBrushSize);
+            colorPicker.addEventListener('input', updateColor);
+            
+            document.querySelectorAll('[data-tool]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    selectTool(this.dataset.tool);
+                });
+            });
+            
+            colorSwatches.forEach(swatch => {
+                swatch.addEventListener('click', function() {
+                    const color = this.dataset.color;
+                    if (color === 'custom') {
+                        colorPicker.click();
+                    } else {
+                        selectColor(color);
+                        this.classList.add('selected');
+                        colorSwatches.forEach(s => {
+                            if (s !== this) s.classList.remove('selected');
+                        });
+                    }
+                });
+            });
+            
+            undoBtn.addEventListener('click', undo);
+            redoBtn.addEventListener('click', redo);
+            clearBtn.addEventListener('click', clearCanvas);
+            saveBtn.addEventListener('click', saveCanvas);
+            
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseleave', stopDrawing);
+            
+            canvas.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const mouseEvent = new MouseEvent('mousedown', {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                });
+                canvas.dispatchEvent(mouseEvent);
+            });
+            
+            canvas.addEventListener('touchmove', function(e) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const mouseEvent = new MouseEvent('mousemove', {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                });
+                canvas.dispatchEvent(mouseEvent);
+            });
+            
+            canvas.addEventListener('touchend', function(e) {
+                e.preventDefault();
+                const mouseEvent = new MouseEvent('mouseup', {});
+                canvas.dispatchEvent(mouseEvent);
+            });
+            
+            initCanvas();
+            
+            canvas.addEventListener('mouseup', function() {
+                setTimeout(() => {
+                    saveToHistory();
+                }, 100);
+            });
+            
+            canvas.addEventListener('mouseleave', function() {
+                setTimeout(() => {
+                    saveToHistory();
+                }, 100);
+            });
+        })();
+    </script>
+</body>
+</html>

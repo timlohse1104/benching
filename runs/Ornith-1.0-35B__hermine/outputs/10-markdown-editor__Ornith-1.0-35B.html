@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Markdown Editor</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  header {
+    background: #16213e;
+    border-bottom: 1px solid #0f3460;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  header h1 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #a8d8ea;
+    white-space: nowrap;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .toolbar button {
+    background: #0f3460;
+    color: #a8d8ea;
+    border: 1px solid #1a4a8a;
+    padding: 5px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.2s;
+  }
+
+  .toolbar button:hover { background: #1a4a8a; }
+
+  .toolbar button:active { background: #2563eb; }
+
+  .stats {
+    font-size: 12px;
+    color: #8899aa;
+    white-space: nowrap;
+  }
+
+  .container {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  .pane-label {
+    background: #16213e;
+    padding: 6px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #8899aa;
+    border-bottom: 1px solid #0f3460;
+    flex-shrink: 0;
+  }
+
+  #editor {
+    flex: 1;
+    width: 100%;
+    background: #0d1117;
+    color: #c9d1d9;
+    border: none;
+    resize: none;
+    padding: 16px;
+    font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    outline: none;
+    overflow: auto;
+    tab-size: 4;
+  }
+
+  #editor::placeholder { color: #444; }
+
+  #preview {
+    flex: 1;
+    overflow: auto;
+    padding: 16px 24px;
+    background: #1a1a2e;
+  }
+
+  .pane + .pane {
+    border-left: 2px solid #0f3460;
+  }
+
+  /* Preview styles */
+  #preview h1, #preview h2, #preview h3,
+  #preview h4, #preview h5, #preview h6 {
+    margin: 1em 0 0.5em;
+    font-weight: 700;
+    line-height: 1.3;
+    color: #e6edf3;
+  }
+  #preview h1 { font-size: 2em; border-bottom: 1px solid #30363d; padding-bottom: 0.3em; }
+  #preview h2 { font-size: 1.5em; border-bottom: 1px solid #30363d; padding-bottom: 0.3em; }
+  #preview h3 { font-size: 1.25em; }
+  #preview h4 { font-size: 1em; }
+  #preview h5 { font-size: 0.875em; }
+  #preview h6 { font-size: 0.85em; color: #8b949e; }
+
+  #preview p { margin: 0.6em 0; line-height: 1.7; }
+
+  #preview a { color: #58a6ff; text-decoration: none; }
+  #preview a:hover { text-decoration: underline; }
+
+  #preview code {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "SF Mono", "Fira Code", Menlo, Consolas, monospace;
+    font-size: 0.9em;
+    color: #f0883e;
+  }
+
+  #preview pre {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 14px;
+    overflow-x: auto;
+    margin: 1em 0;
+  }
+
+  #preview pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #c9d1d9;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  #preview blockquote {
+    border-left: 4px solid #58a6ff;
+    padding: 4px 16px;
+    margin: 1em 0;
+    color: #8b949e;
+    background: rgba(88,166,255,0.05);
+    border-radius: 0 4px 4px 0;
+  }
+
+  #preview blockquote p { margin: 0.3em 0; }
+
+  #preview ul, #preview ol {
+    padding-left: 2em;
+    margin: 0.6em 0;
+  }
+
+  #preview li { margin: 0.3em 0; line-height: 1.6; }
+
+  #preview hr {
+    border: none;
+    border-top: 2px solid #30363d;
+    margin: 2em 0;
+  }
+
+  #preview img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    margin: 0.5em 0;
+  }
+
+  @media (max-width: 768px) {
+    .container { flex-direction: column; }
+    .pane + .pane { border-left: none; border-top: 2px solid #0f3460; }
+    header { padding: 6px 10px; }
+    header h1 { font-size: 14px; }
+    .toolbar button { padding: 4px 10px; font-size: 12px; }
+    #editor { font-size: 13px; padding: 12px; }
+    #preview { padding: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Markdown Editor</h1>
+  <div class="toolbar">
+    <button id="copyBtn" title="Copy generated HTML">Copy HTML</button>
+    <span class="stats" id="stats">0 words · 0 characters</span>
+  </div>
+</header>
+
+<div class="container">
+  <div class="pane">
+    <div class="pane-label">Markdown</div>
+    <textarea id="editor" spellcheck="false"></textarea>
+  </div>
+  <div class="pane">
+    <div class="pane-label">Preview</div>
+    <div id="preview"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  "use strict";
+
+  var editor = document.getElementById("editor");
+  var preview = document.getElementById("preview");
+  var statsEl = document.getElementById("stats");
+  var copyBtn = document.getElementById("copyBtn");
+  var generatedHTML = "";
+
+  var sample = [
+    "# Welcome to Markdown Editor",
+    "",
+    "A **live preview** Markdown editor built entirely with vanilla JavaScript.",
+    "",
+    "## Features",
+    "",
+    "This editor supports the following Markdown features:",
+    "",
+    "- **Headings** of all levels (# through ######)",
+    "- ***Bold and italic*** combined",
+    "- `Inline code` snippets",
+    "- Fenced code blocks with syntax highlighting support",
+    "- Unordered lists like this one",
+    "- Ordered lists like this:",
+    "",
+    "1. First item",
+    "2. Second item",
+    "3. Third item",
+    "",
+    "## Code Block Example",
+    "",
+    "```javascript",
+    "function greet(name) {",
+    "  console.log(\"Hello, \" + name + \"!\");",
+    "}",
+    "",
+    "greet(\"World\");",
+    "```",
+    "",
+    "## Blockquote",
+    "",
+    "> The best way to predict the future is to invent it.",
+    "> — Alan Kay",
+    "",
+    "## Links and Images",
+    "",
+    "Visit [Example Site](https://example.com) for more information.",
+    "",
+    "![Placeholder Image](https://via.placeholder.com/400x150/1a1a2e/a8d8ea?text=Markdown+Editor)",
+    "",
+    "## Horizontal Rule",
+    "",
+    "---",
+    "",
+    "## Inline Formatting",
+    "",
+    "You can write **bold text**, *italic text*, or ***both*** at the same time.",
+    "",
+    "Use `npm install` to install packages from the terminal.",
+    "",
+    "***",
+    "",
+    "## Another Horizontal Rule",
+    "",
+    "___",
+    "",
+    "###### Small Heading (Level 6)",
+    "",
+    "That wraps up the sample document. Start editing on the left to see your changes in real time!",
+    ""
+  ].join("\n");
+
+  editor.value = sample;
+
+  function escapeHtml(str) {
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function parseInline(text) {
+    var result = "";
+    var i = 0;
+    var len = text.length;
+
+    while (i < len) {
+      var ch = text[i];
+
+      // Images: ![alt](url)
+      if (ch === "!" && text[i + 1] === "[") {
+        var altEnd = text.indexOf("]", i + 2);
+        if (altEnd !== -1 && text[altEnd + 1] === "(") {
+          var urlEnd = text.indexOf(")", altEnd + 2);
+          if (urlEnd !== -1) {
+            var alt = escapeHtml(text.slice(i + 2, altEnd));
+            var url = escapeHtml(text.slice(altEnd + 2, urlEnd));
+            result += '<img src="' + url + '" alt="' + alt + '">';
+            i = urlEnd + 1;
+            continue;
+          }
+        }
+      }
+
+      // Links: [text](url)
+      if (ch === "[") {
+        var linkEnd = text.indexOf("]", i + 1);
+        if (linkEnd !== -1 && text[linkEnd + 1] === "(") {
+          var hrefEnd = text.indexOf(")", linkEnd + 2);
+          if (hrefEnd !== -1) {
+            var linkText = parseInline(text.slice(i + 1, linkEnd));
+            var href = escapeHtml(text.slice(linkEnd + 2, hrefEnd));
+            result += '<a href="' + href + '">' + linkText + "</a>";
+            i = hrefEnd + 1;
+            continue;
+          }
+        }
+      }
+
+      // Code: `code`
+      if (ch === "`") {
+        var codeEnd = text.indexOf("`", i + 1);
+        if (codeEnd !== -1) {
+          var codeContent = escapeHtml(text.slice(i + 1, codeEnd));
+          result += "<code>" + codeContent + "</code>";
+          i = codeEnd + 1;
+          continue;
+        }
+      }
+
+      // Bold+Italic: ***text*** or ___text___
+      if ((ch === "*" || ch === "_") && text[i + 1] === ch && text[i + 2] === ch) {
+        var tripleChar = ch;
+        var tripleEnd = text.indexOf(tripleChar + tripleChar + tripleChar, i + 3);
+        if (tripleEnd !== -1) {
+          var inner = parseInline(text.slice(i + 3, tripleEnd));
+          result += "<strong><em>" + inner + "</em></strong>";
+          i = tripleEnd + 3;
+          continue;
+        }
+      }
+
+      // Bold: **text** or __text__
+      if ((ch === "*" || ch === "_") && text[i + 1] === ch) {
+        var boldChar = ch;
+        var boldEnd = text.indexOf(boldChar + boldChar, i + 2);
+        if (boldEnd !== -1) {
+          var inner2 = parseInline(text.slice(i + 2, boldEnd));
+          result += "<strong>" + inner2 + "</strong>";
+          i = boldEnd + 2;
+          continue;
+        }
+      }
+
+      // Italic: *text* or _text_
+      if (ch === "*" || ch === "_") {
+        var singleEnd = text.indexOf(ch, i + 1);
+        if (singleEnd !== -1) {
+          var inner3 = parseInline(text.slice(i + 1, singleEnd));
+          result += "<em>" + inner3 + "</em>";
+          i = singleEnd + 1;
+          continue;
+        }
+      }
+
+      result += ch;
+      i++;
+    }
+
+    return result;
+  }
+
+  function markdownToHtml(md) {
+    var lines = md.split("\n");
+    var html = "";
+    var i = 0;
+    var len = lines.length;
+
+    function peek(offset) {
+      return lines[i + offset] || "";
+    }
+
+    function advance(n) {
+      i += n;
+    }
+
+    while (i < len) {
+      var line = lines[i];
+
+      // Fenced code block
+      if (/^```/.test(line)) {
+        var codeLines = [];
+        advance(1);
+        while (i < len && !/^```/.test(lines[i])) {
+          codeLines.push(escapeHtml(lines[i]));
+          advance(1);
+        }
+        advance(1); // skip closing ```
+        html += "<pre><code>" + codeLines.join("\n") + "</code></pre>\n";
+        continue;
+      }
+
+      // Blank line
+      if (line.trim() === "") {
+        advance(1);
+        continue;
+      }
+
+      // Heading
+      var headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+      if (headingMatch) {
+        var level = headingMatch[1].length;
+        var headingText = parseInline(headingMatch[2]);
+        html += "<h" + level + ">" + headingText + "</h" + level + ">\n";
+        advance(1);
+        continue;
+      }
+
+      // Horizontal rule
+      if (/^(\-{3,}|\*{3,}|_{3,})$/.test(line.trim())) {
+        html += "<hr>\n";
+        advance(1);
+        continue;
+      }
+
+      // Blockquote
+      if (/^>\s?/.test(line)) {
+        var bqLines = [];
+        while (i < len && /^>\s?/.test(lines[i])) {
+          var bqContent = lines[i].replace(/^>\s?/, "");
+          bqLines.push(bqContent);
+          advance(1);
+        }
+        var bqInner = markdownToHtml(bqLines.join("\n"));
+        html += "<blockquote>" + bqInner + "</blockquote>\n";
+        continue;
+      }
+
+      // Unordered list
+      if (/^[\-\*]\s+/.test(line)) {
+        html += "<ul>\n";
+        while (i < len && /^[\-\*]\s+/.test(lines[i])) {
+          var liContent = lines[i].replace(/^[\-\*]\s+/, "");
+          html += "<li>" + parseInline(liContent) + "</li>\n";
+          advance(1);
+        }
+        html += "</ul>\n";
+        continue;
+      }
+
+      // Ordered list
+      if (/^\d+\.\s+/.test(line)) {
+        html += "<ol>\n";
+        while (i < len && /^\d+\.\s+/.test(lines[i])) {
+          var oliContent = lines[i].replace(/^\d+\.\s+/, "");
+          html += "<li>" + parseInline(oliContent) + "</li>\n";
+          advance(1);
+        }
+        html += "</ol>\n";
+        continue;
+      }
+
+      // Paragraph - collect consecutive non-blank, non-special lines
+      var paraLines = [];
+      while (i < len) {
+        var pl = lines[i];
+        if (pl.trim() === "" || /^#{1,6}\s+/.test(pl) || /^```/.test(pl) || /^(\-{3,}|\*{3,}|_{3,})$/.test(pl.trim()) || /^>\s?/.test(pl) || /^[\-\*]\s+/.test(pl) || /^\d+\.\s+/.test(pl)) {
+          break;
+        }
+        paraLines.push(pl);
+        advance(1);
+      }
+      if (paraLines.length > 0) {
+        html += "<p>" + parseInline(paraLines.join(" ")) + "</p>\n";
+      }
+    }
+
+    return html;
+  }
+
+  function updatePreview() {
+    var md = editor.value;
+    generatedHTML = markdownToHtml(md);
+    preview.innerHTML = generatedHTML;
+
+    var text = md.replace(/\s+/g, " ").trim();
+    var charCount = md.length;
+    var wordCount = text === "" ? 0 : text.split(/\s+/).length;
+    statsEl.textContent = wordCount + " word" + (wordCount !== 1 ? "s" : "") + " · " + charCount + " character" + (charCount !== 1 ? "s" : "");
+  }
+
+  editor.addEventListener("input", updatePreview);
+
+  // Handle tab key in textarea
+  editor.addEventListener("keydown", function(e) {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      var start = this.selectionStart;
+      var end = this.selectionEnd;
+      this.value = this.value.substring(0, start) + "    " + this.value.substring(end);
+      this.selectionStart = this.selectionEnd = start + 4;
+      updatePreview();
+    }
+  });
+
+  copyBtn.addEventListener("click", function() {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(generatedHTML).then(function() {
+        copyBtn.textContent = "Copied!";
+        setTimeout(function() { copyBtn.textContent = "Copy HTML"; }, 1500);
+      }).catch(function() {
+        fallbackCopy();
+      });
+    } else {
+      fallbackCopy();
+    }
+  });
+
+  function fallbackCopy() {
+    var ta = document.createElement("textarea");
+    ta.value = generatedHTML;
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand("copy");
+      copyBtn.textContent = "Copied!";
+      setTimeout(function() { copyBtn.textContent = "Copy HTML"; }, 1500);
+    } catch (err) {
+      copyBtn.textContent = "Copy failed";
+      setTimeout(function() { copyBtn.textContent = "Copy HTML"; }, 1500);
+    }
+    document.body.removeChild(ta);
+  }
+
+  updatePreview();
+})();
+</script>
+
+</body>
+</html>

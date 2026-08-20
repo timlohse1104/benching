@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2D Physics Sandbox</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #111;
+    color: #ccc;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+  }
+  #canvas {
+    flex: 1;
+    display: block;
+    cursor: crosshair;
+  }
+  #panel {
+    width: 260px;
+    background: #1a1a2e;
+    border-left: 2px solid #333;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+  }
+  #panel h2 {
+    font-size: 18px;
+    color: #e0e0ff;
+    border-bottom: 1px solid #444;
+    padding-bottom: 8px;
+  }
+  .control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .control-group label {
+    font-size: 13px;
+    color: #aaa;
+    display: flex;
+    justify-content: space-between;
+  }
+  .control-group label span {
+    color: #7df;
+    font-weight: bold;
+  }
+  input[type="range"] {
+    width: 100%;
+    accent-color: #5af;
+    cursor: pointer;
+  }
+  button {
+    padding: 10px 16px;
+    border: 1px solid #555;
+    border-radius: 6px;
+    background: #2a2a4a;
+    color: #e0e0ff;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  button:hover { background: #3a3a6a; }
+  button.active { background: #4a2a6a; border-color: #a5f; }
+  #ball-count {
+    font-size: 14px;
+    color: #aaa;
+    padding: 8px;
+    background: #222;
+    border-radius: 6px;
+    text-align: center;
+  }
+  #ball-count strong { color: #7df; }
+  .hint {
+    font-size: 12px;
+    color: #666;
+    line-height: 1.5;
+    padding: 8px;
+    background: #151525;
+    border-radius: 6px;
+  }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="panel">
+  <h2>⚙ Physics Controls</h2>
+  <div id="ball-count">Active Balls: <strong id="count">0</strong></div>
+
+  <div class="control-group">
+    <label>Gravity <span id="grav-val">0.5</span></label>
+    <input type="range" id="gravity" min="0" max="2" step="0.05" value="0.5">
+  </div>
+
+  <div class="control-group">
+    <label>Restitution <span id="rest-val">0.75</span></label>
+    <input type="range" id="restitution" min="0.1" max="1.0" step="0.05" value="0.75">
+  </div>
+
+  <div class="control-group">
+    <label>Friction <span id="fric-val">0.995</span></label>
+    <input type="range" id="friction" min="0.900" max="1.000" step="0.001" value="0.995">
+  </div>
+
+  <div class="control-group">
+    <label>Sub-steps <span id="sub-val">4</span></label>
+    <input type="range" id="substeps" min="1" max="10" step="1" value="4">
+  </div>
+
+  <button id="reset-btn">🔄 Reset Scene</button>
+  <button id="toggle-collisions">Collisions: ON</button>
+
+  <div class="hint">
+    Click to spawn a ball.<br>
+    Click &amp; drag to fling it.<br>
+    Drag vector sets initial velocity.
+  </div>
+</div>
+
+<script>
+(function() {
+  "use strict";
+
+  var canvas = document.getElementById("canvas");
+  var ctx = canvas.getContext("2d");
+
+  var balls = [];
+  var collisionsEnabled = true;
+  var dragging = false;
+  var dragStart = { x: 0, y: 0 };
+  var dragEnd = { x: 0, y: 0 };
+
+  var gravity = 0.5;
+  var restitution = 0.75;
+  var friction = 0.995;
+  var subSteps = 4;
+
+  var colors = [
+    "#ff6b6b","#feca57","#48dbfb","#ff9ff3","#54a0ff",
+    "#5f27cd","#01a3a4","#f368e0","#ff6348","#7bed9f",
+    "#70a1ff","#eccc68","#a4b0be","#5352ed","#2ed573"
+  ];
+
+  function resize() {
+    canvas.width = canvas.clientWidth * (window.devicePixelRatio || 1);
+    canvas.height = canvas.clientHeight * (window.devicePixelRatio || 1);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  function randomRadius() {
+    return 12 + Math.random() * 28;
+  }
+
+  function spawnBall(x, y, vx, vy) {
+    var r = randomRadius();
+    var color = colors[balls.length % colors.length];
+    balls.push({
+      x: x, y: y,
+      vx: vx || 0, vy: vy || 0,
+      r: r,
+      color: color,
+      mass: r * r
+    });
+  }
+
+  function resetScene() {
+    balls = [];
+  }
+
+  function toggleCollisions() {
+    collisionsEnabled = !collisionsEnabled;
+    var btn = document.getElementById("toggle-collisions");
+    btn.textContent = "Collisions: " + (collisionsEnabled ? "ON" : "OFF");
+    btn.classList.toggle("active", !collisionsEnabled);
+  }
+
+  function update() {
+    var dt = 1;
+    var sub = subSteps;
+    var stepG = gravity / sub;
+    var stepF = Math.pow(friction, 1 / sub);
+    var w = canvas.clientWidth;
+    var h = canvas.clientHeight;
+
+    for (var s = 0; s < sub; s++) {
+      for (var i = 0; i < balls.length; i++) {
+        var b = balls[i];
+        b.vy += stepG;
+        b.vx *= stepF;
+        b.vy *= stepF;
+        b.x += b.vx;
+        b.y += b.vy;
+
+        var rest = restitution;
+        if (b.x - b.r < 0) { b.x = b.r; b.vx = Math.abs(b.vx) * rest; }
+        if (b.x + b.r > w) { b.x = w - b.r; b.vx = -Math.abs(b.vx) * rest; }
+        if (b.y - b.r < 0) { b.y = b.r; b.vy = Math.abs(b.vy) * rest; }
+        if (b.y + b.r > h) { b.y = h - b.r; b.vy = -Math.abs(b.vy) * rest; }
+      }
+
+      if (collisionsEnabled) {
+        for (var i = 0; i < balls.length; i++) {
+          for (var j = i + 1; j < balls.length; j++) {
+            var a = balls[i];
+            var bb = balls[j];
+            var dx = bb.x - a.x;
+            var dy = bb.y - a.y;
+            var distSq = dx * dx + dy * dy;
+            var minDist = a.r + bb.r;
+            if (distSq < minDist * minDist && distSq > 0.0001) {
+              var dist = Math.sqrt(distSq);
+              var nx = dx / dist;
+              var ny = dy / dist;
+
+              var overlap = minDist - dist;
+              var totalMass = a.mass + bb.mass;
+              a.x -= nx * overlap * (bb.mass / totalMass);
+              a.y -= ny * overlap * (bb.mass / totalMass);
+              bb.x += nx * overlap * (a.mass / totalMass);
+              bb.y += ny * overlap * (a.mass / totalMass);
+
+              var dvx = a.vx - bb.vx;
+              var dvy = a.vy - bb.vy;
+              var dvn = dvx * nx + dvy * ny;
+
+              if (dvn > 0) {
+                var impulse = (2 * dvn) / totalMass * restitution;
+                a.vx -= impulse * bb.mass * nx;
+                a.vy -= impulse * bb.mass * ny;
+                bb.vx += impulse * a.mass * nx;
+                bb.vy += impulse * a.mass * ny;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  function draw() {
+    var w = canvas.clientWidth;
+    var h = canvas.clientHeight;
+    ctx.clearRect(0, 0, w, h);
+
+    for (var i = 0; i < balls.length; i++) {
+      var b = balls[i];
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.fillStyle = b.color;
+      ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.4)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      var grad = ctx.createRadialGradient(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.1, b.x, b.y, b.r);
+      grad.addColorStop(0, "rgba(255,255,255,0.25)");
+      grad.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+    }
+
+    if (dragging) {
+      ctx.beginPath();
+      ctx.moveTo(dragStart.x, dragStart.y);
+      ctx.lineTo(dragEnd.x, dragEnd.y);
+      ctx.strokeStyle = "rgba(255,255,100,0.6)";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      var arrowLen = 30;
+      var adx = dragEnd.x - dragStart.x;
+      var ady = dragEnd.y - dragStart.y;
+      var aLen = Math.sqrt(adx * adx + ady * ady);
+      if (aLen > 0) {
+        var ax = dragStart.x - (adx / aLen) * arrowLen;
+        var ay = dragStart.y - (ady / aLen) * arrowLen;
+        ctx.beginPath();
+        ctx.arc(dragStart.x, dragStart.y, 8, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255,255,100,0.5)";
+        ctx.fill();
+      }
+    }
+  }
+
+  function loop() {
+    update();
+    draw();
+    document.getElementById("count").textContent = balls.length;
+    requestAnimationFrame(loop);
+  }
+
+  canvas.addEventListener("mousedown", function(e) {
+    var rect = canvas.getBoundingClientRect();
+    var x = e.clientX - rect.left;
+    var y = e.clientY - rect.top;
+    dragging = true;
+    dragStart.x = x;
+    dragStart.y = y;
+    dragEnd.x = x;
+    dragEnd.y = y;
+  });
+
+  canvas.addEventListener("mousemove", function(e) {
+    if (!dragging) return;
+    var rect = canvas.getBoundingClientRect();
+    dragEnd.x = e.clientX - rect.left;
+    dragEnd.y = e.clientY - rect.top;
+  });
+
+  canvas.addEventListener("mouseup", function(e) {
+    if (!dragging) return;
+    dragging = false;
+    var rect = canvas.getBoundingClientRect();
+    var x = e.clientX - rect.left;
+    var y = e.clientY - rect.top;
+    var vx = (dragStart.x - x) * 0.15;
+    var vy = (dragStart.y - y) * 0.15;
+    spawnBall(dragStart.x, dragStart.y, vx, vy);
+  });
+
+  canvas.addEventListener("mouseleave", function() {
+    dragging = false;
+  });
+
+  var gravSlider = document.getElementById("gravity");
+  var gravVal = document.getElementById("grav-val");
+  gravSlider.addEventListener("input", function() {
+    gravity = parseFloat(this.value);
+    gravVal.textContent = gravity.toFixed(2);
+  });
+
+  var restSlider = document.getElementById("restitution");
+  var restVal = document.getElementById("rest-val");
+  restSlider.addEventListener("input", function() {
+    restitution = parseFloat(this.value);
+    restVal.textContent = restitution.toFixed(2);
+  });
+
+  var fricSlider = document.getElementById("friction");
+  var fricVal = document.getElementById("fric-val");
+  fricSlider.addEventListener("input", function() {
+    friction = parseFloat(this.value);
+    fricVal.textContent = friction.toFixed(3);
+  });
+
+  var subSlider = document.getElementById("substeps");
+  var subVal = document.getElementById("sub-val");
+  subSlider.addEventListener("input", function() {
+    subSteps = parseInt(this.value);
+    subVal.textContent = subSteps;
+  });
+
+  document.getElementById("reset-btn").addEventListener("click", resetScene);
+  document.getElementById("toggle-collisions").addEventListener("click", toggleCollisions);
+
+  for (var i = 0; i < 8; i++) {
+    spawnBall(
+      100 + Math.random() * (canvas.clientWidth - 200),
+      50 + Math.random() * 200,
+      (Math.random() - 0.5) * 4,
+      (Math.random() - 0.5) * 4
+    );
+  }
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

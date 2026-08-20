@@ -76,18 +76,27 @@ def _probe_served_models(api_base: str, timeout_s: float = 2.0) -> tuple[bool, l
 
 def _preflight(console: Console, models: list[ModelConfig]) -> list[ModelConfig]:
     """Check reachability / API keys / served model names. Return usable models."""
-    table = Table(title="Preflight", show_header=True, header_style="bold")
-    table.add_column("model")
-    table.add_column("kind")
-    table.add_column("endpoint")
-    table.add_column("served / requested")
-    table.add_column("status")
-
     # Probe each unique local OpenAI-compatible api_base once
     probe_cache: dict[str, tuple[bool, list[str], str | None]] = {}
     for m in models:
         if m.is_openai_compatible_local and m.api_base and m.api_base not in probe_cache:
             probe_cache[m.api_base] = _probe_served_models(m.api_base)
+
+    # Print the served model list once per endpoint, up front, instead of
+    # repeating it in every table row below.
+    for api_base, (reachable, served, err) in probe_cache.items():
+        if reachable:
+            served_summary = ", ".join(served) if served else "[dim]none[/dim]"
+            console.print(f"[dim]endpoint[/dim] {api_base} [dim]serves:[/dim] {served_summary}")
+        else:
+            console.print(f"[dim]endpoint[/dim] {api_base} [red]unreachable[/red] ({err})")
+
+    table = Table(title="Preflight", show_header=True, header_style="bold")
+    table.add_column("model")
+    table.add_column("kind")
+    table.add_column("endpoint")
+    table.add_column("requested / used")
+    table.add_column("status")
 
     usable: list[ModelConfig] = []
     for m in models:
@@ -106,13 +115,12 @@ def _preflight(console: Console, models: list[ModelConfig]) -> list[ModelConfig]
 
         if m.is_openai_compatible_local and m.api_base:
             reachable, served, err = probe_cache.get(m.api_base, (False, [], "no probe"))
-            served_summary = ", ".join(served) if served else "[dim]none[/dim]"
             if not reachable:
                 table.add_row(
                     m.id,
                     kind,
                     endpoint,
-                    served_summary,
+                    "[dim]-[/dim]",
                     f"[red]unreachable[/red] ({err}) -> skipped",
                 )
                 continue
@@ -121,7 +129,7 @@ def _preflight(console: Console, models: list[ModelConfig]) -> list[ModelConfig]
                     m.id,
                     kind,
                     endpoint,
-                    f"{served_summary}  /  [red]want: {m.model_name}[/red]",
+                    f"[red]want: {m.model_name}[/red]",
                     "[red]model not served[/red] -> skipped",
                 )
                 continue
@@ -130,7 +138,7 @@ def _preflight(console: Console, models: list[ModelConfig]) -> list[ModelConfig]
                 m.id,
                 kind,
                 endpoint,
-                f"{served_summary}  /  [green]use: {shown_name}[/green]",
+                f"[green]use: {shown_name}[/green]",
                 "[green]OK[/green]",
             )
             # If the user didn't pin a model_name and the server reports one, adopt it

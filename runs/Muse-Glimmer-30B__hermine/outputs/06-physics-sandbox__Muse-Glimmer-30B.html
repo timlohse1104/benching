@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>2D Physics Sandbox</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+html,body{margin:0;padding:0;overflow:hidden;background:#0a0a0a;font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+canvas{display:block}
+#ui{position:absolute;top:12px;left:12px;background:rgba(20,20,24,0.75);backdrop-filter:blur(6px);color:#e8e8e8;padding:14px 16px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.5);min-width:260px}
+#ui h1{margin:0 0 10px;font-size:16px;font-weight:600;letter-spacing:.3px}
+.row{display:flex;align-items:center;justify-content:space-between;margin:8px 0}
+.row label{font-size:13px;opacity:.9}
+input[type=range]{flex:1;margin:0 8px}
+.val{min-width:48px;text-align:right;font-variant-numeric:tabular-nums;font-size:12px;opacity:.85}
+.btns{display:flex;gap:8px;margin-top:10px}
+button{background:#2a2a33;color:#e8e8e8;border:1px solid #3a3a45;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:13px}
+button:hover{background:#353542}
+#count{margin-top:8px;font-size:12px;opacity:.8}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+<h1>Bouncing Balls Sandbox</h1>
+<div class="row"><label>Gravity</label><input id="gravity" type="range" min="0" max="2000" step="10" value="800"><span class="val" id="gravityVal">800</span></div>
+<div class="row"><label>Restitution</label><input id="rest" type="range" min="0" max="1" step="0.01" value="0.75"><span class="val" id="restVal">0.75</span></div>
+<div class="row"><label>Friction</label><input id="fric" type="range" min="0" max="0.2" step="0.001" value="0.02"><span class="val" id="fricVal">0.020</span></div>
+<div class="btns">
+<button id="reset">Reset</button>
+<button id="toggle">Collisions: On</button>
+</div>
+<div id="count">Balls: 0</div>
+</div>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+function resize(){canvas.width = innerWidth; canvas.height = innerHeight;}
+addEventListener('resize', resize); resize();
+
+let gravity = 800;
+let restitution = 0.75;
+let friction = 0.02;
+let collisionsEnabled = true;
+
+const gravityEl = document.getElementById('gravity');
+const restEl = document.getElementById('rest');
+const fricEl = document.getElementById('fric');
+const gravityVal = document.getElementById('gravityVal');
+const restVal = document.getElementById('restVal');
+const fricVal = document.getElementById('fricVal');
+gravityEl.oninput = ()=>{gravity=+gravityEl.value; gravityVal.textContent=gravity;};
+restEl.oninput = ()=>{restitution=+restEl.value; restVal.textContent=restitution.toFixed(2);};
+fricEl.oninput = ()=>{friction=+fricEl.value; fricVal.textContent=friction.toFixed(3);};
+
+document.getElementById('reset').onclick = ()=>{balls=[]; spawnInitial();};
+const toggleBtn = document.getElementById('toggle');
+toggleBtn.onclick = ()=>{collisionsEnabled=!collisionsEnabled; toggleBtn.textContent='Collisions: '+(collisionsEnabled?'On':'Off');};
+
+class Ball{
+ constructor(x,y,vx,vy,r){
+  this.x=x; this.y=y; this.vx=vx; this.vy=vy; this.r=r;
+  this.m=r*r;
+  this.color=`hsl(${(Math.random()*360)|0},80%,60%)`;
+ }
+ update(dt){
+  this.vy += gravity*dt;
+  const damp = Math.max(0,1 - friction*dt);
+  this.vx *= damp;
+  this.vy *= damp;
+  this.x += this.vx*dt;
+  this.y += this.vy*dt;
+  if(this.x - this.r < 0){this.x=this.r; this.vx = -this.vx*restitution;}
+  if(this.x + this.r > canvas.width){this.x=canvas.width-this.r; this.vx = -this.vx*restitution;}
+  if(this.y - this.r < 0){this.y=this.r; this.vy = -this.vy*restitution;}
+  if(this.y + this.r > canvas.height){this.y=canvas.height-this.r; this.vy = -this.vy*restitution; this.vx *= 0.98;}
+ }
+ draw(){
+  ctx.beginPath();
+  ctx.arc(this.x,this.y,this.r,0,Math.PI*2);
+  ctx.fillStyle=this.color;
+  ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,0.2)';
+  ctx.lineWidth=1;
+  ctx.stroke();
+ }
+}
+
+const balls=[];
+function spawnBall(x,y,vx=0,vy=0){
+ const r = 10 + Math.random()*28;
+ balls.push(new Ball(x,y,vx,vy,r));
+ document.getElementById('count').textContent='Balls: '+balls.length;
+}
+function spawnInitial(){
+ for(let i=0;i<12;i++) spawnBall(100+Math.random()*200,100+Math.random()*100, (Math.random()-0.5)*200, (Math.random()-0.5)*200);
+}
+spawnInitial();
+
+function resolveCollision(a,b){
+ const dx = b.x - a.x;
+ const dy = b.y - a.y;
+ let dist = Math.hypot(dx,dy);
+ const minDist = a.r + b.r;
+ if(dist===0 || dist>=minDist) return;
+ const nx = dx/dist;
+ const ny = dy/dist;
+ const overlap = minDist - dist;
+ const totalM = a.m + b.m;
+ const moveA = overlap * (b.m/totalM);
+ const moveB = overlap * (a.m/totalM);
+ a.x -= nx*moveA; a.y -= ny*moveA;
+ b.x += nx*moveB; b.y += ny*moveB;
+ const rvx = b.vx - a.vx;
+ const rvy = b.vy - a.vy;
+ const velAlong = rvx*nx + rvy*ny;
+ if(velAlong>0) return;
+ const e = restitution;
+ const impulse = -(1+e)*velAlong / (1/a.m + 1/b.m);
+ const ix = impulse*nx;
+ const iy = impulse*ny;
+ a.vx -= ix/a.m; a.vy -= iy/a.m;
+ b.vx += ix/b.m; b.vy += iy/b.m;
+}
+
+function getPos(e){
+ const r = canvas.getBoundingClientRect();
+ return {x:e.clientX - r.left, y:e.clientY - r.top};
+}
+let isDragging=false, dragStart=null, dragCurrent=null;
+canvas.addEventListener('mousedown', e=>{const p=getPos(e); isDragging=true; dragStart=p; dragCurrent=p;});
+addEventListener('mousemove', e=>{if(isDragging){dragCurrent=getPos(e);}});
+addEventListener('mouseup', e=>{
+ if(isDragging){
+  const p=getPos(e);
+  const vx=(dragStart.x - p.x)*5;
+  const vy=(dragStart.y - p.y)*5;
+  spawnBall(dragStart.x, dragStart.y, vx, vy);
+  isDragging=false; dragStart=null; dragCurrent=null;
+ }
+});
+
+let last=performance.now();
+function loop(now){
+ const dt = Math.min((now-last)/1000,0.033); last=now;
+ for(const b of balls) b.update(dt);
+ if(collisionsEnabled){
+  for(let k=0;k<3;k++){
+   for(let i=0;i<balls.length;i++){
+    for(let j=i+1;j<balls.length;j++){
+     resolveCollision(balls[i],balls[j]);
+    }
+   }
+  }
+ }
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+ for(const b of balls) b.draw();
+ if(isDragging && dragStart && dragCurrent){
+  ctx.strokeStyle='rgba(255,255,255,0.6)';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(dragStart.x,dragStart.y);
+  ctx.lineTo(dragCurrent.x,dragCurrent.y);
+  ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,0.8)';
+  ctx.beginPath(); ctx.arc(dragStart.x,dragStart.y,4,0,Math.PI*2); ctx.fill();
+ }
+ requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

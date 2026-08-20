@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Neon Low-Poly Tower Defense</title>
+<style>
+html,body{margin:0;height:100%;background:#020210;color:#9ff;font-family:monospace}
+#topbar{padding:8px 12px;background:#06061a;border-bottom:2px solid #0ff;display:flex;gap:20px;align-items:center}
+.neon{text-shadow:0 0 6px currentColor}
+#gameContainer{display:flex;height:calc(100% - 48px)}
+canvas{background:#000;border:2px solid #0ff;box-shadow:0 0 20px #0ff}
+#sidebar{width:240px;background:#080812;border-left:2px solid #f0f;padding:10px;display:flex;flex-direction:column;gap:10px}
+button{background:#0a0a14;color:#0ff;border:1px solid #0ff;padding:6px 8px;cursor:pointer}
+button.active{background:#0ff;color:#000}
+#skillModal{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center}
+#skillBox{background:#0a0a14;border:2px solid #ff0;padding:16px;max-width:700px}
+.node{display:inline-block;margin:6px;padding:8px 10px;border:1px solid #ff0;cursor:pointer}
+.node.bought{opacity:.4}
+#overlay{position:absolute;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;flex-direction:column}
+</style>
+</head>
+<body>
+<div id="topbar" class="neon">
+<span>Gold: <b id="gold">0</b></span>
+<span>Base HP: <b id="baseHP">100</b></span>
+<span>Wave: <b id="wave">1</b></span>
+<span>Surge: <b id="surgeCd">Ready</b></span>
+<button id="surgeBtn">SURGE</button>
+</div>
+<div id="gameContainer">
+<canvas id="game" width="768" height="480"></canvas>
+<div id="sidebar">
+<div><b>Turrets</b></div>
+<button data-t="0" class="active">Laser</button>
+<button data-t="1">Pulse</button>
+<button data-t="2">Seeker</button>
+<div><b>Actions</b></div>
+<div id="turretInfo">Select cell</div>
+<button id="resetBtn">Restart Run</button>
+</div>
+</div>
+<div id="overlay">
+<h2 class="neon">RUN ENDED</h2>
+<p>Wave reached: <span id="endWave"></span></p>
+<button id="continueBtn">Continue to Skill Tree</button>
+</div>
+<div id="skillModal">
+<div id="skillBox">
+<h3 class="neon">Skill Tree — Points: <span id="sp">0</span></h3>
+<div id="skillNodes"></div>
+<button id="closeSkills">Close</button>
+</div>
+</div>
+<script>
+(() => {
+const GRID_W=16, GRID_H=10, CELL=48;
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+let gold=200, baseHP=100, wave=1, waveTimer=0, gameState='playing';
+let turrets=[], enemies=[], bullets=[];
+let selectedTurret=0;
+let surgeActive=false, surgeTimer=0, surgeCooldown=0;
+let skillPoints=0, skills={};
+const path=[];
+const rows=[4,5,6,7];
+for(let r=0;r<rows.length;r++){
+ const y=rows[r];
+ if(r%2===0){for(let x=0;x<GRID_W;x++)path.push({x,y});}
+ else{for(let x=GRID_W-1;x>=0;x--)path.push({x,y});}
+}
+const TURRET_TYPES=[
+ {name:'Laser',color:'#00ffff',cost:100,dmg:20,range:4,rof:0.5,pierce:1},
+ {name:'Pulse',color:'#ff00ff',cost:150,dmg:15,range:3,rof:1.2,aoe:1.5},
+ {name:'Seeker',color:'#ffff00',cost:200,dmg:30,range:5,rof:2.0}
+];
+const ENEMY_TYPES=[
+ {name:'Scout',color:'#00ffcc',hp:50,speed:1.2,reward:10},
+ {name:'Brute',color:'#ff6600',hp:150,speed:0.6,reward:20},
+ {name:'Shield',color:'#ffcc00',hp:80,speed:0.9,shield:50,reward:25},
+ {name:'Splitter',color:'#cc00ff',hp:60,speed:1.0,reward:15},
+ {name:'Stealth',color:'#999999',hp:70,speed:1.3,reward:20}
+];
+const SKILLS=[
+ {id:'gold',name:'Neon Capital',desc:'+50 starting gold',cost:1},
+ {id:'damage',name:'Overcharge',desc:'+15% turret damage',cost:2},
+ {id:'range',name:'Long Lens',desc:'+1 turret range',cost:2},
+ {id:'boss',name:'Boss Weak',desc:'-20% boss HP',cost:3},
+ {id:'surge',name:'Surge Cooldown',desc:'-20s surge cooldown',cost:2},
+ {id:'start',name:'Veteran',desc:'Start with 100 gold',cost:1}
+];
+function loadSkills(){
+ const s=localStorage.getItem('neonSkills');
+ if(s){const o=JSON.parse(s);skillPoints=o.points||0;skills=o.skills||{};}
+}
+function saveSkills(){localStorage.setItem('neonSkills',JSON.stringify({points:skillPoints,skills}));}
+loadSkills();
+function skillMod(k,base){let v=base; if(skills.damage) v*=1+0.15; return v;}
+function initRun(){
+ gold=200 + (skills.gold?50:0) + (skills.start?100:0);
+ baseHP=100;
+ wave=1;
+ turrets=[]; enemies=[]; bullets=[];
+ waveTimer=0; surgeCooldown=0; surgeActive=false;
+ startWave();
+ updateUI();
+}
+function startWave(){
+ const count=5+wave*2;
+ let spawn=0;
+ const spawnInterval=0.8;
+ setTimeout(()=>{},0);
+}
+let spawnTimer=0, enemiesToSpawn=0, spawned=0;
+function beginWave(){
+ enemiesToSpawn=5+wave*2+1;
+ spawned=0; spawnTimer=0;
+}
+beginWave();
+function spawnEnemy(isBoss){
+ let type;
+ if(isBoss){
+  const t=ENEMY_TYPES[wave%5];
+  type={...t,name:'BOSS '+t.name,hp:500+wave*120,speed:0.5,reward:100};
+ }else{
+  type=ENEMY_TYPES[Math.floor(Math.random()*ENEMY_TYPES.length)];
+ }
+ const hpMult=1+wave*0.15;
+ const hp=type.hp*hpMult;
+ if(isBoss && skills.boss) hp*=0.8;
+ enemies.push({
+  x:path[0].x*CELL+CELL/2,
+  y:path[0].y*CELL+CELL/2,
+  pathIdx:0,
+  hp, maxHp:hp,
+  speed:type.speed,
+  color:type.color,
+  reward:type.reward,
+  shield:type.shield||0,
+  isBoss:isBoss,
+  type:type.name
+ });
+}
+function update(dt){
+ if(gameState!=='playing') return;
+ surgeCooldown=Math.max(0,surgeCooldown-dt);
+ if(surgeActive){surgeTimer-=dt; if(surgeTimer<=0){surgeActive=false;}}
+ // spawn
+ spawnTimer-=dt;
+ if(spawned<enemiesToSpawn && spawnTimer<=0){
+   const isBoss=spawned===enemiesToSpawn-1;
+   spawnEnemy(isBoss);
+   spawned++; spawnTimer=1.2;
+ }
+ // enemies
+ for(let i=enemies.length-1;i>=0;i--){
+  const e=enemies[i];
+  if(e.pathIdx>=path.length-1){
+   baseHP-=1;
+   enemies.splice(i,1);
+   if(baseHP<=0){endRun(); return;}
+   continue;
+  }
+  const target=path[e.pathIdx+1];
+  const tx=target.x*CELL+CELL/2, ty=target.y*CELL+CELL/2;
+  const dx=tx-e.x, dy=ty-e.y;
+  const dist=Math.hypot(dx,dy);
+  const move=e.speed*CELL*0.4*dt;
+  if(dist<move){e.x=tx;e.y=ty;e.pathIdx++;}else{e.x+=dx/dist*move;e.y+=dy/dist*move;}
+  if(e.hp<=0){handleDeath(e,i);}
+ }
+ // turrets
+ turrets.forEach(t=>{
+  t.cooldown-=dt;
+  if(t.cooldown<=0){
+   const type=TURRET_TYPES[t.type];
+   const range=(type.range+(t.level-1)*0.5+(skills.range?1:0))*CELL;
+   let target=null, best=Infinity;
+   enemies.forEach(e=>{
+    const d=Math.hypot(e.x - (t.x*CELL+CELL/2), e.y - (t.y*CELL+CELL/2));
+    if(d<=range && d<best){best=d; target=e;}
+   });
+   if(target){
+    const dmg=type.dmg*(1+(t.level-1)*0.3)*(surgeActive?3:1);
+    if(skills.damage) dmg*=1.15;
+    if(type.name==='Pulse'){
+     enemies.forEach(e=>{
+      if(Math.hypot(e.x-target.x,e.y-target.y)<type.aoe*CELL){
+       damageEnemy(e,dmg);
+      }
+     });
+    }else{
+     damageEnemy(target,dmg);
+     if(type.pierce>1){
+      // pierce multiple
+      let pierced=1;
+      enemies.forEach(e=>{
+        if(e!==target && Math.hypot(e.x-target.x,e.y-target.y)<10){
+          damageEnemy(e,dmg);
+          pierced++; if(pierced>type.pierce) return;
+        }
+      });
+     }
+    }
+    t.cooldown=type.rof/(1+(t.level-1)*0.1);
+   }
+  }
+ });
+ // wave progression
+ if(enemies.length===0 && spawned>=enemiesToSpawn){
+  wave++; document.getElementById('wave').textContent=wave;
+  setTimeout(()=>{beginWave();},1500);
+ }
+ updateUI();
+}
+function damageEnemy(e,dmg){
+ if(e.shield>0){e.shield-=dmg; if(e.shield<0){e.hp+=e.shield; e.shield=0;} return;}
+ e.hp-=dmg;
+ if(e.hp<=0) handleDeath(e);
+}
+function handleDeath(e,idx){
+ if(e.type.includes('Splitter')){
+  for(let i=0;i<2;i++) enemies.push({x:e.x,y:e.y,pathIdx:e.pathIdx,hp:30,speed:1.2,color:'#cc00ff',reward:5,shield:0,isBoss:false,type:'Splitter'});
+ }
+ gold+=e.reward||10;
+ if(idx!==undefined) enemies.splice(idx,1); else enemies.splice(enemies.indexOf(e),1);
+}
+function render(){
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+ // grid
+ ctx.strokeStyle='#111'; ctx.lineWidth=1;
+ for(let x=0;x<=GRID_W;x++){ctx.beginPath();ctx.moveTo(x*CELL,0);ctx.lineTo(x*CELL,GRID_H*CELL);ctx.stroke();}
+ for(let y=0;y<=GRID_H;y++){ctx.beginPath();ctx.moveTo(0,y*CELL);ctx.lineTo(GRID_W*CELL,y*CELL);ctx.stroke();}
+ // path
+ path.forEach(p=>{
+  ctx.fillStyle='#0ff'; ctx.shadowColor='#0ff'; ctx.shadowBlur=8;
+  ctx.fillRect(p.x*CELL+4,p.y*CELL+4,CELL-8,CELL-8);
+  ctx.shadowBlur=0;
+ });
+ // turrets
+ turrets.forEach(t=>{
+  const type=TURRET_TYPES[t.type];
+  ctx.fillStyle=type.color; ctx.shadowColor=type.color; ctx.shadowBlur=12;
+  ctx.fillRect(t.x*CELL+8,t.y*CELL+8,CELL-16,CELL-16);
+  ctx.shadowBlur=0;
+  ctx.fillStyle='#000'; ctx.font='10px monospace'; ctx.fillText('Lv'+t.level,t.x*CELL+12,t.y*CELL+26);
+ });
+ // enemies
+ enemies.forEach(e=>{
+  ctx.fillStyle=e.color; ctx.shadowColor=e.color; ctx.shadowBlur=10;
+  ctx.beginPath();
+  ctx.moveTo(e.x,e.y-10);ctx.lineTo(e.x-10,e.y+8);ctx.lineTo(e.x+10,e.y+8);ctx.closePath();ctx.fill();
+  ctx.shadowBlur=0;
+  if(e.isBoss){ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.strokeRect(e.x-12,e.y-22,24,6);}
+ });
+ ctx.shadowBlur=0;
+}
+function loop(ts){let last=ts; requestAnimationFrame(t=>{const dt=Math.min(0.05,(t-last)/1000); last=t; update(dt); render(); loop(t);});}
+function updateUI(){
+ document.getElementById('gold').textContent=gold;
+ document.getElementById('baseHP').textContent=baseHP;
+ document.getElementById('wave').textContent=wave;
+ document.getElementById('surgeCd').textContent=surgeCooldown>0?Math.ceil(surgeCooldown)+'s':(surgeActive?'ACTIVE':'Ready');
+}
+function placeTurret(cx,cy){
+ if(path.some(p=>p.x===cx&&p.y===cy)) return;
+ if(turrets.some(t=>t.x===cx&&t.y===cy)) return;
+ const type=TURRET_TYPES[selectedTurret];
+ const cost=type.cost;
+ if(gold<cost) return;
+ gold-=cost;
+ turrets.push({x:cx,y:cy,type:selectedTurret,level:1,cooldown:0});
+ updateUI();
+}
+function upgradeTurret(t){
+ const type=TURRET_TYPES[t.type];
+ const cost=Math.floor(type.cost*t.level*1.5);
+ if(gold<cost) return;
+ gold-=cost; t.level++; updateUI();
+}
+canvas.addEventListener('click',e=>{
+ if(gameState!=='playing') return;
+ const r=canvas.getBoundingClientRect();
+ const mx=(e.clientX-r.left)*(canvas.width/r.width)/CELL;
+ const my=(e.clientY-r.top)*(canvas.height/r.height)/CELL;
+ const cx=Math.floor(mx), cy=Math.floor(my);
+ if(cx<0||cy<0||cx>=GRID_W||cy>=GRID_H) return;
+ const t=turrets.find(t=>t.x===cx&&t.y===cy);
+ if(t){upgradeTurret(t);} else {placeTurret(cx,cy);}
+});
+document.querySelectorAll('#sidebar button[data-t]').forEach(btn=>{
+ btn.onclick=()=>{document.querySelectorAll('#sidebar button[data-t]').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); selectedTurret=+btn.dataset.t;};
+});
+document.getElementById('surgeBtn').onclick=()=>{
+ if(surgeCooldown>0||surgeActive) return;
+ surgeActive=true; surgeTimer=8; surgeCooldown=60-(skills.surge?20:0);
+};
+document.getElementById('resetBtn').onclick=initRun;
+function endRun(){
+ gameState='gameover';
+ document.getElementById('endWave').textContent=wave;
+ document.getElementById('overlay').style.display='flex';
+ skillPoints+=Math.floor(wave/2);
+ saveSkills();
+}
+document.getElementById('continueBtn').onclick=()=>{
+ document.getElementById('overlay').style.display='none';
+ showSkills();
+};
+function showSkills(){
+ document.getElementById('sp').textContent=skillPoints;
+ const box=document.getElementById('skillNodes'); box.innerHTML='';
+ SKILLS.forEach(s=>{
+  const bought=!!skills[s.id];
+  const div=document.createElement('div');
+  div.className='node'+(bought?' bought':'');
+  div.textContent=`${s.name} - ${s.desc} (${s.cost})`;
+  div.onclick=()=>{
+   if(bought) return;
+   if(skillPoints>=s.cost){
+    skillPoints-=s.cost; skills[s.id]=true; saveSkills(); showSkills();
+   }
+  };
+  box.appendChild(div);
+ });
+ document.getElementById('skillModal').style.display='flex';
+}
+document.getElementById('closeSkills').onclick=()=>{document.getElementById('skillModal').style.display='none'; initRun();};
+initRun(); loop(0);
+})();
+</script>
+</body>
+</html>

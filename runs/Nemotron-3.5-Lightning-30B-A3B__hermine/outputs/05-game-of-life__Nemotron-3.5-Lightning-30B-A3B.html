@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conway's Game of Life</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #121212;
+    color: #e0e0e0;
+    margin: 0;
+    padding: 20px;
+  }
+  canvas {
+    border: 2px solid #333;
+    background: #1a1a1a;
+    display: block;
+    margin-bottom: 20px;
+  }
+  .controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  button, input, select {
+    background: #1e1e1e;
+    color: #e0e0e0;
+    border: 1px solid #333;
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+  button:hover, input:hover, select:hover {
+    background: #2a2a2a;
+  }
+  #info {
+    margin-top: 10px;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+  <div class="controls">
+    <button id="startPause">Start</button>
+    <button id="step">Step</button>
+    <button id="clear">Clear</button>
+    <button id="random">Randomize</button>
+    <label for="speed">Speed: <span id="speedVal">100</span> ms</label>
+    <input type="range" id="speed" min="10" max="2000" value="100">
+    <label for="pattern">Pattern: </label>
+    <select id="pattern">
+      <option value="glider">Glider</option>
+      <option value="rpentomino">R-pentomino</option>
+    </select>
+  </div>
+  <canvas id="canvas" width="600" height="400"></canvas>
+  <div id="info">Generation: <span id="gen">0</span> | Population: <span id="pop">0</span></div>
+
+<script>
+  const COLS = 60;
+  const ROWS = 40;
+  const CELL_SIZE = 10;
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+  let generation = 0;
+  let running = false;
+  let intervalId = null;
+  let currentSpeed = 100;
+
+  function toggleCell(r, c) {
+    if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+      grid[r][c] = 1 - grid[r][c];
+    }
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (grid[r][c]) {
+          ctx.fillStyle = '#00ff00';
+          ctx.fillRect(c * CELL_SIZE + 1, r * CELL_SIZE + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+        }
+        ctx.strokeStyle = '#333333';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+      }
+    }
+  }
+
+  function countNeighbors(r, c) {
+    let count = 0;
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        const nr = (r + dr + ROWS) % ROWS;
+        const nc = (c + dc + COLS) % COLS;
+        count += grid[nr][nc];
+      }
+    }
+    return count;
+  }
+
+  function nextGeneration() {
+    const next = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const neighbors = countNeighbors(r, c);
+        if (grid[r][c]) {
+          if (neighbors === 2 || neighbors === 3) next[r][c] = 1;
+        } else {
+          if (neighbors === 3) next[r][c] = 1;
+        }
+      }
+    }
+    grid = next;
+    generation++;
+    updateCounters();
+    render();
+  }
+
+  function updateCounters() {
+    let pop = 0;
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        pop += grid[r][c];
+    document.getElementById('gen').textContent = generation;
+    document.getElementById('pop').textContent = pop;
+  }
+
+  function clearGrid() {
+    grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+    generation = 0;
+    updateCounters();
+    render();
+  }
+
+  function randomizeGrid() {
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        grid[r][c] = Math.random() < 0.5 ? 1 : 0;
+    generation = 0;
+    updateCounters();
+    render();
+  }
+
+  function loadPattern(name) {
+    clearGrid();
+    const centerR = Math.floor(ROWS / 2) - 2;
+    const centerC = Math.floor(COLS / 2) - 2;
+    if (name === 'glider') {
+      const glider = [
+        [0, 1, 0, 0, 0],
+        [0, 0, 1, 0, 0],
+        [1, 1, 1, 0, 0],
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 1, 0]
+      ];
+      for (let r = 0; r < 5; r++) {
+        for (let c = 0; c < 5; c++) {
+          if (glider[r][c]) {
+            const rr = centerR + r;
+            const cc = centerC + c;
+            if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS)
+              grid[rr][cc] = 1;
+          }
+        }
+      }
+    } else if (name === 'rpentomino') {
+      const rpent = [
+        [0, 1, 1],
+        [1, 1, 0],
+        [0, 1, 0]
+      ];
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 3; c++) {
+          if (rpent[r][c]) {
+            const rr = centerR + r;
+            const cc = centerC + c;
+            if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS)
+              grid[rr][cc] = 1;
+          }
+        }
+      }
+    }
+    updateCounters();
+    render();
+  }
+
+  document.getElementById('startPause').addEventListener('click', () => {
+    if (running) {
+      clearInterval(intervalId);
+      document.getElementById('startPause').textContent = 'Start';
+      running = false;
+    } else {
+      intervalId = setInterval(() => {
+        nextGeneration();
+      }, currentSpeed);
+      document.getElementById('startPause').textContent = 'Pause';
+      running = true;
+    }
+  });
+
+  document.getElementById('step').addEventListener('click', () => {
+    nextGeneration();
+  });
+
+  document.getElementById('clear').addEventListener('click', clearGrid);
+
+  document.getElementById('random').addEventListener('click', randomizeGrid);
+
+  document.getElementById('pattern').addEventListener('change', (e) => {
+    loadPattern(e.target.value);
+  });
+
+  document.getElementById('speed').addEventListener('input', (e) => {
+    currentSpeed = parseInt(e.target.value);
+    document.getElementById('speedVal').textContent = currentSpeed;
+    if (running) {
+      clearInterval(intervalId);
+      intervalId = setInterval(() => {
+        nextGeneration();
+      }, currentSpeed);
+    }
+  });
+
+  let isDragging = false;
+  canvas.addEventListener('mousedown', (e) => {
+    if (running) return;
+    toggleCellAt(e);
+    isDragging = true;
+  });
+  canvas.addEventListener('mouseup', () => isDragging = false);
+  canvas.addEventListener('mouseleave', () => { isDragging = false; });
+  canvas.addEventListener('mousemove', (e) => {
+    if (isDragging && !running) {
+      toggleCellAt(e);
+    }
+  });
+
+  function toggleCellAt(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const c = Math.floor(x / CELL_SIZE);
+    const r = Math.floor(y / CELL_SIZE);
+    toggleCell(r, c);
+    render();
+    updateCounters();
+  }
+
+  render();
+  updateCounters();
+</script>
+</body>
+</html>

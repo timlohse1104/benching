@@ -24,7 +24,7 @@
 # `GET {api_base}/models` (the "id" field of each entry in `data`). Put that
 # string in `model_name` here so the bench requests the right one.
 #
-# Tip: `curl http://localhost:8080/v1/models` shows the exact name to put in
+# Tip: `curl http://localhost:8081/v1/models` shows the exact name to put in
 # `model_name`. `llm-check list` also shows it after a preflight.
 
 defaults:
@@ -39,7 +39,7 @@ models:
     provider: openai/llamacpp
     label: "llama.cpp (local)"
     kind: workstation             # free-form label; e.g. the host it runs on
-    api_base: http://localhost:8080/v1
+    api_base: http://localhost:8081/v1
     api_key: not-needed           # litellm requires the field; server ignores it
     model_name: "your-model.gguf" # exact name from GET /v1/models
     concurrency: 1

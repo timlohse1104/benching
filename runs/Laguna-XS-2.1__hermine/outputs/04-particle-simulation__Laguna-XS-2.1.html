@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Particle Simulation</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { 
+  overflow: hidden; 
+  background: #0a0a1a; 
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  color: #e0e0ff;
+}
+#canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+#controls {
+  position: fixed;
+  top: 15px;
+  left: 15px;
+  background: rgba(20, 20, 40, 0.85);
+  padding: 12px;
+  border-radius: 8px;
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(100, 100, 200, 0.3);
+}
+#controls h3 {
+  font-size: 14px;
+  margin-bottom: 8px;
+  color: #a0a0ff;
+  text-shadow: 0 0 10px rgba(100, 100, 200, 0.2);
+}
+.control-group {
+  margin-bottom: 10px;
+}
+.control-group:last-child {
+  margin-bottom: 0;
+}
+label {
+  font-size: 12px;
+  color: #c0c0e0;
+  display: block;
+  margin-bottom: 3px;
+}
+input {
+  width: 100%;
+  padding: 6px;
+  background: #1a1a3a;
+  border: 1px solid #3a3a6a;
+  border-radius: 4px;
+  color: #e0e0ff;
+  font-size: 12px;
+}
+input::-webkit-inner-spin-button,
+input::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+#fps {
+  position: fixed;
+  bottom: 15px;
+  right: 15px;
+  background: rgba(20, 20, 40, 0.85);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 13px;
+  color: #ffaa66;
+  border: 1px solid rgba(100, 100, 200, 0.3);
+}
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="controls">
+  <h3>Controls</h3>
+  <div class="control-group">
+    <label>Particles: <span id="particleCount">300</span></label>
+    <input type="range" id="particleSlider" min="50" max="1000" value="300">
+  </div>
+  <div class="control-group">
+    <label>Gravity: <span id="gravityVal">0.3</span></label>
+    <input type="range" id="gravitySlider" min="0" max="1" step="0.01" value="0.3">
+  </div>
+  <div class="control-group">
+    <label>Attraction: <span id="attractionVal">0.5</span></label>
+    <input type="range" id="attractionSlider" min="0" max="2" step="0.01" value="0.5">
+  </div>
+  <div class="control-group">
+    <label>Repulsion: <span id="repulsionVal">0.8</span></label>
+    <input type="range" id="repulsionSlider" min="0" max="2" step="0.01" value="0.8">
+  </div>
+</div>
+<div id="fps">FPS: 0</div>
+<script>
+(() => {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  
+  let width, height;
+  let particles = [];
+  let mouse = { x: 0, y: 0, active: false };
+  
+  // Parameters
+  let particleCount = 300;
+  let gravity = 0.3;
+  let attraction = 0.5;
+  let repulsion = 0.8;
+  
+  // FPS tracking
+  let lastTime = 0;
+  let frameCount = 0;
+  let fps = 0;
+  
+  function resize() {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+  }
+  
+  class Particle {
+    constructor() {
+      this.reset();
+    }
+    
+    reset() {
+      this.x = Math.random() * width;
+      this.y = Math.random() * height;
+      this.vx = (Math.random() - 0.5) * 2;
+      this.vy = (Math.random() - 0.5) * 2;
+      this.size = Math.random() * 3 + 1;
+      this.hue = Math.random() * 60 + 180; // Blue to cyan colors
+      this.trail = [];
+    }
+    
+    update() {
+      // Apply gravity
+      this.vy += gravity;
+      
+      // Mouse interaction
+      if (mouse.active) {
+        const dx = mouse.x - this.x;
+        const dy = mouse.y - this.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist < 100) {
+          const force = (100 - dist) / 100;
+          if (dist > 5) {
+            // Attraction near center, repulsion near cursor
+            const isAttracted = dist > 30;
+            const forceDir = isAttracted ? 1 : -1;
+            this.vx += (dx / dist) * forceDir * force * attraction * 0.2;
+            this.vy += (dy / dist) * forceDir * force * attraction * 0.2;
+          }
+        }
+      }
+      
+      // Update position
+      this.x += this.vx;
+      this.y += this.vy;
+      
+      // Wrap around edges
+      if (this.x < 0) this.x = width;
+      if (this.x > width) this.x = 0;
+      if (this.y < 0) this.y = height;
+      if (this.y > height) this.y = 0;
+      
+      // Add to trail
+      this.trail.push({ x: this.x, y: this.y });
+      if (this.trail.length > 10) this.trail.shift();
+      
+      // Apply drag
+      this.vx *= 0.98;
+      this.vy *= 0.98;
+    }
+    
+    draw() {
+      // Draw trail
+      for (let i = 0; i < this.trail.length - 1; i++) {
+        const p1 = this.trail[i];
+        const p2 = this.trail[i + 1];
+        const alpha = (i + 1) / this.trail.length * 0.3;
+        ctx.strokeStyle = `hsla(${this.hue}, 80%, 60%, ${alpha})`;
+        ctx.lineWidth = this.size * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+      
+      // Draw particle
+      ctx.fillStyle = `hsla(${this.hue}, 80%, 60%, 0.9)`;
+      ctx.shadowBlur = this.size * 3;
+      ctx.shadowColor = `hsla(${this.hue}, 80%, 60%, 0.6)`;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  
+  function initParticles() {
+    particles = [];
+    for (let i = 0; i < particleCount; i++) {
+      particles.push(new Particle());
+    }
+  }
+  
+  function animate(timestamp) {
+    if (!lastTime) lastTime = timestamp;
+    const delta = timestamp - lastTime;
+    
+    // Update FPS
+    frameCount++;
+    if (timestamp - lastTime >= 1000) {
+      fps = Math.round((frameCount * 1000) / (timestamp - lastTime));
+      frameCount = 0;
+      lastTime = timestamp;
+    }
+    
+    ctx.clearRect(0, 0, width, height);
+    
+    // Update and draw particles
+    for (const p of particles) {
+      p.update();
+      p.draw();
+    }
+    
+    // Update FPS display
+    document.getElementById('fps').textContent = `FPS: ${fps}`;
+    
+    requestAnimationFrame(animate);
+  }
+  
+  // Event listeners
+  window.addEventListener('resize', resize);
+  
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = e.clientX - rect.left;
+    mouse.y = e.clientY - rect.top;
+    mouse.active = true;
+  });
+  
+  canvas.addEventListener('mouseleave', () => {
+    mouse.active = false;
+  });
+  
+  // Control panel
+  document.getElementById('particleSlider').addEventListener('input', (e) => {
+    particleCount = parseInt(e.target.value);
+    document.getElementById('particleCount').textContent = particleCount;
+    initParticles();
+  });
+  
+  document.getElementById('gravitySlider').addEventListener('input', (e) => {
+    gravity = parseFloat(e.target.value);
+    document.getElementById('gravityVal').textContent = gravity.toFixed(2);
+  });
+  
+  document.getElementById('attractionSlider').addEventListener('input', (e) => {
+    attraction = parseFloat(e.target.value);
+    document.getElementById('attractionVal').textContent = attraction.toFixed(2);
+  });
+  
+  document.getElementById('repulsionSlider').addEventListener('input', (e) => {
+    repulsion = parseFloat(e.target.value);
+    document.getElementById('repulsionVal').textContent = repulsion.toFixed(2);
+  });
+  
+  // Initialize
+  resize();
+  initParticles();
+  animate(0);
+})();
+</script>
+</body>
+</html>

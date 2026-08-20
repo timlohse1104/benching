@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animated Fractal Tree L-System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a2980, #26d0ce);
+            min-height: 100vh;
+            color: #fff;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            padding: 20px 0 30px;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            background: linear-gradient(to right, #ff9a9e, #fad0c4, #ffecd2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .subtitle {
+            color: rgba(255,255,255,0.8);
+            font-size: 1rem;
+        }
+        
+        .controls {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #fff;
+        }
+        
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        input[type="range"] {
+            flex: 1;
+            height: 8px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 4px;
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #ff6b6b;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(255,107,107,0.8);
+        }
+        
+        .value-display {
+            background: rgba(0,0,0,0.3);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            min-width: 50px;
+            text-align: center;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+        }
+        
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+        
+        .checkbox-item input {
+            width: 18px;
+            height: 18px;
+            accent-color: #ff6b6b;
+        }
+        
+        .btn {
+            background: linear-gradient(to right, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 15px;
+            box-shadow: 0 4px 15px rgba(255,107,107,0.4);
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255,107,107,0.6);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .canvas-container {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        }
+        
+        canvas {
+            width: 100%;
+            height: 500px;
+            display: block;
+            border-radius: 10px;
+            background: rgba(0,0,0,0.1);
+        }
+        
+        .info {
+            text-align: center;
+            color: rgba(255,255,255,0.7);
+            font-size: 0.85rem;
+            margin-top: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8rem;
+            }
+            
+            .controls {
+                padding: 15px;
+            }
+            
+            .checkbox-group {
+                gap: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌳 Animated Fractal Tree</h1>
+            <p class="subtitle">Generated with L-System | Turtle Graphics</p>
+        </header>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="depth">Recursion Depth: <span id="depthValue" class="value-display">6</span></label>
+                <div class="slider-container">
+                    <input type="range" id="depth" min="1" max="10" value="6">
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label for="angle">Branch Angle: <span id="angleValue" class="value-display">25°</span></label>
+                <div class="slider-container">
+                    <input type="range" id="angle" min="10" max="60" value="25">
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label for="ratio">Length Ratio: <span id="ratioValue" class="value-display">0.7</span></label>
+                <div class="slider-container">
+                    <input type="range" id="ratio" min="0.4" max="0.9" step="0.01" value="0.7">
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label for="jitter">Randomness/Jitter: <span id="jitterValue" class="value-display">0.15</span></label>
+                <div class="slider-container">
+                    <input type="range" id="jitter" min="0" max="0.5" step="0.01" value="0.15">
+                </div>
+            </div>
+            
+            <div class="checkbox-group">
+                <div class="checkbox-item">
+                    <input type="checkbox" id="showLeaves" checked>
+                    <label for="showLeaves">Show Leaves</label>
+                </div>
+                <div class="checkbox-item">
+                    <input type="checkbox" id="animate" checked>
+                    <label for="animate">Animate Growth</label>
+                </div>
+            </div>
+            
+            <button class="btn" id="regenerate">🔄 Regenerate Tree</button>
+        </div>
+        
+        <div class="canvas-container">
+            <canvas id="treeCanvas"></canvas>
+            <div class="info">Drag sliders to customize the fractal tree | Click "Regenerate" for new random seed</div>
+        </div>
+    </div>
+
+    <script>
+        class FractalTree {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.width = canvas.width = window.innerWidth * 0.9 < 800 ? window.innerWidth * 0.9 : 800;
+                this.height = canvas.height = 500;
+                
+                // L-system configuration
+                this.axiom = "X";
+                this.rules = {
+                    'X': "F-[[X]+X]+F[+FX]X",
+                    'F': "FF"
+                };
+                
+                // Parameters
+                this.depth = 6;
+                this.angle = 25 * Math.PI / 180;
+                this.lengthRatio = 0.7;
+                this.jitter = 0.15;
+                this.showLeaves = true;
+                this.animate = true;
+                
+                // Animation state
+                this.branches = [];
+                this.animationId = null;
+                this.startTime = null;
+                this.animationDuration = 3000; // ms
+                
+                // Colors
+                this.trunkColor = '#8B4513';
+                this.branchesColors = ['#8B4513', '#A0522D', '#CD853F', '#D2691E', '#B8860B', '#8B8000'];
+                this.leafColors = ['#228B22', '#32CD32', '#66CDAA', '#2E8B57', '#006400'];
+                
+                this.init();
+            }
+            
+            init() {
+                this.bindEvents();
+                this.regenerate();
+            }
+            
+            bindEvents() {
+                const depthSlider = document.getElementById('depth');
+                const angleSlider = document.getElementById('angle');
+                const ratioSlider = document.getElementById('ratio');
+                const jitterSlider = document.getElementById('jitter');
+                const showLeavesCheckbox = document.getElementById('showLeaves');
+                const animateCheckbox = document.getElementById('animate');
+                const regenerateBtn = document.getElementById('regenerate');
+                
+                depthSlider.addEventListener('input', (e) => {
+                    this.depth = parseInt(e.target.value);
+                    document.getElementById('depthValue').textContent = this.depth;
+                });
+                
+                angleSlider.addEventListener('input', (e) => {
+                    this.angle = e.target.value * Math.PI / 180;
+                    document.getElementById('angleValue').textContent = `${e.target.value}°`;
+                });
+                
+                ratioSlider.addEventListener('input', (e) => {
+                    this.lengthRatio = parseFloat(e.target.value);
+                    document.getElementById('ratioValue').textContent = this.lengthRatio.toFixed(1);
+                });
+                
+                jitterSlider.addEventListener('input', (e) => {
+                    this.jitter = parseFloat(e.target.value);
+                    document.getElementById('jitterValue').textContent = this.jitter.toFixed(2);
+                });
+                
+                showLeavesCheckbox.addEventListener('change', (e) => {
+                    this.showLeaves = e.target.checked;
+                });
+                
+                animateCheckbox.addEventListener('change', (e) => {
+                    this.animate = e.target.checked;
+                    if (!this.animate) {
+                        this.stopAnimation();
+                        this.drawTree();
+                    }
+                });
+                
+                regenerateBtn.addEventListener('click', () => this.regenerate());
+                
+                // Handle window resize
+                window.addEventListener('resize', () => {
+                    this.width = this.canvas.width = window.innerWidth * 0.9 < 800 ? window.innerWidth * 0.9 : 800;
+                    this.height = this.canvas.height = 500;
+                    this.drawTree();
+                });
+            }
+            
+            generateWithSeed(seed) {
+                // Use seed for reproducible randomness
+                let x = seed;
+                const mul = 1103515245;
+                const add = 12345;
+                const mod = 2147483647;
+                
+                this.random = () => {
+                    x = (x * mul + add) % mod;
+                    return x / mod;
+                };
+            }
+            
+            regenerate() {
+                // Generate random seed
+                const seed = Math.floor(Math.random() * 100000);
+                this.generateWithSeed(seed);
+                
+                // Generate L-system string
+                const lsystemString = this.generateLSystem(this.axiom, this.depth);
+                
+                // Parse and generate branches
+                this.branches = [];
+                this.parseLSystem(lsystemString);
+                
+                // Reset animation
+                this.stopAnimation();
+                this.startTime = null;
+                
+                // Draw
+                if (this.animate) {
+                    this.startAnimation();
+                } else {
+                    this.drawTree();
+                }
+            }
+            
+            generateLSystem(axiom, iterations) {
+                let result = axiom;
+                for (let i = 0; i < iterations; i++) {
+                    let next = '';
+                    for (let char of result) {
+                        if (this.rules[char]) {
+                            next += this.rules[char];
+                        } else {
+                            next += char;
+                        }
+                    }
+                    result = next;
+                }
+                return result;
+            }
+            
+            parseLSystem(instructions) {
+                const stack = [];
+                let x = this.width / 2;
+                let y = this.height + 50;
+                let angle = -Math.PI / 2; // Start pointing up
+                let len = 12;
+                
+                const jitter = this.jitter;
+                
+                for (let i = 0; i < instructions.length; i++) {
+                    const command = instructions[i];
+                    
+                    if (command === 'F') {
+                        const newX = x + Math.cos(angle) * len;
+                        const newY = y + Math.sin(angle) * len;
+                        
+                        this.branches.push({
+                            x1: x,
+                            y1: y,
+                            x2: newX,
+                            y2: newY,
+                            depth: Math.floor(Math.random() * this.depth) + 1
+                        });
+                        
+                        x = newX;
+                        y = newY;
+                    } else if (command === 'X' || command === 'F') {
+                        // Continue
+                    } else if (command === '+') {
+                        angle += this.angle + (this.random ? (this.random() - 0.5) * jitter * 2 : 0);
+                    } else if (command === '-') {
+                        angle -= this.angle + (this.random ? (this.random() - 0.5) * jitter * 2 : 0);
+                    } else if (command === '[') {
+                        stack.push({ x, y, angle, len });
+                        len *= this.lengthRatio;
+                    } else if (command === ']') {
+                        const saved = stack.pop();
+                        x = saved.x;
+                        y = saved.y;
+                        angle = saved.angle;
+                        len = saved.len;
+                    }
+                }
+            }
+            
+            startAnimation() {
+                if (this.animationId) {
+                    cancelAnimationFrame(this.animationId);
+                }
+                this.startTime = null;
+                this.animationLoop();
+            }
+            
+            stopAnimation() {
+                if (this.animationId) {
+                    cancelAnimationFrame(this.animationId);
+                    this.animationId = null;
+                }
+            }
+            
+            animationLoop(timestamp) {
+                if (!this.startTime) this.startTime = timestamp;
+                
+                const elapsed = timestamp - this.startTime;
+                const progress = Math.min(elapsed / this.animationDuration, 1);
+                
+                this.drawTree(progress);
+                
+                if (progress < 1) {
+                    this.animationId = requestAnimationFrame((ts) => this.animationLoop(ts));
+                } else {
+                    this.animationId = null;
+                }
+            }
+            
+            drawTree(animationProgress = 1) {
+                const ctx = this.ctx;
+                const width = this.width;
+                const height = this.height;
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, width, height);
+                
+                // Draw background
+                ctx.fillStyle = 'rgba(0,0,0,0.1)';
+                ctx.fillRect(0, 0, width, height);
+                
+                // Draw branches
+                const drawCount = Math.floor(this.branches.length * animationProgress);
+                
+                for (let i = 0; i < drawCount; i++) {
+                    const branch = this.branches[i];
+                    const depth = branch.depth;
+                    
+                    // Color based on depth
+                    const colorIndex = Math.min(Math.floor(depth / this.depth * this.branchesColors.length), this.branchesColors.length - 1);
+                    ctx.strokeStyle = this.branchesColors[colorIndex] || '#8B4513';
+                    
+                    // Line width based on depth
+                    ctx.lineWidth = Math.max(1, 4 * (1 - depth / (this.depth * 2)));
+                    
+                    // Alpha for animation
+                    ctx.globalAlpha = this.animate ? Math.min(1, i / (this.branches.length * 0.3)) : 1;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(branch.x1, branch.y1);
+                    ctx.lineTo(branch.x2, branch.y2);
+                    ctx.stroke();
+                }
+                
+                ctx.globalAlpha = 1;
+                
+                // Draw leaves
+                if (this.showLeaves && animationProgress > 0.8) {
+                    this.drawLeaves(animationProgress);
+                }
+            }
+            
+            drawLeaves(progress) {
+                const ctx = this.ctx;
+                const leafProgress = Math.min(1, (progress - 0.8) / 0.2);
+                
+                // Draw leaves at branch endpoints
+                const leafPositions = new Set();
+                for (let i = Math.floor(this.branches.length * progress * 0.5); i < this.branches.length; i++) {
+                    const branch = this.branches[i];
+                    const key = `${Math.floor(branch.x2)},${Math.floor(branch.y2)}`;
+                    
+                    if (!leafPositions.has(key)) {
+                        leafPositions.add(key);
+                        
+                        const leafSize = 4 + Math.random() * 3;
+                        const colorIndex = Math.floor(Math.random() * this.leafColors.length);
+                        
+                        ctx.fillStyle = this.leafColors[colorIndex];
+                        ctx.globalAlpha = leafProgress;
+                        
+                        ctx.beginPath();
+                        ctx.ellipse(branch.x2, branch.y2, leafSize, leafSize * 0.6, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                        
+                        // Add some shine to leaves
+                        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                        ctx.beginPath();
+                        ctx.arc(branch.x2 - leafSize * 0.3, branch.y2 - leafSize * 0.3, leafSize * 0.2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+                
+                ctx.globalAlpha = 1;
+            }
+        }
+        
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            new FractalTree(document.getElementById('treeCanvas'));
+        });
+    </script>
+</body>
+</html>

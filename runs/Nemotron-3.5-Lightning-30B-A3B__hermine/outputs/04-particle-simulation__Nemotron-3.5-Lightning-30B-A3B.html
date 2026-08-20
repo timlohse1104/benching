@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Particle Simulation</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; background: #050510; color: #c0c0e0; font-family: 'Segoe UI', sans-serif; font-size: 14px; }
+    canvas { display: block; }
+    .panel { position: absolute; top: 20px; left: 20px; background: rgba(5,5,15,0.85); padding: 14px 20px; border-radius: 8px; border: 1px solid #1a1a3a; backdrop-filter: blur(4px); }
+    .panel h3 { margin: 0 0 10px 0; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #5aa0ff; }
+    .panel label { display: block; margin: 6px 0; font-size: 12px; }
+    .panel input { width: 190px; padding: 6px 8px; margin-top: 2px; background: #101020; border: 1px solid #2a2a4a; border-radius: 5px; color: #d0d0f0; font-size: 12px; }
+    #fps { position: absolute; bottom: 20px; right: 20px; font-size: 11px; color: #5fa8ff; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div class="panel">
+    <h3>Controls</h3>
+    <label>Particle Count: <span id="countVal">300</span></label>
+    <input type="range" id="countSlider" min="50" max="500" value="300">
+    <label>Gravity: <span id="gravVal">0.10</span></label>
+    <input type="range" id="gravSlider" min="-0.5" max="0.5" step="0.01" value="0.10">
+    <label>Attraction: <span id="attrVal">1.00</span></label>
+    <input type="range" id="attrSlider" min="-5" max="5" step="0.1" value="1.00">
+  </div>
+  <div id="fps"></div>
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const fpsDiv = document.getElementById('fps');
+    const countSlider = document.getElementById('countSlider');
+    const countVal = document.getElementById('countVal');
+    const gravSlider = document.getElementById('gravSlider');
+    const gravVal = document.getElementById('gravVal');
+    const attrSlider = document.getElementById('attrSlider');
+    const attrVal = document.getElementById('attrVal');
+
+    let width, height;
+    let particles = [];
+    let mouse = { x: null, y: null };
+    let gravity = 0.1;
+    let attractionStrength = 1;
+    let particleCount = 300;
+
+    function resize() {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = width;
+      canvas.height = height;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    canvas.addEventListener('mousemove', (e) => {
+      mouse.x = e.clientX;
+      mouse.y = e.clientY;
+    });
+    canvas.addEventListener('mouseleave', () => {
+      mouse.x = null;
+      mouse.y = null;
+    });
+
+    class Particle {
+      constructor() { this.reset(); }
+      reset() {
+        this.x = Math.random() * width;
+        this.y = Math.random() * height;
+        const speed = 0.5 + Math.random() * 1.5;
+        const angle = Math.random() * Math.PI * 2;
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed;
+        this.color = 'hsl(' + (Math.random() * 360) + ', 35%, 78%)';
+      }
+      update() {
+        this.vy += gravity;
+        if (mouse.x !== null && mouse.y !== null) {
+          const dx = mouse.x - this.x;
+          const dy = mouse.y - this.y;
+          const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+          const force = attractionStrength / (dist * 0.2);
+          this.vx += (dx / dist) * force * 0.0002;
+          this.vy += (dy / dist) * force * 0.0002;
+        }
+        this.vx *= 0.99;
+        this.vy *= 0.99;
+        this.x += this.vx;
+        this.y += this.vy;
+        if (this.x < 0) this.x = width;
+        if (this.x > width) this.x = 0;
+        if (this.y < 0) this.y = height;
+        if (this.y > height) this.y = 0;
+      }
+    }
+
+    function initParticles(n) {
+      particles = [];
+      for (let i = 0; i < n; i++) {
+        particles.push(new Particle());
+      }
+    }
+    initParticles(300);
+
+    let lastTime = performance.now();
+    let frameCount = 0;
+    let fps = 0;
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const now = performance.now();
+      frameCount++;
+      if (dt >= 1000) {
+        fps = frameCount;
+        frameCount = 0;
+        lastTime = now;
+        fpsDiv.textContent = 'FPS: ' + fps;
+      }
+      ctx.fillStyle = '#050510';
+      ctx.fillRect(0, 0, width, height);
+      particles.forEach(p => {
+        p.update();
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        const r = 1.5 + Math.random() * 1.5;
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+    animate();
+
+    countSlider.addEventListener('input', (e) => {
+      particleCount = parseInt(e.target.value, 10);
+      countVal.textContent = particleCount;
+      initParticles(particleCount);
+    });
+    gravSlider.addEventListener('input', (e) => {
+      gravity = parseFloat(e.target.value);
+      gravVal.textContent = gravity.toFixed(2);
+    });
+    attrSlider.addEventListener('input', (e) => {
+      attractionStrength = parseFloat(e.target.value);
+      attrVal.textContent = attractionStrength.toFixed(2);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neon Nexus — Tower Defense</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a12;overflow:hidden;font-family:'Courier New',monospace;color:#e0e0ff;user-select:none}
+canvas{display:block}
+#ui-overlay{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+#ui-overlay>*{pointer-events:auto}
+#top-bar{position:absolute;top:0;left:0;right:0;height:48px;background:linear-gradient(180deg,rgba(10,10,18,0.95),rgba(10,10,18,0.7));display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:1px solid rgba(0,255,255,0.15)}
+#top-bar .stat{display:flex;align-items:center;gap:6px;font-size:13px;text-shadow:0 0 8px currentColor}
+#top-bar .stat .val{font-weight:bold;font-size:15px}
+#gold-display{color:#ffdd00}
+#wave-display{color:#00ffcc}
+#lives-display{color:#ff4466}
+#tier-display{color:#aa66ff}
+#build-panel{position:absolute;bottom:0;left:0;right:0;height:100px;background:linear-gradient(0deg,rgba(10,10,18,0.95),rgba(10,10,18,0.7));display:flex;align-items:center;justify-content:center;gap:12px;padding:0 20px;border-top:1px solid rgba(0,255,255,0.15)}
+.build-btn{width:80px;height:80px;border:2px solid rgba(0,255,255,0.3);background:rgba(0,20,40,0.6);border-radius:8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;transition:all 0.2s}
+.build-btn:hover{border-color:#00ffff;background:rgba(0,40,80,0.6);transform:scale(1.05)}
+.build-btn.selected{border-color:#ffdd00;box-shadow:0 0 15px rgba(255,221,0,0.4)}
+.build-btn .icon{font-size:24px}
+.build-btn .name{font-size:9px;color:#88aaff}
+.build-btn .cost{font-size:10px;color:#ffdd00}
+.build-btn.disabled{opacity:0.3;pointer-events:none}
+#side-panel{position:absolute;right:10px;top:60px;width:200px;background:rgba(10,10,25,0.9);border:1px solid rgba(0,255,255,0.2);border-radius:8px;padding:12px;display:none}
+#side-panel h3{color:#00ffcc;font-size:13px;margin-bottom:8px;text-shadow:0 0 8px #00ffcc}
+#side-panel .info-row{display:flex;justify-content:space-between;font-size:11px;margin:4px 0;color:#8899aa}
+#side-panel .info-row .v{color:#e0e0ff}
+.upgrade-btn{width:100%;padding:6px;margin-top:8px;border:1px solid rgba(170,102,255,0.4);background:rgba(30,10,60,0.6);color:#aa66ff;border-radius:4px;cursor:pointer;font-size:11px;font-family:inherit;transition:all 0.2s}
+.upgrade-btn:hover{background:rgba(60,20,100,0.6);border-color:#aa66ff}
+#start-screen,#skill-screen,#wave-choose-screen{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(5,5,12,0.95);z-index:100}
+#start-screen h1{font-size:48px;color:#00ffff;text-shadow:0 0 30px #00ffff,0 0 60px #0088ff;margin-bottom:10px;letter-spacing:4px}
+#start-screen .subtitle{color:#8866cc;font-size:14px;margin-bottom:40px;letter-spacing:2px}
+.menu-btn{padding:14px 40px;border:2px solid #00ffff;background:rgba(0,30,60,0.5);color:#00ffff;font-size:16px;font-family:inherit;cursor:pointer;border-radius:6px;transition:all 0.3s;margin:8px;letter-spacing:2px}
+.menu-btn:hover{background:rgba(0,60,120,0.5);box-shadow:0 0 20px rgba(0,255,255,0.3);transform:scale(1.05)}
+#skill-screen h2{color:#aa66ff;font-size:28px;margin-bottom:20px;text-shadow:0 0 20px #aa66ff}
+.skill-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;max-width:600px;margin-bottom:20px}
+.skill-node{width:120px;height:70px;border:1px solid rgba(170,102,255,0.3);background:rgba(20,10,40,0.6);border-radius:6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:all 0.2s}
+.skill-node:hover{border-color:#aa66ff;background:rgba(40,20,80,0.6)}
+.skill-node.locked{opacity:0.3;pointer-events:none}
+.skill-node .s-icon{font-size:20px}
+.skill-node .s-name{font-size:9px;color:#8899aa}
+.skill-node .s-level{font-size:10px;color:#ffdd00}
+#wave-choose-screen h2{color:#ffdd00;font-size:24px;margin-bottom:10px;text-shadow:0 0 20px #ffdd00}
+#wave-choose-screen .desc{color:#8899aa;font-size:13px;margin-bottom:25px}
+.choice-cards{display:flex;gap:15px}
+.choice-card{width:200px;padding:20px;border:2px solid rgba(0,255,200,0.3);background:rgba(0,20,40,0.5);border-radius:10px;cursor:pointer;transition:all 0.3s;text-align:center}
+.choice-card:hover{border-color:#00ffcc;background:rgba(0,40,80,0.5);transform:translateY(-5px);box-shadow:0 5px 20px rgba(0,255,200,0.2)}
+.choice-card .c-icon{font-size:36px;margin-bottom:10px}
+.choice-card .c-name{color:#00ffcc;font-size:14px;margin-bottom:6px}
+.choice-card .c-desc{color:#8899aa;font-size:11px;line-height:1.4}
+#game-over-screen{position:absolute;top:0;left:0;right:0;bottom:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(5,5,12,0.95);z-index:100}
+#game-over-screen h1{font-size:42px;color:#ff4466;text-shadow:0 0 30px #ff4466;margin-bottom:10px}
+#game-over-screen .stats{color:#8899aa;font-size:14px;margin-bottom:30px;text-align:center;line-height:2}
+#game-over-screen .stats .v{color:#ffdd00}
+#notification{position:absolute;top:60px;left:50%;transform:translateX(-50%);padding:10px 24px;background:rgba(0,20,40,0.9);border:1px solid #00ffcc;border-radius:6px;color:#00ffcc;font-size:13px;opacity:0;transition:opacity 0.3s;pointer-events:none;z-index:50}
+#neural-indicator{position:absolute;top:55px;left:50%;transform:translateX(-50%);padding:4px 12px;background:rgba(255,0,100,0.2);border:1px solid #ff0066;border-radius:4px;color:#ff0066;font-size:11px;opacity:0;transition:opacity 0.3s;pointer-events:none;z-index:50}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="ui-overlay">
+<div id="top-bar" style="display:none">
+<div class="stat" id="gold-display"><span>⬡</span><span class="val" id="gold-val">100</span></div>
+<div class="stat" id="wave-display"><span>WAVE</span><span class="val" id="wave-val">1</span></div>
+<div class="stat" id="lives-display"><span>♥</span><span class="val" id="lives-val">20</span></div>
+<div class="stat" id="tier-display"><span>TK</span><span class="val" id="tier-val">0</span></div>
+</div>
+<div id="build-panel" style="display:none">
+<div class="build-btn" data-type="firewall" onclick="selectTurret('firewall')">
+<span class="icon">🔥</span><span class="name">FIREWALL</span><span class="cost">⬡ 50</span>
+</div>
+<div class="build-btn" data-type="virus" onclick="selectTurret('virus')">
+<span class="icon">☣️</span><span class="name">VIRUS</span><span class="cost">⬡ 75</span>
+</div>
+<div class="build-btn" data-type="surge" onclick="selectTurret('surge')">
+<span class="icon">⚡</span><span class="name">SURGE</span><span class="cost">⬡ 60</span>
+</div>
+<div class="build-btn" data-type="neural" id="neural-btn" onclick="toggleNeural()" style="border-color:rgba(255,0,100,0.4)">
+<span class="icon">🧠</span><span class="name">NEURAL</span><span class="cost">SPACE</span>
+</div>
+</div>
+<div id="side-panel">
+<h3 id="sp-title">Turret</h3>
+<div id="sp-info"></div>
+<div id="sp-upgrades"></div>
+<div id="sp-actions"></div>
+</div>
+<div id="start-screen">
+<h1>NEON NEXUS</h1>
+<div class="subtitle">TOWER DEFENSE // ROGUE-LIKE</div>
+<button class="menu-btn" onclick="startGame()">INITIALIZE RUN</button>
+<button class="menu-btn" onclick="showSkills()">SKILL MATRIX</button>
+<div id="run-stats" style="color:#667;margin-top:20px;font-size:12px;text-align:center;line-height:1.8"></div>
+</div>
+<div id="skill-screen" style="display:none">
+<h2>SKILL MATRIX</h2>
+<div style="color:#667;font-size:12px;margin-bottom:15px">Points: <span id="skill-points" style="color:#ffdd00">0</span></div>
+<div class="skill-grid" id="skill-grid"></div>
+<button class="menu-btn" onclick="hideSkills()" style="margin-top:10px">BACK</button>
+</div>
+<div id="wave-choose-screen" style="display:none">
+<h2>SELECT UPGRADE</h2>
+<div class="desc">Choose one enhancement for the next wave</div>
+<div class="choice-cards" id="choice-cards"></div>
+</div>
+<div id="game-over-screen">
+<h1>SYSTEM CRASH</h1>
+<div class="stats" id="go-stats"></div>
+<button class="menu-btn" onclick="restartGame()">REBOOT</button>
+<button class="menu-btn" onclick="showSkills()">SKILL MATRIX</button>
+</div>
+<div id="notification"></div>
+<div id="neural-indicator">NEURAL LINK ACTIVE — CLICK TO AIM</div>
+</div>
+
+<script>
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+let W,H;
+function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight}
+resize();window.addEventListener('resize',resize);
+
+// === CONSTANTS ===
+const COLS=16,ROWS=12;
+const TILE_W=56,TILE_H=56;
+const GRID_OFF_X=(W-COLS*TILE_W)/2;
+const GRID_OFF_Y=70;
+
+// === GAME STATE ===
+let game={
+  state:'menu', // menu, playing, waveIntro, waveChoice, gameover
+  gold:100,lives:20,wave:0,tier:0,
+  enemies:[],turrets:[],projectiles:[],particles:[],
+  grid:[], // 0=empty, 1=path, 2=buildable, 3=blocked
+  selectedTurret:null,
+  neuralTurret:null,
+  neuralAim:null,
+  waveTimer:0,waveEnemies:[],waveSpawnTimer:0,waveSpawnIndex:0,
+  waveComplete:false,waveDelay:0,
+  runKills:0,runWaves:0,runGold:0,
+  neuralActive:false,
+  choiceQueue:[],
+  lastTime:0
+};
+
+// === SKILL TREE (permanent) ===
+let skills={
+  offense:{name:'Offense',icon:'⚔️',levels:[
+    {name:'Damage I',desc:'+10% damage',cost:1,fn:s=>s.turretDmg*=1.1},
+    {name:'Damage II',desc:'+15% damage',cost:1,fn:s=>s.turretDmg*=1.15},
+    {name:'Damage III',desc:'+20% damage',cost:1,fn:s=>s.turretDmg*=1.2},
+    {name:'Firepower',desc:'+10% damage',cost:1,fn:s=>s.turretDmg*=1.1},
+  ]},
+  speed:{name:'Speed',icon:'⚡',levels:[
+    {name:'Haste I',desc:'+10% atk speed',cost:1,fn:s=>s.atkSpeed*=1.1},
+    {name:'Haste II',desc:'+15% atk speed',cost:1,fn:s=>s.atkSpeed*=1.15},
+    {name:'Swift',desc:'+10% atk speed',cost:1,fn:s=>s.atkSpeed*=1.1},
+  ]},
+  range:{name:'Range',icon:'📡',levels:[
+    {name:'Scope I',desc:'+15% range',cost:1,fn:s=>s.range*=1.15},
+    {name:'Scope II',desc:'+20% range',cost:1,fn:s=>s.range*=1.2},
+    {name:'Omni',desc:'+15% range',cost:1,fn:s=>s.range*=1.15},
+  ]},
+  economy:{name:'Economy',icon:'💰',levels:[
+    {name:'Mining I',desc:'+10% gold',cost:1,fn:s=>s.goldMult*=1.1},
+    {name:'Mining II',desc:'+15% gold',cost:1,fn:s=>s.goldMult*=1.15},
+    {name:'Wealth',desc:'+10% gold',cost:1,fn:s=>s.goldMult*=1.1},
+  ]},
+  defense:{name:'Defense',icon:'🛡️',levels:[
+    {name:'Reinforce',desc:'+1 life',cost:2,fn:s=>s.maxLives+=1},
+    {name:'Fortify',desc:'+1 life',cost:2,fn:s=>s.maxLives+=1},
+    {name:'Iron Wall',desc:'+2 lives',cost:3,fn:s=>s.maxLives+=2},
+  ]},
+  neural:{name:'Neural Link',icon:'🧠',levels:[
+    {name:'Link I',desc:'Unlock neural aim',cost:1,fn:s=>s.neuralUnlocked=true},
+    {name:'Link II',desc:'Neural +50% dmg',cost:2,fn:s=>s.neuralDmg*=1.5},
+    {name:'Link III',desc:'Neural +100% dmg',cost:3,fn:s=>s.neuralDmg*=2.0},
+  ]},
+  fusion:{name:'Fusion',icon:'🔮',levels:[
+    {name:'Fuse I',desc:'Enemies drop fusion',cost:1,fn:s=>s.fusionChance=0.15},
+    {name:'Fuse II',desc:'Better fusion',cost:1,fn:s=>s.fusionChance=0.25},
+    {name:'Overload',desc:'Fuse +damage',cost:2,fn:s=>{s.fusionChance=0.3;s.fusionDmg=1.5}},
+  ]}
+};
+
+let skillPoints=0;
+let skillTier={};
+for(let k in skills)skillTier[k]=0;
+
+function loadProgress(){
+  try{
+    let d=JSON.parse(localStorage.getItem('neonNexus'));
+    if(d){skillPoints=d.skillPoints||0;for(let k in d.skillTier)skillTier[k]=d.skillTier[k]||0}
+  }catch(e){}
+}
+function saveProgress(){
+  localStorage.setItem('neonNexus',JSON.stringify({skillPoints,skillTier}));
+}
+loadProgress();
+
+let baseStats={turretDmg:1,atkSpeed:1,range:1,goldMult:1,maxLives:0,neuralUnlocked:false,neuralDmg:1,fusionChance:0,fusionDmg:1};
+function applySkills(){
+  let s={...baseStats};
+  for(let k in skills){
+    let count=skillTier[k]||0;
+    for(let i=0;i<count&&i<skills[k].levels.length;i++){
+      skills[k].levels[i].fn(s);
+    }
+  }
+  return s;
+}
+
+// === TURRET DEFINITIONS ===
+const TURRET_DEFS={
+  firewall:{name:'Firewall',cost:50,dmg:10,range:3,atkSpd:1.0,color:'#ff4422',color2:'#ff8800',projColor:'#ff6600',projSpd:8,icon:'🔥',desc:'Reliable single-target damage',upgradeCost:30},
+  virus:{name:'Virus',cost:75,dmg:6,range:2.5,atkSpd:0.6,color:'#44ff44',color2:'#00ff88',projColor:'#88ff00',projSpd:5,icon:'☣️',desc:'Area damage over time',upgradeCost:45,aot:true,aotDmg:3,aotDur:2},
+  surge:{name:'Surge',cost:60,dmg:8,range:3.5,atkSpd:1.2,color:'#4488ff',color2:'#88ccff',projColor:'#aaddff',projSpd:12,icon:'⚡',desc:'Chain lightning, hits multiple',upgradeCost:40,chain:3}
+};
+
+// === ENEMY DEFINITIONS ===
+const ENEMY_DEFS={
+  glitch:{name:'Glitch',hp:30,speed:2.5,reward:5,color:'#ff00ff',size:10,armor:0,boss:false,shape:'diamond'},
+  juggernaut:{name:'Juggernaut',hp:120,speed:0.8,reward:15,color:'#ff8800',size:16,armor:3,boss:false,shape:'hex'},
+  phantom:{name:'Phantom',hp:60,speed:1.8,reward:10,color:'#aa44ff',size:12,armor:0,boss:false,shape:'triangle',phase:0.4},
+  splitter:{name:'Splitter',hp:80,speed:1.5,reward:12,color:'#ffdd00',size:14,armor:1,boss:false,shape:'pentagon',splits:2},
+  magnet:{name:'Magnet',hp:50,speed:2.0,reward:8,color:'#ff4488',size:11,armor:0,boss:false,shape:'circle',magnet:true},
+  boss:{name:'Corrupted Admin',hp:500,speed:0.6,reward:100,color:'#ff0044',size:24,armor:5,boss:true,shape:'octagon',boss:true}
+};
+
+// === PATH ===
+let path=[];
+function generatePath(){
+  path=[];
+  // Winding path from left to right
+  let waypoints=[
+    {c:-1,r:1},{c:2,r:1},{c:2,r:5},{c:5,r:5},{c:5,r:2},{c:8,r:2},{c:8,r:8},{c:11,r:8},{c:11,r:4},{c:14,r:4},{c:14,r:6},{c:COLS,r:6}
+  ];
+  for(let i=0;i<waypoints.length-1;i++){
+    let a=waypoints[i],b=waypoints[i+1];
+    let steps=Math.max(Math.abs(b.c-a.c),Math.abs(b.r-a.r))*2;
+    for(let s=0;s<=steps;s++){
+      let t=s/steps;
+      let c=a.c+(b.c-a.c)*t;
+      let r=a.r+(b.r-a.r)*t;
+      path.push({c,c:r});
+    }
+  }
+}
+
+function initGrid(){
+  game.grid=[];
+  for(let r=0;r<ROWS;r++){
+    game.grid[r]=[];
+    for(let c=0;c<COLS;c++){
+      game.grid[r][c]=3; // blocked
+    }
+  }
+  // Mark path tiles
+  let pathCells=new Set();
+  for(let p of path){
+    let c=Math.round(p.c),r=Math.round(p.r);
+    if(c>=0&&c<COLS&&r>=0&&r<ROWS){
+      pathCells.add(r*COLS+c);
+      game.grid[r][c]=1;
+    }
+  }
+  // Mark buildable tiles adjacent to path
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      if(game.grid[r][c]===1)continue;
+      let adj=false;
+      for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
+        let nr=r+dr,nc=c+dc;
+        if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&game.grid[nr][nc]===1)adj=true;
+      }
+      if(adj)game.grid[r][c]=2;
+    }
+  }
+}
+
+// === ENEMY CLASS ===
+class Enemy{
+  constructor(def,wave,x,y){
+    this.def={...def};
+    this.maxHp=Math.floor(def.hp*(1+wave*0.15));
+    this.hp=this.maxHp;
+    this.speed=def.speed*(1+wave*0.02);
+    this.reward=Math.floor(def.reward*(1+wave*0.1));
+    this.x=x;this.y=y;
+    this.pathIndex=0;
+    this.alive=true;
+    this.frozen=0;
+    this.poisoned=0;this.poisonDmg=0;
+    this.magnetActive=false;
+    this.magnetTimer=0;
+    this.flashTimer=0;
+    this.angle=0;
+    this.rotationSpeed=(Math.random()-0.5)*2;
+    this.hitFlash=0;
+  }
+  update(dt){
+    if(!this.alive)return;
+    this.hitFlash=Math.max(0,this.hitFlash-dt*5);
+    if(this.poisoned>0){
+      this.poisoned-=dt;
+      this.hp-=this.poisonDmg*dt;
+      if(this.hp<=0)this.die();
+    }
+    if(this.magnetActive){
+      this.magnetTimer-=dt;
+      if(this.magnetTimer<=0){
+        this.magnetActive=false;
+        // Steal gold from nearest turret
+        let nearest=null,minD=Infinity;
+        for(let t of game.turrets){
+          let d=Math.hypot(t.x-this.x,t.y-this.y);
+          if(d<minD){minD=d;nearest=t}
+        }
+        if(nearest&&minD<200){
+          let steal=Math.floor(5+game.wave*2);
+          game.gold=Math.max(0,game.gold-steal);
+          spawnParticles(this.x,this.y,'#ff4488',5);
+        }
+      }
+    }
+    // Move along path
+    if(this.pathIndex<path.length-1){
+      let target=path[this.pathIndex+1];
+      let tx=target.c*TILE_W+TILE_W/2+GRID_OFF_X;
+      let ty=target.r*TILE_H+TILE_H/2+GRID_OFF_Y;
+      let dx=tx-this.x,dy=ty-this.y;
+      let d=Math.hypot(dx,dy);
+      let move=this.speed*TILE_W*dt;
+      if(d<move+5){
+        this.x=tx;this.y=ty;
+        this.pathIndex++;
+      }else{
+        this.x+=dx/d*move;
+        this.y+=dy/d*move;
+        this.angle=Math.atan2(dy,dx);
+      }
+    }
+    this.rotationSpeed+=(Math.random()-0.5)*dt*5;
+    this.angle+=this.rotationSpeed*dt*0.1;
+    // Check if reached end
+    if(this.pathIndex>=path.length-1){
+      this.alive=false;
+      game.lives--;
+      spawnParticles(this.x,this.y,'#ff0044',10);
+      if(game.lives<=0)gameOver();
+    }
+  }
+  takeDamage(amt,source){
+    let actual=Math.max(1,amt-this.def.armor);
+    this.hp-=actual;
+    this.hitFlash=1;
+    if(this.hp<=0)this.die();
+  }
+  die(){
+    if(!this.alive)return;
+    this.alive=false;
+    game.gold+=this.reward;
+    game.runKills++;
+    spawnParticles(this.x,this.y,this.def.color,15);
+    // Splitter logic
+    if(this.def.splits){
+      for(let i=0;i<this.def.splits;i++){
+        let mini={...this.def,name:'Mini'+this.def.name,hp:this.maxHp*0.4,speed:this.speed*1.3,reward:Math.floor(this.reward/3),size:this.def.size*0.6,armor:0,boss:false,shape:'diamond'};
+        let e=new Enemy(mini,0,this.x+(Math.random()-0.5)*20,this.y+(Math.random()-0.5)*20);
+        e.pathIndex=this.pathIndex;
+        game.enemies.push(e);
+      }
+    }
+    // Fusion drop
+    let s=applySkills();
+    if(Math.random()<s.fusionChance){
+      game.choiceQueue.push({type:'fusion',color:this.def.color,name:this.def.name+' Core'});
+    }
+  }
+  draw(){
+    if(!this.alive)return;
+    ctx.save();
+    ctx.translate(this.x,this.y);
+    ctx.rotate(this.angle);
+    // Glow
+    ctx.shadowColor=this.hitFlash>0?'#ffffff':this.def.color;
+    ctx.shadowBlur=this.hitFlash>0?15:8;
+    // Body
+    ctx.fillStyle=this.hitFlash>0?'#ffffff':this.def.color;
+    ctx.strokeStyle=this.def.color;
+    ctx.lineWidth=2;
+    drawPoly(ctx,this.def.shape,this.def.size);
+    ctx.fill();ctx.stroke();
+    // Inner detail
+    ctx.shadowBlur=0;
+    ctx.fillStyle='rgba(0,0,0,0.4)';
+    drawPoly(ctx,this.def.shape,this.def.size*0.5);
+    ctx.fill();
+    // HP bar
+    ctx.rotate(-this.angle);
+    let bw=this.def.size*2;
+    ctx.fillStyle='#333';
+    ctx.fillRect(-bw/2,-this.def.size-10,bw,4);
+    ctx.fillStyle=this.hp/this.maxHp>0.3?'#00ff88':'#ff4444';
+    ctx.fillRect(-bw/2,-this.def.size-10,bw*(this.hp/this.maxHp),4);
+    // Boss indicator
+    if(this.def.boss){
+      ctx.fillStyle='#ff0044';
+      ctx.font='bold 10px monospace';
+      ctx.textAlign='center';
+      ctx.fillText('BOSS',0,-this.def.size-14);
+    }
+    ctx.restore();
+  }
+}
+
+function drawPoly(ctx,shape,size){
+  ctx.beginPath();
+  let sides={diamond:4,hex:6,triangle:3,pentagon:5,circle:6,octagon:8}[shape]||4;
+  for(let i=0;i<sides;i++){
+    let a=Math.PI*2/sides*i-Math.PI/2;
+    let x=Math.cos(a)*size,y=Math.sin(a)*size;
+    if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+  }
+  ctx.closePath();
+}
+
+// === TURRET CLASS ===
+class Turret{
+  constructor(type,col,row){
+    let def=TURRET_DEFS[type];
+    this.type=type;
+    this.col=col;this.row=row;
+    this.x=col*TILE_W+TILE_W/2+GRID_OFF_X;
+    this.y=row*TILE_H+TILE_H/2+GRID_OFF_Y;
+    this.def={...def};
+    this.level=1;
+    this.cooldown=0;
+    this.target=null;
+    this.angle=0;
+    this.fusionColor=null;
+    this.fusionDmgMult=1;
+    this.totalSpent=def.cost;
+  }
+  getRange(){
+    let s=applySkills();
+    return this.def.range*TILE_W*s.range;
+  }
+  getDmg(){
+    let s=applySkills();
+    let base=this.def.dmg*(1+this.level*0.5);
+    return base*s.turretDmg*this.fusionDmgMult;
+  }
+  getAtkSpd(){
+    let s=applySkills();
+    return this.def.atkSpd*s.atkSpeed;
+  }
+  upgrade(){
+    let cost=Math.floor(this.def.upgradeCost*Math.pow(1.5,this.level-1));
+    if(game.gold<cost)return false;
+    game.gold-=cost;
+    this.totalSpent+=cost;
+    this.level++;
+    return true;
+  }
+  update(dt){
+    this.cooldown-=dt;
+    // Find target
+    let range=this.getRange();
+    let best=null,bestProgress=-1;
+    for(let e of game.enemies){
+      if(!e.alive)continue;
+      let d=Math.hypot(e.x-this.x,e.y-this.y);
+      if(d<=range){
+        if(e.pathIndex>bestProgress||(e.pathIndex===bestProgress&&d<Math.hypot(best.x-this.x,best.y-this.y))){
+          best=e;bestProgress=e.pathIndex;
+        }
+      }
+    }
+    // Neural override
+    if(game.neuralTurret===this&&game.neuralAim){
+      let na=game.neuralAim;
+      let target=null,minD=Infinity;
+      for(let e of game.enemies){
+        if(!e.alive)continue;
+        let d=Math.hypot(e.x-na.x,e.y-na.y);
+        if(d<=range&&d<minD){target=e;minD=d}
+      }
+      if(target){best=target;bestProgress=target.pathIndex}
+    }
+    this.target=best;
+    if(best){
+      let tx=best.x-this.x,ty=best.y-this.y;
+      let ta=Math.atan2(ty,tx);
+      let diff=ta-this.angle;
+      while(diff>Math.PI)diff-=Math.PI*2;
+      while(diff<-Math.PI)diff+=Math.PI*2;
+      this.angle+=diff*Math.min(1,dt*12);
+      if(this.cooldown<=0){
+        this.shoot(best);
+        this.cooldown=1/this.getAtkSpd();
+      }
+    }
+  }
+  shoot(target){
+    let dmg=this.getDmg();
+    let s=applySkills();
+    if(game.neuralTurret===this)dmg*=s.neuralDmg;
+    if(this.type==='virus'){
+      // AoE projectile
+      game.projectiles.push(new Projectile(this.x,this.y,target,dmg,this.def.projColor,this.def.aotDmg,this.def.aotDur,this));
+    }else if(this.type==='surge'){
+      // Chain projectile
+      game.projectiles.push(new Projectile(this.x,this.y,target,dmg,this.def.projColor,0,0,this,this.def.chain||3));
+    }else{
+      game.projectiles.push(new Projectile(this.x,this.y,target,dmg,this.def.projColor,0,0,this));
+    }
+  }
+  draw(){
+    let def=this.def;
+    // Base
+    ctx.save();
+    ctx.translate(this.x,this.y);
+    // Range circle if selected
+    if(game.selectedTurret===this){
+      ctx.beginPath();
+      ctx.arc(0,0,this.getRange(),0,Math.PI*2);
+      ctx.strokeStyle='rgba(0,255,255,0.15)';
+      ctx.lineWidth=1;
+      ctx.stroke();
+    }
+    // Neural indicator
+    if(game.neuralTurret===this){
+      ctx.beginPath();
+      ctx.arc(0,0,22,0,Math.PI*2);
+      ctx.strokeStyle='#ff0066';
+      ctx.lineWidth=2;
+      ctx.shadowColor='#ff0066';
+      ctx.shadowBlur=10;
+      ctx.stroke();
+      ctx.shadowBlur=0;
+    }
+    // Level indicator
+    ctx.fillStyle='rgba(0,0,0,0.5)';
+    ctx.fillRect(-15,-22,30,6);
+    ctx.fillStyle='#00ffcc';
+    ctx.fillRect(-15,-22,30*(this.level/10),6);
+    // Turret body - low poly style
+    ctx.rotate(this.angle);
+    ctx.shadowColor=def.color;
+    ctx.shadowBlur=8;
+    // Main body
+    ctx.fillStyle=def.color;
+    ctx.strokeStyle=def.color2;
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    if(this.type==='firewall'){
+      // Triangle shape
+      ctx.moveTo(16,0);ctx.lineTo(-10,-10);ctx.lineTo(-6,0);ctx.lineTo(-10,10);ctx.closePath();
+    }else if(this.type==='virus'){
+      // Cross shape
+      ctx.moveTo(12,0);ctx.lineTo(4,-4);ctx.lineTo(4,-12);ctx.lineTo(-4,-12);ctx.lineTo(-4,-4);ctx.lineTo(-12,-4);ctx.lineTo(-12,4);ctx.lineTo(-4,4);ctx.lineTo(-4,12);ctx.lineTo(4,12);ctx.lineTo(4,4);ctx.lineTo(12,4);ctx.closePath();
+    }else{
+      // Lightning bolt shape
+      ctx.moveTo(14,0);ctx.lineTo(2,-6);ctx.lineTo(6,-6);ctx.lineTo(-8,0);ctx.lineTo(6,6);ctx.lineTo(2,6);ctx.closePath();
+    }
+    ctx.fill();ctx.stroke();
+    // Fusion overlay
+    if(this.fusionColor){
+      ctx.globalAlpha=0.4;
+      ctx.fillStyle=this.fusionColor;
+      ctx.fill();
+      ctx.globalAlpha=1;
+    }
+    // Level stars
+    ctx.rotate(-this.angle);
+    ctx.shadowBlur=0;
+    ctx.fillStyle='#ffdd00';
+    ctx.font='8px monospace';
+    ctx.textAlign='center';
+    let stars='★'.repeat(Math.min(this.level,5));
+    if(this.level>5)stars+='+'+(this.level-5);
+    ctx.fillText(stars,0,18);
+    ctx.restore();
+  }
+}
+
+// === PROJECTILE CLASS ===
+class Projectile{
+  constructor(x,y,target,dmg,color,aotDmg,aotDur,turret,chain=0){
+    this.x=x;this.y=y;
+    this.target=target;
+    this.dmg=dmg;
+    this.color=color;
+    this.speed=TILE_W*6;
+    this.alive=true;
+    this.aotDmg=aotDmg;
+    this.aotDur=aotDur;
+    this.turret=turret;
+    this.chain=chain;
+    this.chained=[];
+    this.trail=[];
+  }
+  update(dt){
+    if(!this.alive)return;
+    this.trail.push({x:this.x,y:this.y,life:0.3});
+    this.trail=this.trail.filter(t=>{t.life-=dt;return t.life>0});
+    if(!this.target||!this.target.alive){
+      // Find new target
+      let best=null,minD=Infinity;
+      for(let e of game.enemies){
+        if(!e.alive||this.chained.includes(e))continue;
+        let d=Math.hypot(e.x-this.x,e.y-this.y);
+        if(d<minD){minD=d;best=e}
+      }
+      if(!best){this.alive=false;return}
+      this.target=best;
+    }
+    let dx=this.target.x-this.x,dy=this.target.y-this.y;
+    let d=Math.hypot(dx,dy);
+    let move=this.speed*dt;
+    if(d<move+8){
+      // Hit
+      this.target.takeDamage(this.dmg,this.turret);
+      this.chained.push(this.target);
+      spawnParticles(this.target.x,this.target.y,this.color,5);
+      if(this.aotDmg>0){
+        this.target.poisoned=this.aotDur;
+        this.target.poisonDmg=this.aotDmg;
+      }
+      // Chain
+      if(this.chain>0&&this.chained.length<this.chain){
+        let next=null,minD2=Infinity;
+        for(let e of game.enemies){
+          if(!e.alive||this.chained.includes(e))continue;
+          let d2=Math.hypot(e.x-this.target.x,e.y-this.target.y);
+          if(d2<TILE_W*2&&d2<minD2){minD2=d2;next=e}
+        }
+        if(next){
+          this.target=next;
+          this.dmg*=0.7;
+          this.chain--;
+          return;
+        }
+      }
+      this.alive=false;
+    }else{
+      this.x+=dx/d*move;
+      this.y+=dy/d*move;
+    }
+  }
+  draw(){
+    if(!this.alive)return;
+    // Trail
+    for(let t of this.trail){
+      ctx.globalAlpha=t.life/0.3*0.5;
+      ctx.fillStyle=this.color;
+      ctx.fillRect(t.x-2,t.y-2,4,4);
+    }
+    ctx.globalAlpha=1;
+    // Projectile
+    ctx.shadowColor=this.color;
+    ctx.shadowBlur=8;
+    ctx.fillStyle=this.color;
+    ctx.beginPath();
+    ctx.arc(this.x,this.y,4,0,Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur=0;
+  }
+}
+
+// === PARTICLES ===
+function spawnParticles(x,y,color,count){
+  for(let i=0;i<count;i++){
+    let angle=Math.random()*Math.PI*2;
+    let speed=30+Math.random()*80;
+    game.particles.push({
+      x,y,
+      vx:Math.cos(angle)*speed,
+      vy:Math.sin(angle)*speed,
+      life:0.5+Math.random()*0.5,
+      color,
+      size:2+Math.random()*3
+    });
+  }
+}
+
+function updateParticles(dt){
+  for(let p of game.particles){
+    p.x+=p.vx*dt;
+    p.y+=p.vy*dt;
+    p.vx*=0.95;p.vy*=0.95;
+    p.life-=dt;
+  }
+  game.particles=game.particles.filter(p=>p.life>0);
+}
+
+function drawParticles(){
+  for(let p of game.particles){
+    ctx.globalAlpha=p.life;
+    ctx.shadowColor=p.color;
+    ctx.shadowBlur=6;
+    ctx.fillStyle=p.color;
+    ctx.fillRect(p.x-p.size/2,p.y-p.size/2,p.size,p.size);
+  }
+  ctx.globalAlpha=1;ctx.shadowBlur=0;
+}
+
+// === WAVE GENERATION ===
+function generateWave(n){
+  let enemies=[];
+  let isBossWave=(n%5===0);
+  let count=5+Math.floor(n*1.5);
+  if(isBossWave)count=Math.floor(count*0.6);
+  for(let i=0;i<count;i++){
+    let roll=Math.random();
+    let type;
+    if(n<3){
+      type='glitch';
+    }else if(n<5){
+      type=roll<0.6?'glitch':roll<0.85?'juggernaut':'phantom';
+    }else if(n<8){
+      type=roll<0.3?'glitch':roll<0.5?'juggernaut':roll<0.7?'phantom':roll<0.85?'splitter':'magnet';
+    }else{
+      let r=Math.random();
+      if(r<0.2)type='glitch';
+      else if(r<0.35)type='juggernaut';
+      else if(r<0.5)type='phantom';
+      else if(r<0.7)type='splitter';
+      else type='magnet';
+    }
+    enemies.push(type);
+  }
+  if(isBossWave)enemies.push('boss');
+  // Shuffle but keep boss last
+  let bossIdx=enemies.indexOf('boss');
+  if(bossIdx>=0){
+    enemies.splice(bossIdx,1);
+    enemies.push('boss');
+  }
+  return enemies;
+}
+
+// === ROGUELIKE CHOICES ===
+const CHOICE_POOL=[
+  {name:'Overclock',desc:'All turrets +20% damage this wave',icon:'💥',apply:()=>{waveBuff.dmg=1.2}},
+  {name:'Reinforce',desc:'+3 max lives',icon:'❤️',apply:()=>{game.lives+=3}},
+  {name:'Gold Rush',desc:'Gain 50 gold',icon:'💰',apply:()=>{game.gold+=50}},
+  {name:'Rapid Fire',desc:'All turrets +25% atk speed this wave',icon:'⚡',apply:()=>{waveBuff.atkSpeed=1.25}},
+  {name:'Heal Core',desc:'Restore 5 lives',icon:'🩹',apply:()=>{game.lives=Math.min(20,game.lives+5)}},
+  {name:'Fusion Blast',desc:'Next wave enemies drop 2x fusion cores',icon:'🔮',apply:()=>{waveBuff.doubleFusion=true}},
+  {name:'Armor Piercing',desc:'All turrets ignore 50% enemy armor this wave',icon:'🗡️',apply:()=>{waveBuff.armorPierce=true}},
+  {name:'Time Warp',desc:'Enemies -20% speed this wave',icon:'⏰',apply:()=>{waveBuff.slow=0.8}},
+  {name:'Juggernaut Slayer',desc:'All turrets +50% damage vs juggernauts',icon:'💪',apply:()=>{waveBuff.vsJuggernaut=1.5}},
+  {name:'Neural Overload',desc:'Neural link turret does +100% damage this wave',icon:'🧠',apply:()=>{waveBuff.neuralDmg=2.0}},
+];
+let waveBuff={dmg:1,atkSpeed:1,armorPierce:false,slow:1,doubleFusion:false,vsJuggernaut:1,neuralDmg:1};
+
+function showWaveChoice(){
+  game.state='waveChoice';
+  let screen=document.getElementById('wave-choose-screen');
+  screen.style.display='flex';
+  let cards=document.getElementById('choice-cards');
+  cards.innerHTML='';
+  let choices=[];
+  let pool=[...CHOICE_POOL];
+  for(let i=0;i<3&&pool.length;i++){
+    let idx=Math.floor(Math.random()*pool.length);
+    choices.push(pool.splice(idx,1)[0]);
+  }
+  for(let c of choices){
+    let div=document.createElement('div');
+    div.className='choice-card';
+    div.innerHTML=`<div class="c-icon">${c.icon}</div><div class="c-name">${c.name}</div><div class="c-desc">${c.desc}</div>`;
+    div.onclick=()=>{
+      c.apply();
+      screen.style.display='none';
+      startNextWave();
+    };
+    cards.appendChild(div);
+  }
+}
+
+// === GAME FLOW ===
+function startGame(){
+  document.getElementById('start-screen').style.display='none';
+  document.getElementById('top-bar').style.display='flex';
+  document.getElementById('build-panel').style.display='flex';
+  let s=applySkills();
+  game.gold=100;game.lives=20+s.maxLives;game.wave=0;game.tier=0;
+  game.enemies=[];game.turrets=[];game.projectiles=[];game.particles=[];
+  game.neuralTurret=null;game.neuralAim=null;game.neuralActive=false;
+  game.choiceQueue=[];
+  game.runKills=0;game.runGold=0;
+  generatePath();initGrid();
+  showWaveChoice();
+}
+
+function startNextWave(){
+  game.wave++;
+  game.state='playing';
+  document.getElementById('wave-choose-screen').style.display='none';
+  waveBuff={dmg:1,atkSpeed:1,armorPierce:false,slow:1,doubleFusion:false,vsJuggernaut:1,neuralDmg:1};
+  game.waveEnemies=generateWave(game.wave);
+  game.waveSpawnTimer=0;game.waveSpawnIndex=0;game.waveComplete=false;
+  document.getElementById('wave-val').textContent=game.wave;
+  notify('WAVE '+game.wave+(game.wave%5===0?' — BOSS INCOMING!':''));
+}
+
+function gameOver(){
+  game.state='gameover';
+  let s=applySkills();
+  skillPoints+=Math.floor(game.wave/3)+1;
+  saveProgress();
+  let go=document.getElementById('game-over-screen');
+  go.style.display='flex';
+  document.getElementById('go-stats').innerHTML=`
+    Waves Survived: <span class="v">${game.wave}</span><br>
+    Enemies Destroyed: <span class="v">${game.runKills}</span><br>
+    Gold Earned: <span class="v">${game.runGold}</span><br>
+    Tiers Earned: <span class="v">${game.tier}</span>
+  `;
+}
+
+function restartGame(){
+  document.getElementById('game-over-screen').style.display='none';
+  startGame();
+}
+
+// === UI HELPERS ===
+function notify(msg){
+  let el=document.getElementById('notification');
+  el.textContent=msg;el.style.opacity=1;
+  setTimeout(()=>el.style.opacity=0,2500);
+}
+
+function selectTurret(type){
+  game.selectedTurret=null;
+  game.selectedTurretType=type;
+  document.querySelectorAll('.build-btn').forEach(b=>b.classList.remove('selected'));
+  document.querySelector(`.build-btn[data-type="${type}"]`).classList.add('selected');
+}
+
+function toggleNeural(){
+  let s=applySkills();
+  if(!s.neuralUnlocked){notify('Upgrade Neural Link in Skill Matrix!');return}
+  game.neuralActive=!game.neuralActive;
+  if(game.neuralActive){
+    // Select first turret or nearest
+    if(game.turrets.length>0){
+      game.neuralTurret=game.turrets[0];
+      document.getElementById('neural-indicator').style.opacity=1;
+    }
+  }else{
+    game.neuralTurret=null;
+    game.neuralAim=null;
+    document.getElementById('neural-indicator').style.opacity=0;
+  }
+}
+
+function showSkills(){
+  document.getElementById('start-screen').style.display='none';
+  document.getElementById('game-over-screen').style.display='none';
+  document.getElementById('skill-screen').style.display='flex';
+  document.getElementById('skill-points').textContent=skillPoints;
+  renderSkillGrid();
+}
+function hideSkills(){
+  document.getElementById('skill-screen').style.display='none';
+  document.getElementById('start-screen').style.display='flex';
+  updateRunStats();
+}
+function renderSkillGrid(){
+  let grid=document.getElementById('skill-grid');
+  grid.innerHTML='';
+  for(let k in skills){
+    let cat=skills[k];
+    let count=skillTier[k]||0;
+    for(let i=0;i<cat.levels.length;i++){
+      let div=document.createElement('div');
+      div.className='skill-node'+(i>=count?' locked':'');
+      div.innerHTML=`<span class="s-icon">${cat.icon}</span><span class="s-name">${cat.levels[i].name}</span><span class="s-level">${i<count?'✓':'Cost: '+cat.levels[i].cost+'pt'}</span>`;
+      if(i<count){
+        div.title=cat.levels[i].desc;
+      }else{
+        div.onclick=()=>{
+          let cost=cat.levels[i].cost;
+          if(skillPoints>=cost){
+            skillPoints-=cost;
+            skillTier[k]=i+1;
+            saveProgress();
+            renderSkillGrid();
+            document.getElementById('skill-points').textContent=skillPoints;
+            notify('Unlocked: '+cat.levels[i].name);
+          }
+        };
+      }
+      grid.appendChild(div);
+    }
+  }
+}
+function updateRunStats(){
+  let el=document.getElementById('run-stats');
+  el.innerHTML='Skill Points: '+skillPoints+'<br>Total Skills: '+Object.values(skillTier).reduce((a,b)=>a+b,0);
+}
+
+// === INPUT ===
+let mouseX=0,mouseY=0;
+canvas.addEventListener('mousemove',e=>{mouseX=e.clientX;mouseY=e.clientY;game.neuralAim={x:e.clientX,y:e.clientY}});
+canvas.addEventListener('click',e=>{
+  if(game.state!=='playing')return;
+  let gc=Math.floor((e.clientX-GRID_OFF_X)/TILE_W);
+  let gr=Math.floor((e.clientY-GRID_OFF_Y)/TILE_H);
+  if(gc<0||gc>=COLS||gr<0||gr>=ROWS)return;
+  // Check if clicking existing turret
+  let clickedTurret=null;
+  for(let t of game.turrets){
+    if(t.col===gc&&t.row===gr){clickedTurret=t;break}
+  }
+  if(clickedTurret){
+    game.selectedTurret=clickedTurret;
+    showSidePanel(clickedTurret);
+    return;
+  }
+  // Build turret
+  if(game.selectedTurretType){
+    let def=TURRET_DEFS[game.selectedTurretType];
+    if(game.grid[gr][gc]===2&&game.gold>=def.cost){
+      game.gold-=def.cost;
+      let t=new Turret(game.selectedTurretType,gc,gr);
+      game.turrets.push(t);
+      spawnParticles(t.x,t.y,def.color,10);
+      notify('Built '+def.name);
+    }else if(game.grid[gr][gc]!==2){
+      notify('Cannot build here');
+    }else{
+      notify('Not enough gold');
+    }
+  }else if(clickedTurret){
+    // Deselect
+    game.selectedTurret=null;
+    document.getElementById('side-panel').style.display='none';
+  }
+});
+canvas.addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  game.selectedTurretType=null;
+  game.selectedTurret=null;
+  game.neuralActive=false;
+  game.neuralTurret=null;
+  document.querySelectorAll('.build-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById('side-panel').style.display='none';
+  document.getElementById('neural-indicator').style.opacity=0;
+});
+
+function showSidePanel(turret){
+  let panel=document.getElementById('side-panel');
+  panel.style.display='block';
+  document.getElementById('sp-title').textContent=turret.def.name+' Lv.'+turret.level;
+  let info=document.getElementById('sp-info');
+  info.innerHTML=`
+    <div class="info-row"><span>Damage</span><span class="v">${turret.getDmg().toFixed(1)}</span></div>
+    <div class="info-row"><span>Range</span><span class="v">${turret.getRange().toFixed(0)}</span></div>
+    <div class="info-row"><span>Atk Speed</span><span class="v">${turret.getAtkSpd().toFixed(2)}/s</span></div>
+    <div class="info-row"><span>Level</span><span class="v">${turret.level}/10</span></div>
+    ${turret.fusionColor?`<div class="info-row"><span>Fusion</span><span class="v" style="color:${turret.fusionColor}">${turret.fusionColor}</span></div>`:''}
+  `;
+  let upg=document.getElementById('sp-upgrades');
+  let cost=Math.floor(turret.def.upgradeCost*Math.pow(1.5,turret.level-1));
+  if(turret.level<10){
+    upg.innerHTML=`<button class="upgrade-btn" onclick="upgradeSelected(${game.turrets.indexOf(turret)})">Upgrade (⬡${cost})</button>`;
+  }else{
+    upg.innerHTML='<div style="color:#ffdd00;font-size:11px;text-align:center;margin-top:8px">MAX LEVEL</div>';
+  }
+  // Neural assign
+  let actions=document.getElementById('sp-actions');
+  actions.innerHTML=`<button class="upgrade-btn" style="border-color:rgba(255,0,100,0.4);color:#ff0066" onclick="assignNeural(${game.turrets.indexOf(turret)})">🧠 Neural Link</button>`;
+}
+
+function upgradeSelected(idx){
+  let t=game.turrets[idx];
+  if(t&&t.upgrade()){
+    spawnParticles(t.x,t.y,'#ffdd00',8);
+    showSidePanel(t);
+    notify('Upgraded to Lv.'+t.level);
+  }
+}
+function assignNeural(idx){
+  game.neuralTurret=game.turrets[idx];
+  game.neuralActive=true;
+  document.getElementById('neural-indicator').style.opacity=1;
+  notify('Neural Link assigned');
+}
+
+// === DRAWING ===
+function drawGrid(){
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      let x=c*TILE_W+GRID_OFF_X;
+      let y=r*TILE_H+GRID_OFF_Y;
+      let type=game.grid[r][c];
+      if(type===1){
+        // Path
+        ctx.fillStyle='rgba(20,20,40,0.8)';
+        ctx.fillRect(x,y,TILE_W,TILE_H);
+        // Path border glow
+        ctx.strokeStyle='rgba(0,255,255,0.08)';
+        ctx.lineWidth=1;
+        ctx.strokeRect(x+0.5,y+0.5,TILE_W-1,TILE_H-1);
+        // Low-poly path detail
+        ctx.fillStyle='rgba(0,255,255,0.03)';
+        ctx.beginPath();
+        ctx.moveTo(x,y+TILE_H);ctx.lineTo(x+TILE_W/2,y);ctx.lineTo(x+TILE_W,y+TILE_H);
+        ctx.fill();
+      }else if(type===2){
+        // Buildable
+        ctx.fillStyle='rgba(10,15,30,0.6)';
+        ctx.fillRect(x,y,TILE_W,TILE_H);
+        ctx.strokeStyle='rgba(0,255,255,0.12)';
+        ctx.lineWidth=1;
+        ctx.strokeRect(x+0.5,y+0.5,TILE_W-1,TILE_H-1);
+        // Hover highlight
+        let gc=Math.floor((mouseX-GRID_OFF_X)/TILE_W);
+        let gr=Math.floor((mouseY-GRID_OFF_Y)/TILE_H);
+        if(gc===c&&gr===r&&game.selectedTurretType){
+          let def=TURRET_DEFS[game.selectedTurretType];
+          ctx.fillStyle='rgba(0,255,255,0.1)';
+          ctx.fillRect(x,y,TILE_W,TILE_H);
+          ctx.strokeStyle=def.color;
+          ctx.lineWidth=2;
+          ctx.strokeRect(x+1,y+1,TILE_W-2,TILE_H-2);
+        }
+      }
+    }
+  }
+  // Grid overlay lines
+  ctx.strokeStyle='rgba(0,255,255,0.04)';
+  ctx.lineWidth=0.5;
+  for(let r=0;r<=ROWS;r++){
+    ctx.beginPath();
+    ctx.moveTo(GRID_OFF_X,r*TILE_H+GRID_OFF_Y);
+    ctx.lineTo(GRID_OFF_X+COLS*TILE_W,r*TILE_H+GRID_OFF_Y);
+    ctx.stroke();
+  }
+  for(let c=0;c<=COLS;c++){
+    ctx.beginPath();
+    ctx.moveTo(c*TILE_W+GRID_OFF_X,GRID_OFF_Y);
+    ctx.lineTo(c*TILE_W+GRID_OFF_X,ROWS*TILE_H+GRID_OFF_Y);
+    ctx.stroke();
+  }
+}
+
+function drawPathFlow(){
+  // Animated flow along path
+  let t=Date.now()*0.001;
+  ctx.strokeStyle='rgba(0,255,255,0.06)';
+  ctx.lineWidth=2;
+  ctx.setLineDash([8,12]);
+  ctx.lineDashOffset=-t*30;
+  ctx.beginPath();
+  for(let i=0;i<path.length;i++){
+    let p=path[i];
+    let x=p.c*TILE_W+TILE_W/2+GRID_OFF_X;
+    let y=p.r*TILE_H+TILE_H/2+GRID_OFF_Y;
+    if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawSpawns(){
+  // Entry marker
+  let entry=path[0];
+  let ex=entry.c*TILE_W+TILE_W/2+GRID_OFF_X;
+  let ey=entry.r*TILE_H+TILE_H/2+GRID_OFF_Y;
+  ctx.save();
+  ctx.translate(ex,ey);
+  ctx.rotate(Date.now()*0.002);
+  ctx.strokeStyle='rgba(255,0,68,0.4)';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(12,0);ctx.lineTo(-6,-8);ctx.lineTo(-6,8);ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+  // Exit marker
+  let exit=path[path.length-1];
+  let ex2=exit.c*TILE_W+TILE_W/2+GRID_OFF_X;
+  let ey2=exit.r*TILE_H+TILE_H/2+GRID_OFF_Y;
+  ctx.save();
+  ctx.translate(ex2,ey2);
+  ctx.rotate(-Date.now()*0.002);
+  ctx.strokeStyle='rgba(0,255,136,0.4)';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(-12,0);ctx.lineTo(6,-8);ctx.lineTo(6,8);ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+}
+
+// === MAIN LOOP ===
+function update(dt){
+  if(game.state!=='playing')return;
+  // Spawn enemies
+  if(game.waveSpawnIndex<game.waveEnemies.length){
+    game.waveSpawnTimer-=dt;
+    if(game.waveSpawnTimer<=0){
+      let type=game.waveEnemies[game.waveSpawnIndex];
+      let def=ENEMY_DEFS[type];
+      let start=path[0];
+      let e=new Enemy(def,game.wave,start.c*TILE_W+TILE_W/2+GRID_OFF_X,start.r*TILE_H+TILE_H/2+GRID_OFF_Y);
+      game.enemies.push(e);
+      game.waveSpawnIndex++;
+      game.waveSpawnTimer=type==='boss'?2:0.6+Math.random()*0.4;
+    }
+  }
+  // Check wave complete
+  if(game.waveSpawnIndex>=game.waveEnemies.length&&game.enemies.filter(e=>e.alive).length===0&&!game.waveComplete){
+    game.waveComplete=true;
+    game.waveDelay=2;
+    game.tier++;
+    notify('WAVE '+game.wave+' COMPLETE!');
+  }
+  if(game.waveComplete){
+    game.waveDelay-=dt;
+    if(game.waveDelay<=0){
+      showWaveChoice();
+    }
+  }
+  // Update enemies
+  for(let e of game.enemies){
+    e.update(dt);
+    if(e.def.slow&&waveBuff.slow!==1)e.speed*=waveBuff.slow;
+  }
+  game.enemies=game.enemies.filter(e=>e.alive);
+  // Update turrets
+  for(let t of game.turrets){
+    t.update(dt);
+  }
+  // Update projectiles
+  for(let p of game.projectiles){
+    p.update(dt);
+    if(waveBuff.dmg!==1&&p.turret)p.dmg*=waveBuff.dmg;
+    if(waveBuff.armorPierce&&p.turret){
+      // Apply armor pierce via damage boost (simplified)
+    }
+  }
+  game.projectiles=game.projectiles.filter(p=>p.alive);
+  updateParticles(dt);
+  // Update UI
+  document.getElementById('gold-val').textContent=game.gold;
+  document.getElementById('lives-val').textContent=game.lives;
+  document.getElementById('tier-val').textContent=game.tier;
+  // Update build button states
+  document.querySelectorAll('.build-btn').forEach(b=>{
+    let type=b.dataset.type;
+    if(type&&TURRET_DEFS[type]){
+      b.classList.toggle('disabled',game.gold<TURRET_DEFS[type].cost);
+    }
+  });
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  // Background
+  ctx.fillStyle='#0a0a12';
+  ctx.fillRect(0,0,W,H);
+  // Subtle grid bg
+  ctx.strokeStyle='rgba(0,255,255,0.015)';
+  ctx.lineWidth=0.5;
+  for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+  if(game.state==='playing'||game.state==='waveChoice'){
+    drawGrid();
+    drawPathFlow();
+    drawSpawns();
+    for(let t of game.turrets)t.draw();
+    for(let e of game.enemies)e.draw();
+    for(let p of game.projectiles)p.draw();
+    drawParticles();
+    // Neural aim line
+    if(game.neuralActive&&game.neuralTurret&&game.neuralAim){
+      let t=game.neuralTurret;
+      ctx.strokeStyle='rgba(255,0,100,0.2)';
+      ctx.lineWidth=1;
+      ctx.setLineDash([4,4]);
+      ctx.beginPath();
+      ctx.moveTo(t.x,t.y);
+      ctx.lineTo(game.neuralAim.x,game.neuralAim.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Crosshair
+      ctx.strokeStyle='rgba(255,0,100,0.6)';
+      ctx.lineWidth=1;
+      let nx=game.neuralAim.x,ny=game.neuralAim.y;
+      ctx.beginPath();ctx.moveTo(nx-10,ny);ctx.lineTo(nx+10,ny);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(nx,ny-10);ctx.lineTo(nx,ny+10);ctx.stroke();
+    }
+  }
+}
+
+function gameLoop(ts){
+  let dt=Math.min((ts-game.lastTime)/1000,0.05);
+  game.lastTime=ts;
+  update(dt);
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+game.lastTime=performance.now();
+requestAnimationFrame(gameLoop);
+updateRunStats();
+</script>
+</body>
+</html>

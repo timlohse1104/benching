@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fractal Tree Generator</title>
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    overflow: hidden;
+    background: #0a0a1a;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #e0d8c8;
+}
+
+canvas {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 0;
+}
+
+#controls {
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 10;
+    background: rgba(15, 12, 30, 0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 200, 150, 0.15);
+    border-radius: 14px;
+    padding: 20px 22px;
+    width: 280px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    max-height: 95vh;
+    overflow-y: auto;
+}
+
+#controls h2 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    text-align: center;
+    background: linear-gradient(90deg, #ff9a66, #ff6eb4, #a855f7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 1px;
+}
+
+.control-group {
+    margin-bottom: 14px;
+}
+
+.control-group label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    margin-bottom: 4px;
+    color: #c8b8a0;
+}
+
+.control-group label span.val {
+    color: #ff9a66;
+    font-weight: 600;
+    min-width: 30px;
+    text-align: right;
+}
+
+input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+    cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ff9a66, #ff6eb4);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(255, 100, 100, 0.3);
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ff9a66, #ff6eb4);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+}
+
+select {
+    width: 100%;
+    padding: 6px 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 200, 150, 0.2);
+    border-radius: 8px;
+    color: #e0d8c8;
+    font-size: 12px;
+    cursor: pointer;
+    outline: none;
+}
+
+select option {
+    background: #1a1530;
+    color: #e0d8c8;
+}
+
+#generateBtn {
+    width: 100%;
+    padding: 10px;
+    margin-top: 8px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #ff6b6b, #ff8e53, #ff6eb4);
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(255, 100, 80, 0.3);
+}
+
+#generateBtn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(255, 100, 80, 0.5);
+}
+
+#generateBtn:active {
+    transform: translateY(0);
+}
+
+#speedSlider {
+    margin-top: 4px;
+}
+
+.divider {
+    border: none;
+    border-top: 1px solid rgba(255, 200, 150, 0.1);
+    margin: 14px 0;
+}
+
+#status {
+    text-align: center;
+    font-size: 11px;
+    color: #887868;
+    margin-top: 8px;
+    min-height: 16px;
+}
+
+#lsystemInfo {
+    font-size: 10px;
+    color: #685848;
+    text-align: center;
+    margin-top: 6px;
+    line-height: 1.4;
+}
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div id="controls">
+    <h2>✦ FRACTAL TREE ✦</h2>
+
+    <div class="control-group">
+        <label>L-System Preset</label>
+        <select id="preset">
+            <option value="classic">Classic Tree</option>
+            <option value="bush">Bushy</option>
+            <option value="pine">Pine</option>
+            <option value="willow">Weeping Willow</option>
+            <option value="blossom">Cherry Blossom</option>
+        </select>
+    </div>
+
+    <div class="control-group">
+        <label>Recursion Depth <span class="val" id="depthVal">7</span></label>
+        <input type="range" id="depth" min="1" max="10" value="7">
+    </div>
+
+    <div class="control-group">
+        <label>Branch Angle (°) <span class="val" id="angleVal">25.7</span></label>
+        <input type="range" id="angle" min="5" max="60" value="25.7" step="0.1">
+    </div>
+
+    <div class="control-group">
+        <label>Length Ratio <span class="val" id="ratioVal">0.72</span></label>
+        <input type="range" id="ratio" min="0.5" max="0.85" value="0.72" step="0.01">
+    </div>
+
+    <div class="control-group">
+        <label>Jitter / Randomness <span class="val" id="jitterVal">0.0</span></label>
+        <input type="range" id="jitter" min="0" max="0.3" value="0" step="0.01">
+    </div>
+
+    <div class="control-group">
+        <label>Animation Speed <span class="val" id="speedVal">3</span></label>
+        <input type="range" id="speed" min="1" max="10" value="3" step="1">
+    </div>
+
+    <div class="control-group">
+        <label>Wind Sway <span class="val" id="windVal">0.3</span></label>
+        <input type="range" id="wind" min="0" max="1" value="0.3" step="0.05">
+    </div>
+
+    <hr class="divider">
+
+    <button id="generateBtn">🌱 Regenerate</button>
+    <div id="status"></div>
+    <div id="lsystemInfo"></div>
+</div>
+
+<script>
+(function() {
+    "use strict";
+
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    let W, H;
+    function resize() {
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener("resize", resize);
+
+    // Seeded PRNG (mulberry32)
+    function mulberry32(a) {
+        return function() {
+            a |= 0; a = a + 0x6D2B79F5 | 0;
+            var t = Math.imul(a ^ a >>> 15, 1 | a);
+            t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+            return ((t ^ t >>> 14) >>> 0) / 4294967296;
+        };
+    }
+
+    // L-System presets
+    const presets = {
+        classic: { axiom: "X", rules: { X: "F+[[X]-X]-F[-FX]+F", F: "FF" }, startSym: "X" },
+        bush: { axiom: "F", rules: { F: "F[+F]F[-F]F" }, startSym: "F" },
+        pine: { axiom: "X", rules: { X: "F[+X]F[-X]+X", F: "FF" }, startSym: "X" },
+        willow: { axiom: "F", rules: { F: "FF[+F]F[-F][F]" }, startSym: "F" },
+        blossom: { axiom: "X", rules: { X: "F[+X]F[-X]+X", F: "FF" }, startSym: "X" }
+    };
+
+    let rng = mulberry32(42);
+    let commands = [];
+    let animIndex = 0;
+    let animating = false;
+    let treeComplete = false;
+    let blossoms = [];
+    let particles = [];
+    let time = 0;
+
+    // Controls
+    const depthSlider = document.getElementById("depth");
+    const angleSlider = document.getElementById("angle");
+    const ratioSlider = document.getElementById("ratio");
+    const jitterSlider = document.getElementById("jitter");
+    const speedSlider = document.getElementById("speed");
+    const windSlider = document.getElementById("wind");
+    const presetSelect = document.getElementById("preset");
+    const generateBtn = document.getElementById("generateBtn");
+    const statusEl = document.getElementById("status");
+    const infoEl = document.getElementById("lsystemInfo");
+
+    function updateLabels() {
+        document.getElementById("depthVal").textContent = depthSlider.value;
+        document.getElementById("angleVal").textContent = parseFloat(angleSlider.value).toFixed(1);
+        document.getElementById("ratioVal").textContent = parseFloat(ratioSlider.value).toFixed(2);
+        document.getElementById("jitterVal").textContent = parseFloat(jitterSlider.value).toFixed(2);
+        document.getElementById("speedVal").textContent = speedSlider.value;
+        document.getElementById("windVal").textContent = parseFloat(windSlider.value).toFixed(2);
+    }
+
+    [depthSlider, angleSlider, ratioSlider, jitterSlider, speedSlider, windSlider].forEach(s => {
+        s.addEventListener("input", updateLabels);
+    });
+
+    function generateLSystem() {
+        const preset = presets[presetSelect.value];
+        const depth = parseInt(depthSlider.value);
+        const angle = parseFloat(angleSlider.value) * Math.PI / 180;
+        const ratio = parseFloat(ratioSlider.value);
+        const jitter = parseFloat(jitterSlider.value);
+
+        rng = mulberry32(Math.floor(Math.random() * 1e9));
+
+        let current = preset.axiom;
+        for (let i = 0; i < depth; i++) {
+            let next = "";
+            for (let j = 0; j < current.length; j++) {
+                const ch = current[j];
+                if (preset.rules[ch]) {
+                    next += preset.rules[ch];
+                } else {
+                    next += ch;
+                }
+            }
+            current = next;
+        }
+
+        infoEl.textContent = `String length: ${current.length} | Depth: ${depth}`;
+
+        // Parse to commands with jitter
+        commands = [];
+        let stack = [];
+        let branchDepth = 0;
+        let maxDepth = 0;
+        let cmdIdx = 0;
+
+        const len = current.length;
+        for (let i = 0; i < len; i++) {
+            const ch = current[i];
+            if (ch === "F") {
+                commands.push({ type: "draw", depth: branchDepth, idx: cmdIdx++ });
+            } else if (ch === "+") {
+                commands.push({ type: "turn", angle: angle + (jitter > 0 ? (rng() - 0.5) * 2 * jitter : 0), dir: 1, depth: branchDepth });
+            } else if (ch === "-") {
+                commands.push({ type: "turn", angle: -angle + (jitter > 0 ? (rng() - 0.5) * 2 * jitter : 0), dir: -1, depth: branchDepth });
+            } else if (ch === "[") {
+                stack.push({ depth: branchDepth });
+                branchDepth++;
+                if (branchDepth > maxDepth) maxDepth = branchDepth;
+            } else if (ch === "]") {
+                if (stack.length > 0) {
+                    const saved = stack.pop();
+                    branchDepth = saved.depth;
+                    commands.push({ type: "branchEnd", depth: branchDepth + 1 });
+                }
+            }
+        }
+
+        return { ratio, maxDepth };
+    }
+
+    function computeBlossoms(ratio) {
+        blossoms = [];
+        const depth = parseInt(depthSlider.value);
+        if (depth < 4) return;
+
+        // Generate blossoms at terminal branch tips
+        const numBlossoms = Math.min(Math.floor(80 * Math.pow(1.3, depth - 4)), 300);
+        for (let i = 0; i < numBlossoms; i++) {
+            const branchDepth = Math.floor(depth * (0.6 + rng() * 0.4));
+            const angle = rng() * Math.PI * 2;
+            const size = 2 + rng() * 4 * (1 - branchDepth / depth);
+            const hue = rng() < 0.5 ? 330 + rng() * 30 : 40 + rng() * 20;
+            const sat = 60 + rng() * 30;
+            const light = 70 + rng() * 20;
+            const phase = rng() * Math.PI * 2;
+            blossoms.push({ branchDepth, angle, size, hue, sat, light, phase, delay: rng() * 120 });
+        }
+    }
+
+    function computeParticles() {
+        particles = [];
+        for (let i = 0; i < 40; i++) {
+            particles.push({
+                x: W * 0.2 + rng() * W * 0.6,
+                y: H * 0.1 + rng() * H * 0.7,
+                size: 0.5 + rng() * 2,
+                speed: 0.2 + rng() * 0.8,
+                phase: rng() * Math.PI * 2,
+                hue: 30 + rng() * 30
+            });
+        }
+    }
+
+    function getBranchColor(depth, maxDepth) {
+        if (maxDepth === 0) return "#5a3a1a";
+        const t = depth / maxDepth;
+        // Trunk: dark brown -> branches: warm brown -> tips: green
+        if (t < 0.3) {
+            const s = t / 0.3;
+            return lerpColor([90, 58, 26], [130, 80, 40], s);
+        } else if (t < 0.7) {
+            const s = (t - 0.3) / 0.4;
+            return lerpColor([130, 80, 40], [80, 120, 50], s);
+        } else {
+            const s = (t - 0.7) / 0.3;
+            return lerpColor([80, 120, 50], [140, 200, 100], s);
+        }
+    }
+
+    function lerpColor(a, b, t) {
+        const r = Math.round(a[0] + (b[0] - a[0]) * t);
+        const g = Math.round(a[1] + (b[1] - a[1]) * t);
+        const bl = Math.round(a[2] + (b[2] - a[2]) * t);
+        return `rgb(${r},${g},${bl})`;
+    }
+
+    function drawBackground() {
+        // Sunset sky gradient
+        const grad = ctx.createLinearGradient(0, 0, 0, H);
+        grad.addColorStop(0, "#0a0a2e");
+        grad.addColorStop(0.3, "#1a1040");
+        grad.addColorStop(0.55, "#3a1848");
+        grad.addColorStop(0.7, "#8a3040");
+        grad.addColorStop(0.85, "#d46030");
+        grad.addColorStop(1, "#e89040");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+
+        // Stars
+        ctx.fillStyle = "rgba(255, 255, 240, 0.6)";
+        for (let i = 0; i < 80; i++) {
+            const sx = (i * 7919 + 13) % W;
+            const sy = (i * 6271 + 37) % (H * 0.5);
+            const ss = 0.3 + (i % 3) * 0.4;
+            const twinkle = 0.5 + 0.5 * Math.sin(time * 0.02 + i);
+            ctx.globalAlpha = twinkle * 0.7;
+            ctx.beginPath();
+            ctx.arc(sx, sy, ss, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+
+        // Ground
+        const groundGrad = ctx.createLinearGradient(0, H * 0.88, 0, H);
+        groundGrad.addColorStop(0, "#1a1208");
+        groundGrad.addColorStop(0.3, "#2a1a0a");
+        groundGrad.addColorStop(1, "#0a0804");
+        ctx.fillStyle = groundGrad;
+        ctx.beginPath();
+        ctx.moveTo(0, H * 0.92);
+        // Gentle hills
+        for (let x = 0; x <= W; x += 20) {
+            const hillY = H * 0.92 + Math.sin(x * 0.008) * 15 + Math.sin(x * 0.02) * 8;
+            ctx.lineTo(x, hillY);
+        }
+        ctx.lineTo(W, H);
+        ctx.lineTo(0, H);
+        ctx.closePath();
+        ctx.fill();
+
+        // Fireflies / particles
+        particles.forEach(p => {
+            const px = p.x + Math.sin(time * 0.01 + p.phase) * 20;
+            const py = p.y + Math.cos(time * 0.008 + p.phase) * 15;
+            const glow = 0.3 + 0.7 * Math.max(0, Math.sin(time * 0.03 + p.phase));
+            ctx.globalAlpha = glow * 0.6;
+            ctx.fillStyle = `hsla(${p.hue}, 80%, 70%, 1)`;
+            ctx.beginPath();
+            ctx.arc(px, py, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            // Glow
+            ctx.globalAlpha = glow * 0.15;
+            ctx.beginPath();
+            ctx.arc(px, py, p.size * 3, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+    }
+
+    function drawTree(ratio) {
+        const wind = parseFloat(windSlider.value);
+        const depth = parseInt(depthSlider.value);
+        const maxCmds = commands.length;
+        const drawCount = Math.min(animIndex, maxCmds);
+
+        if (drawCount === 0) return;
+
+        ctx.save();
+
+        // Position tree at bottom center
+        const startX = W / 2;
+        const startY = H * 0.90;
+        ctx.translate(startX, startY);
+
+        // Calculate total height for scaling
+        let totalLen = 0;
+        for (let i = 0; i < Math.min(drawCount, maxCmds); i++) {
+            if (commands[i].type === "draw") totalLen += ratio * Math.pow(0.72, 0);
+        }
+        // Approximate tree height for fitting
+        const approxHeight = 400 + depth * 40;
+        const scale = Math.min(W * 0.4 / approxHeight, H * 0.75 / approxHeight, 1);
+        ctx.scale(scale, scale);
+
+        // Turtle state
+        let x = 0, y = 0;
+        let dir = -Math.PI / 2; // Pointing up
+        let stack = [];
+        let currentLen = 8;
+
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+
+        for (let i = 0; i < drawCount; i++) {
+            const cmd = commands[i];
+
+            if (cmd.type === "draw") {
+                const windOffset = wind * Math.sin(time * 0.015 + cmd.depth * 0.5 + x * 0.01) * cmd.depth;
+                const nx = x + Math.cos(dir) * currentLen + windOffset * 0.1;
+                const ny = y + Math.sin(dir) * currentLen;
+
+                const color = getBranchColor(cmd.depth, depth);
+                const lw = Math.max(0.5, (depth - cmd.depth + 1) * 1.2);
+
+                ctx.strokeStyle = color;
+                ctx.lineWidth = lw;
+                ctx.globalAlpha = Math.min(1, (drawCount - i) / 20 + 0.3);
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(nx, ny);
+                ctx.stroke();
+
+                x = nx;
+                y = ny;
+                currentLen *= ratio;
+            } else if (cmd.type === "turn") {
+                dir += cmd.angle;
+            } else if (cmd.type === "[") {
+                stack.push({ x, y, dir, currentLen });
+            } else if (cmd.type === "]") {
+                const saved = stack.pop();
+                x = saved.x;
+                y = saved.y;
+                dir = saved.dir;
+                currentLen = saved.currentLen;
+            }
+        }
+
+        ctx.restore();
+    }
+
+    function drawBlossoms() {
+        const depth = parseInt(depthSlider.value);
+        if (depth < 4 || blossoms.length === 0) return;
+
+        const wind = parseFloat(windSlider.value);
+        const scale = Math.min(W * 0.4 / (400 + depth * 40), H * 0.75 / (400 + depth * 40), 1);
+
+        ctx.save();
+        ctx.translate(W / 2, H * 0.90);
+        ctx.scale(scale, scale);
+
+        blossoms.forEach(b => {
+            if (animIndex < commands.length * 0.8) return; // Only show when tree is mostly grown
+
+            const bloomProgress = Math.max(0, Math.min(1, (animIndex - commands.length * 0.8) / (commands.length * 0.1) - b.delay / (commands.length * 0.1)));
+            if (bloomProgress <= 0) return;
+
+            const windOffset = wind * Math.sin(time * 0.015 + b.branchDepth * 0.5 + b.angle) * b.branchDepth;
+            const bx = Math.cos(b.angle) * (300 + b.branchDepth * 30) + windOffset * 0.15;
+            const by = Math.sin(b.angle) * (300 + b.branchDepth * 30) - 50;
+
+            const pulse = 0.8 + 0.2 * Math.sin(time * 0.04 + b.phase);
+            const size = b.size * bloomProgress * pulse;
+
+            // Glow
+            ctx.globalAlpha = 0.15 * bloomProgress;
+            ctx.fillStyle = `hsl(${b.hue}, ${b.sat}%, ${b.light}%)`;
+            ctx.beginPath();
+            ctx.arc(bx, by, size * 2.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Petals
+            ctx.globalAlpha = 0.8 * bloomProgress;
+            const petalCount = 5;
+            for (let p = 0; p < petalCount; p++) {
+                const pa = (p / petalCount) * Math.PI * 2 + time * 0.005;
+                const px = bx + Math.cos(pa) * size * 0.6;
+                const py = by + Math.sin(pa) * size * 0.6;
+                ctx.fillStyle = `hsl(${b.hue + p * 5}, ${b.sat}%, ${b.light + 10}%)`;
+                ctx.beginPath();
+                ctx.ellipse(px, py, size * 0.5, size * 0.3, pa, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Center
+            ctx.globalAlpha = 0.9 * bloomProgress;
+            ctx.fillStyle = `hsl(${b.hue + 20}, 90%, 85%)`;
+            ctx.beginPath();
+            ctx.arc(bx, by, size * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        ctx.restore();
+    }
+
+    function animate() {
+        time++;
+        const speed = parseInt(speedSlider.value);
+        const maxCmds = commands.length;
+
+        // Progress through commands
+        const stepSize = Math.max(1, Math.floor(speed * (1 + depth / 5)));
+        animIndex += stepSize;
+
+        if (animIndex >= maxCmds && !treeComplete) {
+            treeComplete = true;
+            statusEl.textContent = "✦ Tree fully grown ✦";
+            computeBlossoms();
+            computeParticles();
+        }
+
+        if (!treeComplete) {
+            statusEl.textContent = `Growing... ${Math.floor(animIndex / maxCmds * 100)}%`;
+        }
+
+        drawBackground();
+        drawTree();
+        drawBlossoms();
+
+        requestAnimationFrame(animate);
+    }
+
+    function regenerate() {
+        animIndex = 0;
+        treeComplete = false;
+        blossoms = [];
+        particles = [];
+        statusEl.textContent = "Growing...";
+        generateLSystem();
+    }
+
+    generateBtn.addEventListener("click", regenerate);
+    presetSelect.addEventListener("change", regenerate);
+
+    // Auto-regenerate on slider change (debounced)
+    let debounceTimer;
+    const sliders = [depthSlider, angleSlider, ratioSlider, jitterSlider];
+    sliders.forEach(s => {
+        s.addEventListener("change", () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(regenerate, 300);
+        });
+    });
+
+    // Initial setup
+    updateLabels();
+    regenerate();
+    animate();
+
+})();
+</script>
+</body>
+</html>

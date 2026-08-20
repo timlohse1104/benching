@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Canvas Paint</title>
+    <style>
+        :root {
+            --bg-color: #f4f6f9;
+            --panel-color: #ffffff;
+            --text-color: #333333;
+            --border-color: #dcdcdc;
+            --accent-color: #4a90e2;
+            --accent-hover: #357abd;
+            --shadow: 0 2px 8px rgba(0,0,0,0.1);
+            --danger-color: #e74c3c;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- Header --- */
+        header {
+            width: 100%;
+            padding: 12px 24px;
+            background: var(--panel-color);
+            border-bottom: 1px solid var(--border-color);
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: 600;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            z-index: 10;
+        }
+
+        /* --- Toolbar --- */
+        #toolbar {
+            width: 100%;
+            max-width: 820px;
+            padding: 10px 24px;
+            background: var(--panel-color);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            z-index: 10;
+        }
+
+        .tool-btn {
+            background: none;
+            border: 1px solid transparent;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: var(--text-color);
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tool-btn:hover { background-color: #f0f4f8; }
+        .tool-btn.active {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        .separator {
+            width: 1px;
+            height: 28px;
+            background-color: var(--border-color);
+            margin: 0 4px;
+        }
+
+        /* --- Controls Group --- */
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 8px;
+            background: #f8fafc;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        input[type="range"] {
+            accent-color: var(--accent-color);
+            width: 80px;
+            cursor: pointer;
+        }
+
+        input[type="color"] {
+            width: 32px;
+            height: 32px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            padding: 1px;
+            background: white;
+        }
+
+        /* --- Canvas --- */
+        #canvas-wrapper {
+            flex: 1;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            padding: 20px;
+        }
+
+        canvas {
+            background-color: #fff;
+            box-shadow: var(--shadow);
+            cursor: crosshair;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+        }
+
+        /* --- Status Bar --- */
+        #status-bar {
+            width: 100%;
+            max-width: 820px;
+            padding: 6px 24px;
+            background: var(--panel-color);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: #888;
+            z-index: 10;
+        }
+
+        #status-bar .value {
+            font-weight: 600;
+            color: var(--text-color);
+        }
+    </style>
+</head>
+<body>
+
+<header>Sketchpad</header>
+
+<div id="toolbar">
+    <button class="tool-btn active" id="btn-brush" data-tool="brush">🖌️ Brush</button>
+    <button class="tool-btn" id="btn-eraser" data-tool="eraser">🧹 Eraser</button>
+    
+    <div class="separator"></div>
+
+    <div class="control-group">
+        <label for="size-slider" style="font-size:0.85rem;">Size</label>
+        <input type="range" id="size-slider" min="1" max="50" value="5">
+        <span id="size-value" class="value">5</span>
+    </div>
+
+    <div class="control-group">
+        <label for="color-picker" style="font-size:0.85rem;">Color</label>
+        <input type="color" id="color-picker" value="#000000">
+        <div style="display:flex; gap:2px;">
+            <!-- Preset Palette -->
+            <input type="color" value="#e74c3c" style="width:24px;height:24px;border:none;cursor:pointer;opacity:0.8;" oninput="this.style.opacity=1">
+            <input type="color" value="#e67e22" style="width:24px;height:24px;border:none;cursor:pointer;opacity:0.8;" oninput="this.style.opacity=1">
+            <input type="color" value="#f1c40f" style="width:24px;height:24px;border:none;cursor:pointer;opacity:0.8;" oninput="this.style.opacity=1">
+            <input type="color" value="#2ecc71" style="width:24px;height:24px;border:none;cursor:pointer;opacity:0.8;" oninput="this.style.opacity=1">
+            <input type="color" value="#3498db" style="width:24px;height:24px;border:none;cursor:pointer;opacity=0.8;" oninput="this.style.opacity=1">
+            <input type="color" value="#9b59b6" style="width:24px;height:24px;border:none;cursor:pointer;opacity=0.8;" oninput="this.style.opacity=1">
+        </div>
+    </div>
+
+    <div class="separator"></div>
+
+    <button class="tool-btn" id="btn-undo">↩ Undo</button>
+    <button class="tool-btn" id="btn-redo">↪ Redo</button>
+    <div class="separator"></div>
+    <button class="tool-btn" id="btn-clear" style="color: var(--danger-color);">🗑️ Clear</button>
+    <div class="separator"></div>
+    <button class="tool-btn" id="btn-save">💾 Save PNG</button>
+</div>
+
+<div id="canvas-wrapper">
+    <canvas id="drawing-canvas" width="800" height="600"></canvas>
+</div>
+
+<div id="status-bar">
+    <span>Tool: <span id="status-tool" class="value">Brush</span></span>
+    <span>Color: <span id="status-color" class="value">#000000</span></span>
+    <span>Size: <span id="status-size" class="value">5</span>px</span>
+</div>
+
+<script>
+    (function() {
+        'use strict';
+
+        // --- Config ---
+        const canvas = document.getElementById('drawing-canvas');
+        const ctx = canvas.getContext('2d');
+        const wrapper = document.getElementById('canvas-wrapper');
+        
+        // --- State ---
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        let isEraser = false;
+        
+        // History stack (array of ImageData)
+        let history = [];
+        let historyIndex = -1; // -1 means "initial state"
+
+        // --- UI Elements ---
+        const btnBrush = document.getElementById('btn-brush');
+        const btnEraser = document.getElementById('btn-eraser');
+        const btnUndo = document.getElementById('btn-undo');
+        const btnRedo = document.getElementById('btn-redo');
+        const btnClear = document.getElementById('btn-clear');
+        const btnSave = document.getElementById('btn-save');
+        const sliderSize = document.getElementById('size-slider');
+        const inputColor = document.getElementById('color-picker');
+        const presetColors = document.querySelectorAll('#toolbar input[type="color"]');
+        
+        const statusTool = document.getElementById('status-tool');
+        const statusColor = document.getElementById('status-color');
+        const statusSize = document.getElementById('status-size');
+        const sizeValue = document.getElementById('size-value');
+
+        // --- Initialization ---
+        function init() {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            history.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+            historyIndex = 0;
+            
+            // Initial status update
+            updateStatus();
+        }
+
+        init();
+
+        // --- Drawing Logic ---
+        function startDrawing(e) {
+            isDrawing = true;
+            [lastX, lastY] = getCoordinates(e);
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            e.preventDefault(); // Prevent scrolling on touch
+            
+            const [x, y] = getCoordinates(e);
+            
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+
+            lastX = x;
+            lastY = y;
+        }
+
+        function stopDrawing() {
+            if (!isDrawing) return;
+            isDrawing = false;
+            ctx.beginPath(); // Reset path to avoid connecting stray strokes
+            
+            // Push state to history
+            history.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+            historyIndex = history.length - 1;
+            updateUndoButtons();
+        }
+
+        function getCoordinates(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            let clientX, clientY;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            return [
+                (clientX - rect.left) * scaleX,
+                (clientY - rect.top) * scaleY
+            ];
+        }
+
+        // --- Event Listeners ---
+
+        // Mouse
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing);
+
+        // Touch
+        canvas.addEventListener('touchstart', startDrawing, { passive: false });
+        canvas.addEventListener('touchmove', draw, { passive: false });
+        canvas.addEventListener('touchend', stopDrawing);
+
+        // --- Tool Logic ---
+
+        function setTool(tool) {
+            isEraser = (tool === 'eraser');
+            if (tool === 'brush') {
+                btnBrush.classList.add('active');
+                btnEraser.classList.remove('active');
+            } else {
+                btnEraser.classList.add('active');
+                btnBrush.classList.remove('active');
+            }
+            statusTool.textContent = tool.charAt(0).toUpperCase() + tool.slice(1);
+        }
+
+        btnBrush.addEventListener('click', () => setTool('brush'));
+        btnEraser.addEventListener('click', () => setTool('eraser'));
+
+        // --- Undo / Redo ---
+
+        function updateUndoButtons() {
+            btnUndo.disabled = (historyIndex <= 0);
+            btnRedo.disabled = (historyIndex >= history.length - 1);
+        }
+
+        btnUndo.addEventListener('click', () => {
+            if (historyIndex > 0) {
+                historyIndex--;
+                restoreHistory(historyIndex);
+            }
+        });
+
+        btnRedo.addEventListener('click', () => {
+            if (historyIndex < history.length - 1) {
+                historyIndex++;
+                restoreHistory(historyIndex);
+            }
+        });
+
+        function restoreHistory(idx) {
+            ctx.putImageData(history[idx], 0, 0);
+            updateUndoButtons();
+        }
+
+        // --- Clear ---
+        btnClear.addEventListener('click', () => {
+            if (historyIndex > 0) historyIndex--; // Don't undo the clear itself
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            history.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+            historyIndex = history.length - 1;
+            updateUndoButtons();
+        });
+
+        // --- Save ---
+        btnSave.addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'my-drawing.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+
+        // --- Sliders & Pickers ---
+
+        sliderSize.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            sizeValue.textContent = val;
+            statusSize.textContent = val;
+            if (isDrawing) {
+                // Redraw last line with new size for live preview feel
+                // Note: This is a simplified live-preview approach. 
+                // A full implementation would store the last path and re-render.
+                // For this scope, we just update the slider display.
+            }
+        });
+
+        inputColor.addEventListener('input', (e) => {
+            const color = e.target.value;
+            statusColor.textContent = color;
+        });
+
+        presetColors.forEach(picker => {
+            picker.addEventListener('input', (e) => {
+                inputColor.value = e.target.value;
+                statusColor.textContent = e.target.value;
+            });
+        });
+
+        // --- Status Update Helper ---
+        function updateStatus() {
+            statusTool.textContent = isEraser ? 'Eraser' : 'Brush';
+            statusColor.textContent = inputColor.value;
+            statusSize.textContent = sliderSize.value;
+            updateUndoButtons();
+        }
+
+        // --- Resize Handling (Optional responsiveness) ---
+        // We keep the canvas internal resolution at 800x600 as requested.
+        // The CSS wrapper handles display scaling.
+
+    })();
+</script>
+</body>
+</html>

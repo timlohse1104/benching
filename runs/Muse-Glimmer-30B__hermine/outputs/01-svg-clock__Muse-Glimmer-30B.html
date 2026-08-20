@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Analog Clock</title>
+<style>
+html,body{height:100%;margin:0}
+body{background:#0d1117;color:#e6edf3;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center}
+#clock{width:400px;height:400px;overflow:visible}
+.face{fill:#161b22;stroke:#30363d;stroke-width:4}
+.tick{stroke:#e6edf3;stroke-width:2;stroke-linecap:round}
+.hand{stroke-linecap:round;fill:none}
+.hour{stroke:#e6edf3;stroke-width:8}
+.minute{stroke:#e6edf3;stroke-width:5}
+.second{stroke:#f85149;stroke-width:2}
+.center{fill:#e6edf3}
+#digital{margin-top:24px;font-family:monospace;font-size:28px;letter-spacing:2px}
+</style>
+</head>
+<body>
+<div id="container">
+<svg id="clock" viewBox="0 0 400 400">
+<circle class="face" cx="200" cy="200" r="180"/>
+<g id="ticks"></g>
+<g id="hourGroup" transform="translate(200 200)"><line class="hand hour" x1="0" y1="0" x2="0" y2="-70"/></g>
+<g id="minuteGroup" transform="translate(200 200)"><line class="hand minute" x1="0" y1="0" x2="0" y2="-110"/></g>
+<g id="secondGroup" transform="translate(200 200)"><line class="hand second" x1="0" y1="0" x2="0" y2="-130"/></g>
+<circle class="center" cx="200" cy="200" r="6"/>
+</svg>
+<div id="digital">00:00:00</div>
+</div>
+<script>
+const cx=200,cy=200;
+const ticks=document.getElementById('ticks');
+for(let i=0;i<60;i++){
+ const angle=(i*6-90)*Math.PI/180;
+ const rOuter=185;
+ const rInner=i%5===0?165:175;
+ const x1=cx+Math.cos(angle)*rOuter;
+ const y1=cy+Math.sin(angle)*rOuter;
+ const x2=cx+Math.cos(angle)*rInner;
+ const y2=cy+Math.sin(angle)*rInner;
+ const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+ line.setAttribute('x1',x1);line.setAttribute('y1',y1);
+ line.setAttribute('x2',x2);line.setAttribute('y2',y2);
+ line.setAttribute('class','tick');
+ ticks.appendChild(line);
+}
+const hourGroup=document.getElementById('hourGroup');
+const minuteGroup=document.getElementById('minuteGroup');
+const secondGroup=document.getElementById('secondGroup');
+const digital=document.getElementById('digital');
+function pad(n){return String(n).padStart(2,'0');}
+function update(){
+ const now=new Date();
+ const h=now.getHours()%12;
+ const m=now.getMinutes();
+ const s=now.getSeconds();
+ const ms=now.getMilliseconds();
+ const hourAngle=h*30+m*0.5;
+ const minuteAngle=m*6+s*0.1;
+ const secondAngle=s*6+ms*0.006;
+ hourGroup.setAttribute('transform',`translate(200 200) rotate(${hourAngle})`);
+ minuteGroup.setAttribute('transform',`translate(200 200) rotate(${minuteAngle})`);
+ secondGroup.setAttribute('transform',`translate(200 200) rotate(${secondAngle})`);
+ digital.textContent=`${pad(now.getHours())}:${pad(m)}:${pad(s)}`;
+}
+update();
+setInterval(update,1000);
+</script>
+</body>
+</html>

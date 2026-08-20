@@ -32,8 +32,8 @@ playwright install chromium
 cp config/models.example.yaml config/models.yaml   # then edit to taste
 
 # 5. Start a llama.cpp OpenAI-compatible server in another terminal, e.g.:
-#    llama-server -m /path/to/model.gguf --host 127.0.0.1 --port 8080
-#    (default api_base in config/models.yaml is http://localhost:8080/v1)
+#    llama-server -m /path/to/model.gguf --host 127.0.0.1 --port 8081
+#    (default api_base in config/models.yaml is http://localhost:8081/v1)
 
 # 6. Run the bench
 llm-check run

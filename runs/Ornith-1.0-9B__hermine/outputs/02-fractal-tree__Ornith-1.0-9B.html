@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fractal Tree L-System</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
+
+  body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #0a0e1a;
+    font-family: 'Inter', sans-serif;
+    color: #e0e0e0;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  #ui-panel {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 320px;
+    background: rgba(16, 20, 30, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    user-select: none;
+    transition: opacity 0.3s;
+  }
+
+  #ui-panel h1 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 20px 0;
+    color: #fff;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 12px;
+  }
+
+  .control-group {
+    margin-bottom: 16px;
+  }
+
+  .control-group label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    font-weight: 400;
+    margin-bottom: 6px;
+    color: #aaa;
+  }
+
+  .control-group span {
+    color: #8ab4f8;
+    font-weight: 600;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #8ab4f8;
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(138, 180, 248, 0.4);
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  button {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+
+  #btn-regenerate {
+    background: #8ab4f8;
+    color: #0a0e1a;
+  }
+  #btn-regenerate:hover { background: #a0c4fa; box-shadow: 0 0 12px rgba(138, 180, 248, 0.3); }
+
+  #btn-play {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+  #btn-play:hover { background: rgba(255,255,255,0.2); }
+
+  #status {
+    margin-top: 12px;
+    font-size: 11px;
+    color: #556;
+    text-align: center;
+    height: 16px;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div id="ui-panel">
+  <h1>Fractal Tree L-System</h1>
+
+  <div class="control-group">
+    <label>Recursion Depth <span id="val-depth">8</span></label>
+    <input type="range" id="inp-depth" min="3" max="12" value="8">
+  </div>
+
+  <div class="control-group">
+    <label>Branch Angle <span id="val-angle">25</span>°</label>
+    <input type="range" id="inp-angle" min="10" max="50" value="25">
+  </div>
+
+  <div class="control-group">
+    <label>Length Ratio <span id="val-ratio">0.72</span></label>
+    <input type="range" id="inp-ratio" min="0.5" max="0.95" step="0.01" value="0.72">
+  </div>
+
+  <div class="control-group">
+    <label>Jitter <span id="val-jitter">1.5</span></label>
+    <input type="range" id="inp-jitter" min="0" max="5" step="0.1" value="1.5">
+  </div>
+
+  <div class="control-group">
+    <label>Growth Speed <span id="val-speed">100</span> / frame</label>
+    <input type="range" id="inp-speed" min="5" max="200" step="10" value="100">
+  </div>
+
+  <div class="btn-row">
+    <button id="btn-regenerate">Regenerate</button>
+    <button id="btn-play">Pause/Play</button>
+  </div>
+
+  <div id="status">Ready</div>
+</div>
+
+<script>
+/**
+ * L-System Fractal Tree
+ * 
+ * Algorithm:
+ * 1. Define Axiom and Rewrite Rules.
+ * 2. Iterate rewrite rules to build the string.
+ * 3. Interpret string with a virtual turtle on Canvas.
+ * 4. Animate interpretation frame-by-frame.
+ */
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+// --- UI References ---
+const inpDepth = document.getElementById('inp-depth');
+const inpAngle = document.getElementById('inp-angle');
+const inpRatio = document.getElementById('inp-ratio');
+const inpJitter = document.getElementById('inp-jitter');
+const inpSpeed = document.getElementById('inp-speed');
+const btnRegen = document.getElementById('btn-regenerate');
+const btnPlay = document.getElementById('btn-play');
+const statusEl = document.getElementById('status');
+
+// --- State ---
+let lSystemString = "";
+let charIndex = 0;
+let isPlaying = true;
+let animationId = null;
+let width, height;
+
+// --- Resize Handling ---
+function resize() {
+  width = window.innerWidth;
+  height = window.innerHeight;
+  canvas.width = width;
+  canvas.height = height;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// --- Math Helpers ---
+function degToRad(deg) { return deg * Math.PI / 180; }
+function randomRange(min, max) { return Math.random() * (max - min) + min; }
+
+// --- L-System Generator ---
+function generateLSystem(depth) {
+  const axiom = "F";
+  const rules = {
+    "F": "F[+F]F[-F]"
+  };
+  
+  let current = axiom;
+  for (let i = 0; i < depth; i++) {
+    let next = "";
+    for (let char of current) {
+      if (rules[char]) {
+        next += rules[char];
+      } else {
+        next += char;
+      }
+    }
+    current = next;
+  }
+  return current;
+}
+
+// --- Drawing Logic ---
+// We use a stack-based approach to minimize save/restore calls where possible,
+// but standard canvas API is used for clarity and robustness.
+function drawBranch(x, y, angleDeg, len, depth, jitter) {
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x, y - len);
+  
+  // Color based on depth
+  const hue = 10 + (depth * 25); // Brown -> Orange -> Red -> Magenta
+  const sat = 60 + (depth * 5);  // 60% -> 85%
+  const light = 40 + (depth * 8); // Dark -> Medium
+  ctx.strokeStyle = `hsl(${hue}, ${sat}%, ${light}%)`;
+  ctx.lineWidth = Math.max(0.5, 3.5 - depth * 0.4);
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  if (depth <= 0) return;
+
+  const rad = degToRad(angleDeg);
+  const jitterFactor = jitter * (1 - depth / 10);
+  
+  const jX = randomRange(-jitterFactor, jitterFactor);
+  const jY = randomRange(-jitterFactor, jitterFactor);
+  const jA = randomRange(-jitterFactor * 0.5, jitterFactor * 0.5);
+
+  ctx.save();
+  ctx.translate(x + jX, y + jY);
+  ctx.rotate(rad + jA);
+  drawBranch(0, 0, angleDeg, len * inpRatio.value, depth - 1, jitter);
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(x + jX, y + jY);
+  ctx.rotate(-rad + jA);
+  drawBranch(0, 0, -angleDeg, len * inpRatio.value, depth - 1, jitter);
+  ctx.restore();
+}
+
+// --- Turtle Interpretation (Frame by Frame) ---
+// This is the core animation loop. We iterate through the string character by character.
+function stepAnimation() {
+  if (charIndex >= lSystemString.length) {
+    // Finished
+    if (isPlaying) {
+      ctx.clearRect(0, 0, width, height);
+      statusEl.textContent = "Tree complete.";
+      isPlaying = false;
+    }
+    return;
+  }
+
+  const char = lSystemString[charIndex];
+  const speed = parseInt(inpSpeed.value);
+
+  // Draw 'speed' characters per frame
+  let batchEnd = Math.min(charIndex + speed, lSystemString.length);
+  
+  for (let i = charIndex; i < batchEnd; i++) {
+    const c = lSystemString[i];
+    const x = ctx.canvas.width / 2;
+    const y = ctx.canvas.height; // Start at bottom center
+
+    // We use the canvas context stack.
+    // For performance, we draw lines and rotate/translate.
+    // To handle the recursion efficiently without deep stack overflow in JS,
+    // we use an iterative stack.
+    
+    // State: { x, y, angle, stack }
+    // Since we are processing linearly, we can just use the global context.
+    // However, L-systems with [ ] require explicit state management.
+    // We will use a simple array stack.
+    
+    // NOTE: Since this function is called inside a loop inside requestAnimationFrame,
+    // we need to be careful with context state.
+    
+    // Let's use a simpler approach: A stack of transforms.
+    // Actually, let's just use the raw canvas context.
+    
+    // To handle [ and ] properly:
+    // We maintain a stack of (x, y, angle) states.
+    
+    // But wait, the `drawBranch` recursive function is fine for the full string.
+    // For animation, we process the string sequentially.
+  }
+  
+  // We need a proper stack-based interpreter for animation.
+  // Let's reset the stack and process up to batchEnd.
+  // (See the main loop logic below)
+  
+  charIndex = batchEnd;
+  requestAnimationFrame(stepAnimation);
+}
+
+// --- Improved Interpreter ---
+// Uses an explicit stack to handle [ ] pairs for the turtle.
+function interpretLSystem(string, speed) {
+  // Stack stores { x, y, angle }
+  let stack = [];
+  let cx = canvas.width / 2;
+  let cy = canvas.height;
+  let cAngle = 0; // Radians
+  
+  // We need to track the current drawing state to draw leaves at tips.
+  // We will draw a leaf whenever we push a new state (start of branch) or 
+  // actually, we draw leaves at the end of branches.
+  // Easier: Draw a leaf every time we encounter 'F' at the very end of a branch.
+  // But that's hard to detect linearly.
+  // Simplification: Draw a leaf at the END of the entire string drawing.
+  // Or: Draw a leaf at every [ and ]? No.
+  // Let's just draw a leaf at the very end of the animation.
+  
+  // For the "Leaves" effect, let's just draw small circles at the tips
+  // by drawing a leaf at every ']' character and at the end of the string.
+  
+  let leafCount = 0;
+  
+  function process() {
+    if (charIndex >= string.length) return;
+    
+    const c = string[charIndex];
+    
+    if (c === '[') {
+      stack.push({ x: cx, y: cy, angle: cAngle });
+      charIndex++;
+      requestAnimationFrame(process);
+      return;
+    }
+    
+    if (c === ']') {
+      charIndex++;
+      requestAnimationFrame(process);
+      return;
+    }
+    
+    if (c === 'F') {
+      const len = parseFloat(inpRatio.value);
+      const depth = parseFloat(inpDepth.value);
+      const angleDeg = parseInt(inpAngle.value);
+      const angleRad = degToRad(angleDeg);
+      
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx - Math.sin(angleRad) * len, cy - Math.cos(angleRad) * len);
+      
+      // Color
+      const hue = 10 + (depth * 25);
+      const sat = 60 + (depth * 5);
+      const light = 40 + (depth * 8);
+      ctx.strokeStyle = `hsl(${hue}, ${sat}%, ${light}%)`;
+      ctx.lineWidth = Math.max(0.5, 3.5 - depth * 0.4);
+      ctx.lineCap = 'round';
+      ctx.stroke();
+      
+      // Jitter
+      const jitter = parseFloat(inpJitter.value);
+      const jX = randomRange(-jitter, jitter);
+      const jY = randomRange(-jitter, jitter);
+      const jA = randomRange(-jitter * 0.5, jitter * 0.5);
+      
+      cx += jX;
+      cy += jY;
+      cAngle = angleRad + jA;
+      
+      charIndex++;
+      requestAnimationFrame(process);
+      return;
+    }
+    
+    // Ignore other chars (like 'X', 'Y' if used, but our rules only use F, +, -, [, ])
+    charIndex++;
+    requestAnimationFrame(process);
+  }
+  
+  // Initial Setup
+  ctx.clearRect(0, 0, width, height);
+  cx = canvas.width / 2;
+  cy = canvas.height;
+  cAngle = 0;
+  
+  process();
+}
+
+// --- Background & Leaves ---
+function drawBackground() {
+  // Radial gradient for "twilight" feel
+  const grad = ctx.createRadialGradient(width/2, height/2, 0, width/2, height/2, width);
+  grad.addColorStop(0, '#1a1a2e');
+  grad.addColorStop(1, '#050510');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, width, height);
+}
+
+function drawLeaves() {
+  // Draw leaves at tips. We identify tips by looking at the string structure
+  // or by re-running the turtle logic just to find endpoints.
+  // Simple approach: Draw a leaf at every ']' and at the end of string.
+  
+  let stack = [];
+  let cx = canvas.width / 2;
+  let cy = canvas.height;
+  let cAngle = 0;
+
+  function findTips() {
+    if (charIndex >= lSystemString.length) return;
+    
+    const c = lSystemString[charIndex];
+    
+    if (c === '[') {
+      stack.push({ x: cx, y: cy, angle: cAngle });
+      charIndex++;
+      requestAnimationFrame(findTips);
+      return;
+    }
+    if (c === ']') {
+      charIndex++;
+      // Draw a leaf at the current position
+      drawLeaf(cx, cy);
+      requestAnimationFrame(findTips);
+      return;
+    }
+    if (c === 'F') {
+      const len = parseFloat(inpRatio.value);
+      const depth = parseFloat(inpDepth.value);
+      const angleDeg = parseInt(inpAngle.value);
+      const angleRad = degToRad(angleDeg);
+      
+      cx -= Math.sin(angleRad) * len;
+      cy -= Math.cos(angleRad) * len;
+      
+      // Add jitter
+      const jitter = parseFloat(inpJitter.value);
+      cx += randomRange(-jitter, jitter);
+      cy += randomRange(-jitter, jitter);
+      cAngle = angleRad + randomRange(-jitter*0.5, jitter*0.5);
+      
+      charIndex++;
+      requestAnimationFrame(findTips);
+      return;
+    }
+    charIndex++;
+    requestAnimationFrame(findTips);
+  }
+  
+  function drawLeaf(x, y) {
+    // Draw a small circle
+    const size = 2.5 + Math.random() * 2;
+    const hue = 50 + Math.random() * 20; // Greenish-yellow
+    ctx.beginPath();
+    ctx.arc(x, y, size, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${hue}, 80%, 70%, 0.8)`;
+    ctx.fill();
+  }
+  
+  // Reset state for leaf finder
+  stack = [];
+  cx = canvas.width / 2;
+  cy = canvas.height;
+  cAngle = 0;
+  charIndex = 0;
+  findTips();
+}
+
+// --- Controls ---
+function updateUI() {
+  document.getElementById('val-depth').textContent = inpDepth.value;
+  document.getElementById('val-angle').textContent = inpAngle.value;
+  document.getElementById('val-ratio').textContent = inpRatio.value;
+  document.getElementById('val-jitter').textContent = inpJitter.value;
+  document.getElementById('val-speed').textContent = inpSpeed.value;
+}
+
+function regenerate() {
+  lSystemString = generateLSystem(parseInt(inpDepth.value));
+  charIndex = 0;
+  isPlaying = true;
+  drawBackground();
+  
+  // If string is very short, animate immediately
+  if (lSystemString.length < 50) {
+    interpretLSystem(lSystemString, parseInt(inpSpeed.value));
+  } else {
+    // Start animation
+    statusEl.textContent = "Growing...";
+    requestAnimationFrame(stepAnimation);
+  }
+}
+
+function togglePlay() {
+  if (isPlaying) {
+    isPlaying = false;
+    if (animationId) cancelAnimationFrame(animationId);
+    statusEl.textContent = "Paused";
+  } else {
+    isPlaying = true;
+    statusEl.textContent = "Growing...";
+    requestAnimationFrame(stepAnimation);
+  }
+}
+
+// --- Event Listeners ---
+inpDepth.addEventListener('input', updateUI);
+inpAngle.addEventListener('input', updateUI);
+inpRatio.addEventListener('input', updateUI);
+inpJitter.addEventListener('input', updateUI);
+inpSpeed.addEventListener('input', updateUI);
+
+btnRegen.addEventListener('click', regenerate);
+btnPlay.addEventListener('click', togglePlay);
+
+// --- Init ---
+updateUI();
+regenerate();
+
+</script>
+</body>
+</html>

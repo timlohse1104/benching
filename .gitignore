@@ -14,9 +14,6 @@ venv/
 .pytest_cache/
 .ruff_cache/
 
-# Bench output
-runs/
-
 # Local model registry (copy from config/models.example.yaml)
 config/models.yaml
 

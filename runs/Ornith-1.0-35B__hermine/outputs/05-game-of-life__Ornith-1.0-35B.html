@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conway's Game of Life</title>
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+body {
+    background-color: #0d1117;
+    color: #c9d1d9;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+h1 {
+    font-size: 1.6rem;
+    margin-bottom: 12px;
+    color: #58a6ff;
+    letter-spacing: 1px;
+}
+canvas {
+    border: 2px solid #30363d;
+    background-color: #010409;
+    cursor: crosshair;
+    display: block;
+    margin-bottom: 14px;
+}
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+    max-width: 720px;
+}
+button {
+    background-color: #21262d;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.15s;
+}
+button:hover {
+    background-color: #30363d;
+}
+button:active {
+    background-color: #484f58;
+}
+button.active {
+    background-color: #1f6feb;
+    border-color: #1f6feb;
+    color: #fff;
+}
+label {
+    font-size: 0.9rem;
+    color: #8b949e;
+}
+select, input[type="range"] {
+    accent-color: #58a6ff;
+}
+select {
+    background-color: #21262d;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+input[type="range"] {
+    width: 120px;
+    vertical-align: middle;
+}
+.stats {
+    display: flex;
+    gap: 24px;
+    font-size: 0.95rem;
+    color: #8b949e;
+    margin-bottom: 10px;
+}
+.stats span {
+    color: #58a6ff;
+    font-weight: bold;
+}
+.speed-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+</style>
+</head>
+<body>
+<h1>Conway's Game of Life</h1>
+<div class="stats">
+    <div>Generation: <span id="genCount">0</span></div>
+    <div>Population: <span id="popCount">0</span></div>
+</div>
+<canvas id="grid" width="720" height="480"></canvas>
+<div class="controls">
+    <button id="btnStartPause">Start</button>
+    <button id="btnStep">Step</button>
+    <button id="btnClear">Clear</button>
+    <button id="btnRandom">Randomize</button>
+    <div class="speed-group">
+        <label for="speedSlider">Speed:</label>
+        <input type="range" id="speedSlider" min="1" max="60" value="12">
+        <label id="speedLabel">12 fps</label>
+    </div>
+    <label for="presetSelect">Pattern:</label>
+    <select id="presetSelect">
+        <option value="">— Select —</option>
+        <option value="glider">Glider</option>
+        <option value="lwss">Lightweight Spaceship</option>
+        <option value="pulsar">Pulsar</option>
+        <option value="pentadecathlon">Pentadecathlon</option>
+        <option value="gosperGliderGun">Gosper Glider Gun</option>
+        <option value="rpentomino">R-Pentomino</option>
+    </select>
+</div>
+
+<script>
+(function() {
+    "use strict";
+
+    var canvas = document.getElementById("grid");
+    var ctx = canvas.getContext("2d");
+    var cols = 60;
+    var rows = 40;
+    var cellSize = 12;
+    var gridWidth = cols * cellSize;
+    var gridHeight = rows * cellSize;
+
+    var grid = [];
+    var running = false;
+    var generation = 0;
+    var population = 0;
+    var fps = 12;
+    var lastFrameTime = 0;
+    var animId = null;
+    var drawing = false;
+    var drawValue = 1;
+    var dragButton = 0;
+
+    for (var i = 0; i < rows; i++) {
+        grid[i] = [];
+        for (var j = 0; j < cols; j++) {
+            grid[i][j] = 0;
+        }
+    }
+
+    var presets = {
+        glider: [
+            [0,1,0],
+            [0,0,1],
+            [1,1,1]
+        ],
+        lwss: [
+            [1,0,0,0,1],
+            [0,0,0,0,0],
+            [0,0,0,0,1],
+            [1,0,0,1,1]
+        ],
+        pulsar: [
+            [0,0,1,1,1,0,0,0,1,1,1,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [1,0,0,0,0,1,0,1,0,0,0,0,1],
+            [1,0,0,0,0,1,0,1,0,0,0,0,1],
+            [1,0,0,0,0,1,0,1,0,0,0,0,1],
+            [0,0,1,1,1,0,0,0,1,1,1,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,1,1,1,0,0,0,1,1,1,0,0],
+            [1,0,0,0,0,1,0,1,0,0,0,0,1],
+            [1,0,0,0,0,1,0,1,0,0,0,0,1],
+            [1,0,0,0,0,1,0,1,0,0,0,0,1],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,1,1,1,0,0,0,1,1,1,0,0]
+        ],
+        pentadecathlon: [
+            [1],
+            [1],
+            [0],
+            [0],
+            [0],
+            [1],
+            [0],
+            [0],
+            [0],
+            [1],
+            [1]
+        ],
+        rpentomino: [
+            [0,1,1],
+            [1,1,0],
+            [0,1,0]
+        ],
+        gosperGliderGun: [
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
+            [0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
+            [1,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [1,1,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+        ],
+        pulsar: [
+            [0,0,1,1,1,0,0,0,1,1,1,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [1,0,0,0,0,1,0,1,0,0,0,0,1],
+            [1,0,0,0,0,1,0,1,0,0,0,0,1],
+            [1,0,0,0,0,1,0,1,0,0,0,0,1],
+            [0,0,1,1,1,0,0,0,1,1,1,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,1,1,1,0,0,0,1,1,1,0,0],
+            [1,0,0,0,0,1,0,1,0,0,0,0,1],
+            [1,0,0,0,0,1,0,1,0,0,0,0,1],
+            [1,0,0,0,0,1,0,1,0,0,0,0,1],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,1,1,1,0,0,0,1,1,1,0,0]
+        ],
+        pentadecathlon: [
+            [1],
+            [1],
+            [0],
+            [0],
+            [0],
+            [1],
+            [0],
+            [0],
+            [0],
+            [1],
+            [1]
+        ],
+        rpentomino: [
+            [0,1,1],
+            [1,1,0],
+            [0,1,0]
+        ]
+    };
+
+    function countPopulation() {
+        var count = 0;
+        for (var i = 0; i < rows; i++) {
+            for (var j = 0; j < cols; j++) {
+                count += grid[i][j];
+            }
+        }
+        return count;
+    }
+
+    function drawGrid() {
+        ctx.clearRect(0, 0, gridWidth, gridHeight);
+        for (var i = 0; i < rows; i++) {
+            for (var j = 0; j < cols; j++) {
+                if (grid[i][j] === 1) {
+                    ctx.fillStyle = "#58a6ff";
+                    ctx.fillRect(j * cellSize + 1, i * cellSize + 1, cellSize - 2, cellSize - 2);
+                }
+            }
+        }
+        ctx.strokeStyle = "#1c2333";
+        ctx.lineWidth = 0.5;
+        for (var i = 0; i <= rows; i++) {
+            ctx.beginPath();
+            ctx.moveTo(0, i * cellSize);
+            ctx.lineTo(gridWidth, i * cellSize);
+            ctx.stroke();
+        }
+        for (var j = 0; j <= cols; j++) {
+            ctx.beginPath();
+            ctx.moveTo(j * cellSize, 0);
+            ctx.lineTo(j * cellSize, gridHeight);
+            ctx.stroke();
+        }
+    }
+
+    function step() {
+        var newGrid = [];
+        for (var i = 0; i < rows; i++) {
+            newGrid[i] = [];
+            for (var j = 0; j < cols; j++) {
+                var neighbors = 0;
+                for (var di = -1; di <= 1; di++) {
+                    for (var dj = -1; dj <= 1; dj++) {
+                        if (di === 0 && dj === 0) continue;
+                        var ni = i + di;
+                        var nj = j + dj;
+                        if (ni >= 0 && ni < rows && nj >= 0 && nj < cols) {
+                            neighbors += grid[ni][nj];
+                        }
+                    }
+                }
+                if (grid[i][j] === 1) {
+                    newGrid[i][j] = (neighbors === 2 || neighbors === 3) ? 1 : 0;
+                } else {
+                    newGrid[i][j] = (neighbors === 3) ? 1 : 0;
+                }
+            }
+        }
+        grid = newGrid;
+        generation++;
+        population = countPopulation();
+        updateStats();
+    }
+
+    function updateStats() {
+        document.getElementById("genCount").textContent = generation;
+        document.getElementById("popCount").textContent = population;
+    }
+
+    function gameLoop(timestamp) {
+        if (!running) return;
+        animId = requestAnimationFrame(gameLoop);
+        var interval = 1000 / fps;
+        if (timestamp - lastFrameTime >= interval) {
+            lastFrameTime = timestamp;
+            step();
+            drawGrid();
+        }
+    }
+
+    function start() {
+        if (running) return;
+        running = true;
+        lastFrameTime = performance.now();
+        document.getElementById("btnStartPause").textContent = "Pause";
+        document.getElementById("btnStartPause").classList.add("active");
+        animId = requestAnimationFrame(gameLoop);
+    }
+
+    function pause() {
+        running = false;
+        if (animId) {
+            cancelAnimationFrame(animId);
+            animId = null;
+        }
+        document.getElementById("btnStartPause").textContent = "Start";
+        document.getElementById("btnStartPause").classList.remove("active");
+    }
+
+    function toggleStartPause() {
+        if (running) {
+            pause();
+        } else {
+            start();
+        }
+    }
+
+    function clearGrid() {
+        pause();
+        for (var i = 0; i < rows; i++) {
+            for (var j = 0; j < cols; j++) {
+                grid[i][j] = 0;
+            }
+        }
+        generation = 0;
+        population = 0;
+        updateStats();
+        drawGrid();
+    }
+
+    function randomizeGrid() {
+        for (var i = 0; i < rows; i++) {
+            for (var j = 0; j < cols; j++) {
+                grid[i][j] = Math.random() < 0.25 ? 1 : 0;
+            }
+        }
+        generation = 0;
+        population = countPopulation();
+        updateStats();
+        drawGrid();
+    }
+
+    function loadPreset(name) {
+        if (!presets[name]) return;
+        pause();
+        clearGrid();
+        var pattern = presets[name];
+        var pRows = pattern.length;
+        var pCols = pattern[0].length;
+        var startX = Math.floor((cols - pCols) / 2);
+        var startY = Math.floor((rows - pRows) / 2);
+        for (var i = 0; i < pRows; i++) {
+            for (var j = 0; j < pCols; j++) {
+                var x = startX + j;
+                var y = startY + i;
+                if (x >= 0 && x < cols && y >= 0 && y < rows) {
+                    grid[y][x] = pattern[i][j];
+                }
+            }
+        }
+        population = countPopulation();
+        updateStats();
+        drawGrid();
+    }
+
+    function getCellFromEvent(e) {
+        var rect = canvas.getBoundingClientRect();
+        var scaleX = gridWidth / rect.width;
+        var scaleY = gridHeight / rect.height;
+        var x = (e.clientX - rect.left) * scaleX;
+        var y = (e.clientY - rect.top) * scaleY;
+        var col = Math.floor(x / cellSize);
+        var row = Math.floor(y / cellSize);
+        if (col < 0 || col >= cols || row < 0 || row >= rows) return null;
+        return { row: row, col: col };
+    }
+
+    function toggleCell(row, col) {
+        grid[row][col] = grid[row][col] ? 0 : 1;
+        population = countPopulation();
+        updateStats();
+        drawGrid();
+    }
+
+    canvas.addEventListener("mousedown", function(e) {
+        e.preventDefault();
+        drawing = true;
+        dragButton = e.button;
+        var cell = getCellFromEvent(e);
+        if (cell) {
+            drawValue = grid[cell.row][cell.col] ? 0 : 1;
+            grid[cell.row][cell.col] = drawValue;
+            population = countPopulation();
+            updateStats();
+            drawGrid();
+        }
+    });
+
+    canvas.addEventListener("mousemove", function(e) {
+        if (!drawing) return;
+        var cell = getCellFromEvent(e);
+        if (cell) {
+            grid[cell.row][cell.col] = drawValue;
+            population = countPopulation();
+            updateStats();
+            drawGrid();
+        }
+    });
+
+    canvas.addEventListener("mouseup", function() {
+        drawing = false;
+    });
+
+    canvas.addEventListener("mouseleave", function() {
+        drawing = false;
+    });
+
+    document.getElementById("btnStartPause").addEventListener("click", toggleStartPause);
+    document.getElementById("btnStep").addEventListener("click", function() {
+        if (running) return;
+        step();
+        drawGrid();
+    });
+    document.getElementById("btnClear").addEventListener("click", clearGrid);
+    document.getElementById("btnRandom").addEventListener("click", randomizeGrid);
+
+    document.getElementById("speedSlider").addEventListener("input", function() {
+        fps = parseInt(this.value, 10);
+        document.getElementById("speedLabel").textContent = fps + " fps";
+    });
+
+    document.getElementById("presetSelect").addEventListener("change", function() {
+        if (this.value) {
+            loadPreset(this.value);
+            this.value = "";
+        }
+    });
+
+    drawGrid();
+    updateStats();
+})();
+</script>
+</body>
+</html>

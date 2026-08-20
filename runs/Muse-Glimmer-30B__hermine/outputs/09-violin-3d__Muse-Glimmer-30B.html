@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Playable 3D Violin</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#0a0a0f;color:#eee;font-family:system-ui,Segoe UI,Roboto,sans-serif;overflow:hidden;user-select:none}
+#stage{position:fixed;inset:0;perspective:1200px;display:flex;align-items:center;justify-content:center}
+#violin{transform-style:preserve-3d;width:300px;height:500px;position:relative;transform:scale(1) rotateX(-20deg) rotateY(25deg)}
+.face{position:absolute;backface-visibility:hidden}
+.body-front,.body-back{position:absolute;left:40px;top:100px;width:220px;height:300px;clip-path:polygon(50% 0%,62% 8%,82% 18%,92% 35%,88% 50%,92% 65%,82% 82%,62% 92%,50% 100%,38% 92%,18% 82%,8% 65%,12% 50%,8% 35%,18% 18%,38% 8%);background:linear-gradient(90deg,#7a4a2a,#b07a4a,#6b3e24);box-shadow:inset 0 0 40px rgba(0,0,0,.45),0 10px 30px rgba(0,0,0,.5);border:2px solid #4a2f1a;border-radius:6px}
+.body-back{transform:translateZ(-40px) rotateY(180deg)}
+.neck{position:absolute;left:135px;top:30px;width:30px;height:130px;background:linear-gradient(#6b442a,#8b5a3a);transform:translateZ(20px);border-radius:4px;box-shadow:inset 0 0 12px rgba(0,0,0,.4)}
+.fingerboard{position:absolute;left:140px;top:35px;width:18px;height:120px;background:#111;transform:translateZ(26px);border-radius:2px;box-shadow:inset 0 0 8px #000}
+.scroll{position:absolute;left:120px;top:-45px;width:60px;height:60px;background:radial-gradient(circle at 30% 30%,#a07a4a,#6b442a);transform:translateZ(22px);border-radius:50% 50% 45% 45%/60% 60% 40% 40%;box-shadow:inset 0 0 10px rgba(0,0,0,.4)}
+.bridge{position:absolute;left:140px;top:220px;width:18px;height:70px;background:linear-gradient(#e8d5b5,#c9b08a);transform:translateZ(45px);border-radius:2px;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+.string{position:absolute;left:55px;width:190px;height:2px;background:linear-gradient(to right,#ccc,#fff,#ccc);border-radius:1px;transform:translateZ(46px);cursor:pointer;box-shadow:0 0 6px rgba(255,255,255,.25)}
+.s1{top:135px}
+.s2{top:185px}
+.s3{top:235px}
+.s4{top:285px}
+.string.playing{animation:vibrate .07s ease-in-out infinite alternate;background:#fff}
+@keyframes vibrate{0%{transform:translateZ(46px) translateX(0)}100%{transform:translateZ(46px) translateX(2px)}}
+#hint{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.6);padding:10px 16px;border-radius:10px;font-size:14px;text-align:center;backdrop-filter:blur(4px);box-shadow:0 4px 20px rgba(0,0,0,.4)}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="violin">
+    <div class="body-front"></div>
+    <div class="body-back"></div>
+    <div class="neck"></div>
+    <div class="fingerboard"></div>
+    <div class="scroll"></div>
+    <div class="bridge"></div>
+    <div class="string s1" data-freq="196.00"></div>
+    <div class="string s2" data-freq="293.66"></div>
+    <div class="string s3" data-freq="440.00"></div>
+    <div class="string s4" data-freq="659.25"></div>
+  </div>
+</div>
+<div id="hint">Drag to orbit • Scroll to zoom • Click strings or press 1-4 / A-S-D-F<br>G3 · D4 · A4 · E5</div>
+<script>
+const violinEl=document.getElementById('violin');
+let rotX=-20,rotY=25,scale=1,dragging=false,lastX=0,lastY=0;
+function update(){violinEl.style.transform=`scale(${scale}) rotateX(${rotX}deg) rotateY(${rotY}deg)`}
+document.getElementById('stage').addEventListener('mousedown',e=>{dragging=true;lastX=e.clientX;lastY=e.clientY});
+window.addEventListener('mouseup',()=>dragging=false);
+window.addEventListener('mousemove',e=>{if(!dragging)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;rotY+=dx*0.3;rotX+=dy*0.3;rotX=Math.max(-80,Math.min(80,rotX));lastX=e.clientX;lastY=e.clientY;update()});
+window.addEventListener('wheel',e=>{e.preventDefault();scale*=1-e.deltaY*0.001;scale=Math.min(2,Math.max(.5,scale));update()},{passive:false});
+
+let audioCtx=null;
+function ensureAudio(){if(!audioCtx){audioCtx=new (window.AudioContext||window.webkitAudioContext)()}if(audioCtx.state==='suspended')audioCtx.resume();return audioCtx}
+function playNote(freq,el){const ctx=ensureAudio();const osc=ctx.createOscillator();const gain=ctx.createGain();osc.type='triangle';osc.frequency.value=freq;gain.gain.setValueAtTime(0,ctx.currentTime);gain.gain.linearRampToValueAtTime(0.28,ctx.currentTime+0.01);gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+1.4);osc.connect(gain);gain.connect(ctx.destination);osc.start();osc.stop(ctx.currentTime+1.5);el.classList.add('playing');setTimeout(()=>el.classList.remove('playing'),350)}
+const strings=[...document.querySelectorAll('.string')].map(el=>({el,freq:parseFloat(el.dataset.freq)}));
+strings.forEach(s=>{s.el.addEventListener('pointerdown',()=>playNote(s.freq,s.el))});
+window.addEventListener('keydown',e=>{const k=e.key.toLowerCase();const map={'1':0,'2':1,'3':2,'4':3,'a':0,'s':1,'d':2,'f':3};if(map[k]!==undefined){const s=strings[map[k]];if(s)playNote(s.freq,s.el)}});
+</script>
+</body>
+</html>

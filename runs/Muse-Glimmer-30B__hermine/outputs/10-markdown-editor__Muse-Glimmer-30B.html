@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Markdown Editor</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f5f5f5;color:#222}
+.container{display:grid;grid-template-columns:1fr 1fr;height:100vh}
+header{grid-column:1/-1;background:#fff;border-bottom:1px solid #ddd;padding:.5rem 1rem;display:flex;justify-content:space-between;align-items:center}
+h1{font-size:1rem;margin:0}
+.editor-pane{display:flex}
+textarea{width:100%;height:100%;border:none;outline:none;padding:1rem;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;line-height:1.5;resize:none;background:#fff}
+.preview-pane{overflow:auto;background:#fff;padding:1rem}
+#preview{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.6}
+#preview h1,#preview h2,#preview h3,#preview h4,#preview h5,#preview h6{margin:.5em 0 .3em}
+#preview pre{background:#f0f0f0;padding:.75rem;overflow:auto;border-radius:4px}
+#preview code{background:#f0f0f0;padding:.1rem .3rem;border-radius:3px;font-family:ui-monospace,Menlo,Consolas,monospace}
+#preview pre code{background:none;padding:0}
+#preview blockquote{border-left:3px solid #ccc;padding-left:.75rem;color:#555;margin:.5em 0}
+#preview img{max-width:100%;height:auto}
+footer{grid-column:1/-1;background:#fff;border-top:1px solid #ddd;padding:.5rem 1rem;font-size:12px;display:flex;gap:1rem;align-items:center}
+button{padding:.4rem .8rem;border:1px solid #ccc;background:#fff;border-radius:4px;cursor:pointer}
+button:hover{background:#eee}
+@media (max-width:768px){
+.container{grid-template-columns:1fr;grid-template-rows:auto 1fr auto}
+footer{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+<h1>Markdown Editor</h1>
+<div>
+<span id="wordCount">0 words</span> • <span id="charCount">0 chars</span>
+<button id="copyBtn">Copy HTML</button>
+</div>
+</header>
+<div class="editor-pane">
+<textarea id="editor"># Heading Level 1
+## Heading Level 2
+### Heading Level 3
+#### Heading Level 4
+##### Heading Level 5
+###### Heading Level 6
+
+This is a paragraph with **bold text**, *italic text*, and `inline code`.
+
+Here is a [link to OpenAI](https://openai.com).
+
+![Placeholder Image](https://via.placeholder.com/150)
+
+> This is a blockquote.
+> It can span multiple lines.
+
+- Unordered item one
+- Unordered item two
+- Unordered item three
+
+1. Ordered item one
+2. Ordered item two
+3. Ordered item three
+
+---
+
+```javascript
+// Fenced code block example
+function greet(name) {
+  console.log(`Hello, ${name}!`);
+}
+```
+</textarea>
+</div>
+<div class="preview-pane">
+<div id="preview"></div>
+</div>
+<footer>
+</footer>
+</div>
+<script>
+const editor = document.getElementById('editor');
+const preview = document.getElementById('preview');
+const wordCountEl = document.getElementById('wordCount');
+const charCountEl = document.getElementById('charCount');
+const copyBtn = document.getElementById('copyBtn');
+
+function escapeHtml(str){
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function parseInline(text){
+  text = text.replace(/`([^`]+)`/g,'<code>$1</code>');
+  text = text.replace(/!\[([^\]]*)\]\(([^\)]+)\)/g,'<img alt="$1" src="$2" />');
+  text = text.replace(/\[([^\]]+)\]\(([^\)]+)\)/g,'<a href="$2">$1</a>');
+  text = text.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+  text = text.replace(/__([^_]+)__/g,'<strong>$1</strong>');
+  text = text.replace(/\*([^*]+)\*/g,'<em>$1</em>');
+  text = text.replace(/_([^_]+)_/g,'<em>$1</em>');
+  return text;
+}
+
+function parseMarkdown(md){
+  const escaped = escapeHtml(md);
+  const lines = escaped.split(/\r?\n/);
+  let html = '';
+  let inCode = false;
+  let codeLang = '';
+  let codeBuf = [];
+  let inUL = false;
+  let inOL = false;
+  let inBlockquote = false;
+  let paraBuf = [];
+
+  const flushPara = () => {
+    if(paraBuf.length){
+      html += '<p>'+parseInline(paraBuf.join(' '))+'</p>';
+      paraBuf = [];
+    }
+  };
+  const closeLists = () => {
+    if(inUL){html+='</ul>';inUL=false;}
+    if(inOL){html+='</ol>';inOL=false;}
+  };
+
+  for(let i=0;i<lines.length;i++){
+    let raw = lines[i];
+    let line = raw.trimStart();
+    if(!inCode && line.startsWith('```')){
+      flushPara();closeLists();
+      inCode = true;
+      codeLang = line.slice(3).trim().replace(/[^a-zA-Z0-9_-]/g,'');
+      codeBuf = [];
+      continue;
+    }
+    if(inCode){
+      if(line.startsWith('```')){
+        inCode = false;
+        html += '<pre><code class="lang-'+codeLang+'">'+codeBuf.join('\n')+'</code></pre>';
+        continue;
+      }else{
+        codeBuf.push(raw);
+        continue;
+      }
+    }
+    const heading = line.match(/^(#{1,6})\s+(.*)$/);
+    if(heading){
+      flushPara();closeLists();
+      if(inBlockquote){html+='</blockquote>';inBlockquote=false;}
+      const level = heading[1].length;
+      html += '<h'+level+'>'+parseInline(heading[2])+'</h'+level+'>';
+      continue;
+    }
+    if(/^---$|^___$|\*\*\*$/.test(line.trim())){
+      flushPara();closeLists();
+      if(inBlockquote){html+='</blockquote>';inBlockquote=false;}
+      html += '<hr>';
+      continue;
+    }
+    if(line.startsWith('> ')){
+      flushPara();closeLists();
+      if(!inBlockquote){html+='<blockquote>';inBlockquote=true;}
+      html += '<p>'+parseInline(line.slice(2))+'</p>';
+      continue;
+    }else{
+      if(inBlockquote){html+='</blockquote>';inBlockquote=false;}
+    }
+    const ul = line.match(/^([-*+])\s+(.*)$/);
+    if(ul){
+      flushPara();
+      if(!inUL){html+='<ul>';inUL=true;}
+      html += '<li>'+parseInline(ul[2])+'</li>';
+      continue;
+    }else{
+      if(inUL){html+='</ul>';inUL=false;}
+    }
+    const ol = line.match(/^(\d+)\.\s+(.*)$/);
+    if(ol){
+      flushPara();
+      if(!inOL){html+='<ol>';inOL=true;}
+      html += '<li>'+parseInline(ol[2])+'</li>';
+      continue;
+    }else{
+      if(inOL){html+='</ol>';inOL=false;}
+    }
+    if(line.trim()===''){
+      flushPara();closeLists();
+      continue;
+    }
+    paraBuf.push(line.trim());
+  }
+  flushPara();closeLists();
+  if(inBlockquote) html+='</blockquote>';
+  return html;
+}
+
+function updateCounts(md){
+  const words = md.trim()? md.trim().split(/\s+/).length : 0;
+  wordCountEl.textContent = words+' words';
+  charCountEl.textContent = md.length+' chars';
+}
+
+function update(){
+  const md = editor.value;
+  preview.innerHTML = parseMarkdown(md);
+  updateCounts(md);
+}
+
+editor.addEventListener('input', update);
+copyBtn.addEventListener('click', async ()=>{
+  try{
+    await navigator.clipboard.writeText(preview.innerHTML);
+    copyBtn.textContent = 'Copied!';
+    setTimeout(()=>copyBtn.textContent='Copy HTML',1500);
+  }catch(e){}
+});
+
+update();
+</script>
+</body>
+</html>

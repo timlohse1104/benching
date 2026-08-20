@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Tower Defense: Echo Protocol</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Courier New', monospace; 
+            background: #0a0a1a; 
+            color: #00ffff; 
+            overflow: hidden;
+            perspective: 1000px;
+        }
+        
+        .game-container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        #gameCanvas {
+            flex: 3;
+            background: radial-gradient(circle at center, #1a1a2e 0%, #0a0a1a 100%);
+            border-right: 2px solid #00ffff;
+        }
+        
+        .ui-panel {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        h1, h2, h3 { 
+            color: #00ffff; 
+            text-shadow: 0 0 10px #00ffff;
+            margin-bottom: 15px;
+        }
+        
+        .neon-button {
+            background: linear-gradient(45deg, #00ffff, #0088ff);
+            border: 2px solid #00ffff;
+            color: #0a0a1a;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            text-shadow: 0 0 5px #fff;
+            box-shadow: 0 0 10px #00ffff;
+            transition: all 0.3s;
+        }
+        
+        .neon-button:hover {
+            box-shadow: 0 0 20px #00ffff;
+            transform: scale(1.05);
+        }
+        
+        .neon-button:active {
+            transform: scale(0.95);
+        }
+        
+        .grid-cell {
+            width: 30px;
+            height: 30px;
+            border: 1px solid #00ffff40;
+            display: inline-block;
+            text-align: center;
+            line-height: 30px;
+            font-size: 12px;
+        }
+        
+        .build-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 30px);
+            grid-template-rows: repeat(10, 30px);
+            gap: 1px;
+            margin: 20px 0;
+        }
+        
+        .grid-cell.buildable {
+            background: #0088ff40;
+        }
+        
+        .grid-cell.occupied {
+            background: #ff00ff40;
+        }
+        
+        .grid-cell:hover.buildable {
+            background: #00ffff60;
+            cursor: pointer;
+        }
+        
+        .stats-box {
+            background: rgba(0, 255, 255, 0.1);
+            border: 1px solid #00ffff;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        
+        .skill-tree {
+            display: grid;
+            grid-template-columns: repeat(2, 150px);
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .skill-node {
+            background: linear-gradient(45deg, #ff00ff, #00ffff);
+            border: 2px solid #fff;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #00ffff;
+            transition: all 0.3s;
+        }
+        
+        .skill-node.locked {
+            background: #666;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        
+        .skill-node.unlocked {
+            background: #00ff00;
+            box-shadow: 0 0 20px #00ff00;
+        }
+        
+        .turret-stats {
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(255, 0, 255, 0.1);
+            border-left: 3px solid #ff00ff;
+        }
+        
+        .wave-info {
+            background: rgba(255, 255, 0, 0.1);
+            border: 1px solid #ffff00;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        
+        .neon-text {
+            color: #00ffff;
+            text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff;
+        }
+        
+        .turret-btn {
+            background: linear-gradient(45deg, #ff00ff, #ff8800);
+            border: 2px solid #ff00ff;
+        }
+        
+        .turret-btn:hover {
+            box-shadow: 0 0 20px #ff00ff;
+        }
+        
+        .echo-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 255, 255, 0.05);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        
+        .echo-overlay.active {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div class="ui-panel">
+            <h1>ECHO PROTOCOL</h1>
+            
+            <div class="stats-box">
+                <div class="neon-text">RUN: 1</div>
+                <div class="neon-text">WAVE: <span id="currentWave">1</span></div>
+                <div class="neon-text">SCORE: <span id="score">0</span></div>
+                <div class="neon-text">MONEY: $<span id="money">100</span></div>
+            </div>
+            
+            <h2>BUILD TURRET</h2>
+            <div>
+                <button class="neon-button turret-btn" onclick="buildTurret(0)" data-type="laser">Laser Turret ($20)</button>
+                <button class="neon-button turret-btn" onclick="buildTurret(1)" data-type="missile">Missile Turret ($30)</button>
+                <button class="neon-button turret-btn" onclick="buildTurret(2)" data-type="electric">Electric Turret ($40)</button>
+            </div>
+            
+            <h2>GRID</h2>
+            <div class="build-grid" id="buildGrid"></div>
+            
+            <h2>WAVE INFO</h2>
+            <div class="wave-info">
+                <div class="neon-text">ENEMIES: <span id="enemyCount">10</span></div>
+                <div class="neon-text">BOSS: <span id="bossActive">NO</span></div>
+            </div>
+            
+            <h2>SKILL TREE</h2>
+            <div class="skill-tree" id="skillTree">
+                <div class="skill-node locked" id="skill1" onclick="upgradeSkill(1)">Fire Rate +10%</div>
+                <div class="skill-node locked" id="skill2">Damage +15%</div>
+                <div class="skill-node locked" id="skill3">Range +20%</div>
+                <div class="skill-node locked" id="skill4">Echo Strike</div>
+                <div class="skill-node locked" id="skill5">Gold Find +25%</div>
+                <div class="skill-node locked" id="skill6"> enemy HP -10%</div>
+            </div>
+            
+            <button class="neon-button" onclick="startNewRun()" style="margin-top: 20px;">NEW RUN</button>
+            <button class="neon-button" onclick="nextWave()" style="margin-top: 10px;">NEXT WAVE</button>
+        </div>
+    </div>
+    
+    <div class="echo-overlay" id="echoOverlay"></div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let cellSize = 30;
+        let gridCols = 20;
+        let gridRows = 15;
+        
+        canvas.width = gridCols * cellSize;
+        canvas.height = gridRows * cellSize;
+        
+        let grid = [];
+        let turrets = [];
+        let enemies = [];
+        let projectiles = [];
+        let particles = [];
+        let waveNumber = 1;
+        let score = 0;
+        let money = 100;
+        let runNumber = 1;
+        let gameStarted = false;
+        let bossActive = false;
+        let skills = {
+            fireRate: 0,
+            damage: 0,
+            range: 0,
+            echoStrike: false,
+            goldFind: 0,
+            enemyHP: 0
+        };
+        
+        let enemyTypes = [
+            { name: 'Scout', speed: 2, hp: 20, reward: 10, color: '#00ff00' },
+            { name: 'Brute', speed: 1, hp: 50, reward: 25, color: '#ff0000' },
+            { name: 'Shooter', speed: 1.5, hp: 30, reward: 20, color: '#0000ff', shooting: true },
+            { name: 'Tank', speed: 0.8, hp: 100, reward: 50, color: '#8800ff' },
+            { name: 'Assassin', speed: 3, hp: 15, reward: 30, color: '#ff8800', invisible: true }
+        ];
+        
+        let turretTypes = [
+            { name: 'Laser', cost: 20, baseDamage: 10, baseRange: 80, fireRate: 1, color: '#00ffff', type: 'laser' },
+            { name: 'Missile', cost: 30, baseDamage: 20, baseRange: 100, fireRate: 0.8, color: '#ff00ff', type: 'missile' },
+            { name: 'Electric', cost: 40, baseDamage: 15, baseRange: 90, fireRate: 1.2, color: '#ffff00', type: 'electric' }
+        ];
+        
+        class Turret {
+            constructor(x, y, typeIndex) {
+                this.x = x;
+                this.y = y;
+                this.typeIndex = typeIndex;
+                this.level = 1;
+                this.upgradeCount = 0;
+            }
+            
+            getDamage() {
+                return turretTypes[this.typeIndex].baseDamage * (1 + this.upgradeCount * 0.5);
+            }
+            
+            getRange() {
+                return turretTypes[this.typeIndex].baseRange * (1 + this.upgradeCount * 0.1);
+            }
+            
+            getFireRate() {
+                return turretTypes[this.typeIndex].fireRate * (1 - this.upgradeCount * 0.05);
+            }
+            
+            getColor() {
+                return turretTypes[this.typeIndex].color;
+            }
+        }
+        
+        class Enemy {
+            constructor(typeIndex, pathIndex) {
+                this.typeIndex = typeIndex;
+                this.pathIndex = pathIndex;
+                this.x = paths[pathIndex][0].x;
+                this.y = paths[pathIndex][0].y;
+                this.hp = enemyTypes[typeIndex].hp * (1 + waveNumber * 0.3 + skills.enemyHP * 0.1);
+                this.maxHp = this.hp;
+                this.speed = enemyTypes[typeIndex].speed;
+                this.reward = enemyTypes[typeIndex].reward;
+                this.color = enemyTypes[typeIndex].color;
+                this.shooting = enemyTypes[typeIndex].shooting || false;
+                this.invisible = enemyTypes[typeIndex].invisible || false;
+                this.pathProgress = 0;
+                this.alive = true;
+                this.shootCooldown = 0;
+            }
+            
+            update() {
+                if (!this.alive) return;
+                
+                let path = paths[this.pathIndex];
+                let nextPoint = path[Math.min(this.pathIndex + 1, path.length - 1)];
+                
+                let dx = nextPoint.x - this.x;
+                let dy = nextPoint.y - this.y;
+                let dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist > 0) {
+                    this.x += (dx / dist) * this.speed;
+                    this.y += (dy / dist) * this.speed;
+                    this.pathProgress += this.speed / 100;
+                }
+                
+                if (this.x >= nextPoint.x - 1 && this.x <= nextPoint.x + 1 && 
+                    this.y >= nextPoint.y - 1 && this.y <= nextPoint.y + 1) {
+                    this.pathIndex++;
+                }
+                
+                if (this.pathIndex >= paths[0].length - 1) {
+                    this.alive = false;
+                }
+                
+                if (this.shooting) {
+                    this.shootCooldown--;
+                    if (this.shootCooldown <= 0) {
+                        this.shoot();
+                        this.shootCooldown = 60;
+                    }
+                }
+            }
+            
+            shoot() {
+                for (let turret of turrets) {
+                    let dx = turret.x - this.x;
+                    let dy = turret.y - this.y;
+                    let dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (dist < 100) {
+                        projectiles.push({
+                            x: this.x,
+                            y: this.y,
+                            targetX: turret.x,
+                            targetY: turret.y,
+                            speed: 2,
+                            damage: 15,
+                            type: 'enemyShot',
+                            lifetime: 60
+                        });
+                    }
+                }
+            }
+        }
+        
+        class Projectile {
+            constructor(x, y, targetX, targetY, damage, type) {
+                this.x = x;
+                this.y = y;
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.speed = type === 'laser' ? 5 : 3;
+                this.damage = damage;
+                this.type = type;
+                this.lifetime = type === 'laser' ? 30 : 60;
+            }
+            
+            update() {
+                let dx = this.targetX - this.x;
+                let dy = this.targetY - this.y;
+                let dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist > 0) {
+                    this.x += (dx / dist) * this.speed;
+                    this.y += (dy / dist) * this.speed;
+                }
+                
+                this.lifetime--;
+            }
+        }
+        
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.life = 30;
+                this.size = Math.random() * 3 + 1;
+            }
+            
+            update() {
+                this.life--;
+                this.x += (Math.random() - 0.5) * 2;
+                this.y += (Math.random() - 0.5) * 2;
+            }
+        }
+        
+        let paths = [
+            [{x: 50, y: 50}, {x: 200, y: 50}, {x: 200, y: 200}, {x: 400, y: 200}, {x: 400, y: 400}],
+            [{x: 100, y: 100}, {x: 300, y: 100}, {x: 300, y: 300}, {x: 500, y: 300}],
+            [{x: 150, y: 50}, {x: 350, y: 50}, {x: 350, y: 250}, {x: 550, y: 250}],
+            [{x: 50, y: 150}, {x: 250, y: 150}, {x: 250, y: 350}, {x: 450, y: 350}],
+            [{x: 200, y: 50}, {x: 400, y: 50}, {x: 400, y: 300}, {x: 600, y: 300}]
+        ];
+        
+        function initGrid() {
+            const gridElement = document.getElementById('buildGrid');
+            gridElement.innerHTML = '';
+            
+            for (let i = 0; i < 10; i++) {
+                for (let j = 0; j < 10; j++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'grid-cell buildable';
+                    cell.dataset.x = i;
+                    cell.dataset.y = j;
+                    cell.onclick = () => selectCell(i, j);
+                    gridElement.appendChild(cell);
+                }
+            }
+        }
+        
+        let selectedCell = null;
+        
+        function selectCell(x, y) {
+            selectedCell = {x, y};
+            document.querySelectorAll('.grid-cell').forEach(cell => {
+                cell.classList.remove('selected');
+            });
+            document.querySelector(`.grid-cell[data-x="${x}"][data-y="${y}"]`).classList.add('selected');
+        }
+        
+        function buildTurret(typeIndex) {
+            if (!selectedCell) return;
+            
+            const cost = turretTypes[typeIndex].cost;
+            if (money < cost) return;
+            
+            const cell = document.querySelector(`.grid-cell[data-x="${selectedCell.x}"][data-y="${selectedCell.y}"]`);
+            if (cell.classList.contains('occupied')) return;
+            
+            const turretX = selectedCell.x * 30 + 15;
+            const turretY = selectedCell.y * 30 + 15;
+            
+            turrets.push(new Turret(turretX, turretY, typeIndex));
+            money -= cost;
+            cell.classList.add('occupied');
+            selectedCell = null;
+            updateUI();
+        }
+        
+        function spawnEnemies(count, wave) {
+            const enemyCount = Math.floor(count * (1 + wave * 0.2));
+            for (let i = 0; i < enemyCount; i++) {
+                const typeIndex = i % enemyTypes.length;
+                const pathIndex = i % paths.length;
+                enemies.push(new Enemy(typeIndex, pathIndex));
+            }
+        }
+        
+        function spawnBoss() {
+            const boss = new Enemy(4, 0);
+            boss.hp *= 3;
+            boss.maxHp = boss.hp;
+            boss.color = '#ff00ff';
+            boss.name = 'BOSS';
+            enemies.push(boss);
+            return boss;
+        }
+        
+        function update() {
+            if (!gameStarted) return;
+            
+            turrets.forEach(turret => {
+                let target = null;
+                let minDistance = turret.getRange();
+                
+                enemies.forEach(enemy => {
+                    if (enemy.alive) {
+                        let dx = enemy.x - turret.x;
+                        let dy = enemy.y - turret.y;
+                        let dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (dist < minDistance) {
+                            minDistance = dist;
+                            target = enemy;
+                        }
+                    }
+                });
+                
+                if (target) {
+                    let dx = target.x - turret.x;
+                    let dy = target.y - turret.y;
+                    let dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (dist > 0) {
+                        projectiles.push(new Projectile(
+                            turret.x, turret.y,
+                            target.x, target.y,
+                            turret.getDamage(),
+                            turretTypes[turret.typeIndex].type
+                        ));
+                    }
+                }
+            });
+            
+            enemies.forEach(enemy => enemy.update());
+            projectiles.forEach(p => p.update());
+            particles.forEach(p => p.update());
+            
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const p = projectiles[i];
+                let hit = false;
+                
+                enemies.forEach(enemy => {
+                    if (enemy.alive) {
+                        let dx = p.x - enemy.x;
+                        let dy = p.y - enemy.y;
+                        let dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (dist < 10) {
+                            enemy.hp -= p.damage;
+                            hit = true;
+                            particles.push(new Particle(enemy.x, enemy.y, enemy.color));
+                            
+                            if (enemy.hp <= 0) {
+                                enemy.alive = false;
+                                money += enemy.reward + Math.floor(enemy.reward * skills.goldFind);
+                                score += enemy.reward;
+                            }
+                        }
+                    }
+                });
+                
+                if (hit || p.lifetime <= 0) {
+                    projectiles.splice(i, 1);
+                }
+            }
+            
+            particles = particles.filter(p => p.life > 0);
+            enemies = enemies.filter(e => e.alive);
+            
+            updateUI();
+        }
+        
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.strokeStyle = '#00ffff40';
+            ctx.lineWidth = 1;
+            
+            for (let i = 0; i < gridCols; i++) {
+                for (let j = 0; j < gridRows; j++) {
+                    ctx.strokeRect(i * cellSize, j * cellSize, cellSize, cellSize);
+                }
+            }
+            
+            ctx.fillStyle = '#00ffff';
+            ctx.strokeStyle = '#ff00ff';
+            ctx.lineWidth = 2;
+            
+            paths.forEach(path => {
+                ctx.beginPath();
+                ctx.moveTo(path[0].x, path[0].y);
+                for (let i = 1; i < path.length; i++) {
+                    ctx.lineTo(path[i].x, path[i].y);
+                }
+                ctx.stroke();
+            });
+            
+            turrets.forEach(turret => {
+                ctx.fillStyle = turret.getColor();
+                ctx.beginPath();
+                ctx.arc(turret.x, turret.y, 10, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.strokeStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(turret.x, turret.y, turret.getRange(), 0, Math.PI * 2);
+                ctx.stroke();
+            });
+            
+            enemies.forEach(enemy => {
+                if (!enemy.alive) return;
+                
+                ctx.fillStyle = enemy.color;
+                ctx.beginPath();
+                ctx.arc(enemy.x, enemy.y, 8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.rect(enemy.x - 8, enemy.y - 12, 16 * (enemy.hp / enemy.maxHp), 4);
+                ctx.fill();
+                
+                if (enemy.invisible && Math.random() > 0.5) return;
+                
+                ctx.fillStyle = '#fff';
+                ctx.font = '10px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(enemyTypes[enemy.typeIndex].name, enemy.x, enemy.y + 15);
+            });
+            
+            projectiles.forEach(p => {
+                ctx.fillStyle = p.type === 'laser' ? '#00ffff' : '#ff00ff';
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+                ctx.lineTo(p.targetX, p.targetY);
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+            
+            particles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.life / 30;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            });
+        }
+        
+        let lastUpdate = 0;
+        let lastDraw = 0;
+        let frameCount = 0;
+        
+        function gameLoop(timestamp) {
+            if (timestamp - lastUpdate > 16) {
+                update();
+                lastUpdate = timestamp;
+            }
+            
+            if (timestamp - lastDraw > 16) {
+                draw();
+                lastDraw = timestamp;
+            }
+            
+            frameCount++;
+            if (frameCount % 300 === 0) {
+                spawnEnemies(5, waveNumber);
+            }
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        function updateUI() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('money').textContent = money;
+            document.getElementById('currentWave').textContent = waveNumber;
+            document.getElementById('enemyCount').textContent = enemies.length;
+            document.getElementById('bossActive').textContent = bossActive ? 'YES' : 'NO';
+        }
+        
+        function startNewRun() {
+            waveNumber = 1;
+            enemies = [];
+            projectiles = [];
+            particles = [];
+            score = 0;
+            bossActive = false;
+            gameStarted = true;
+            updateUI();
+        }
+        
+        function nextWave() {
+            waveNumber++;
+            spawnEnemies(10 + waveNumber * 2, waveNumber);
+            
+            if (waveNumber % 3 === 0) {
+                bossActive = true;
+                spawnBoss();
+            }
+            
+            updateUI();
+        }
+        
+        function upgradeSkill(skillId) {
+            const skillNode = document.getElementById(`skill${skillId}`);
+            if (skillNode.classList.contains('locked')) return;
+            if (skillNode.classList.contains('unlocked')) return;
+            
+            skillNode.classList.add('unlocked');
+            skillNode.classList.remove('locked');
+            
+            switch(skillId) {
+                case 1: skills.fireRate = 1; break;
+                case 2: skills.damage = 1; break;
+                case 3: skills.range = 1; break;
+                case 4: skills.echoStrike = true; break;
+                case 5: skills.goldFind = 1; break;
+                case 6: skills.enemyHP = 1; break;
+            }
+        }
+        
+        function activateEchoStrike() {
+            if (!skills.echoStrike) return;
+            
+            const overlay = document.getElementById('echoOverlay');
+            overlay.classList.add('active');
+            
+            setTimeout(() => {
+                overlay.classList.remove('active');
+            }, 500);
+            
+            enemies.forEach(enemy => {
+                if (enemy.alive) {
+                    enemy.hp -= 50;
+                    particles.push(new Particle(enemy.x, enemy.y, '#ff00ff'));
+                }
+            });
+        }
+        
+        document.addEventListener('keydown', (e) => {
+            if (e.key === ' ') {
+                e.preventDefault();
+                activateEchoStrike();
+            }
+        });
+        
+        initGrid();
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>

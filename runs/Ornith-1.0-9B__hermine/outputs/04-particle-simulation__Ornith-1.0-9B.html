@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interactive Particle Simulation</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { overflow: hidden; background: #111; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+  canvas { display: block; }
+  #ui-panel {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 260px;
+    background: rgba(20, 20, 30, 0.85);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 20px;
+    color: #e0e0e0;
+    user-select: none;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    transition: opacity 0.3s;
+  }
+  #fps-counter {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    font-family: monospace;
+    font-size: 14px;
+    color: #4fc3f7;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 6px 12px;
+    border-radius: 6px;
+    pointer-events: none;
+  }
+  h2 { font-size: 16px; margin-bottom: 16px; color: #fff; letter-spacing: 0.5px; }
+  .control-group { margin-bottom: 14px; }
+  .control-label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; color: #aaa; }
+  .control-label span { color: #4fc3f7; font-weight: bold; }
+  input[type=range] {
+    -webkit-appearance: none; width: 100%; background: transparent;
+  }
+  input[type=range]:focus { outline: none; }
+  input[type=range]::-webkit-slider-runnable-track {
+    width: 100%; height: 4px; background: #333; border-radius: 2px;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%;
+    background: #4fc3f7; margin-top: -6px; cursor: pointer; box-shadow: 0 0 6px rgba(79,195,247,0.5);
+  }
+  .hint { font-size: 11px; color: #666; margin-top: 16px; text-align: center; }
+</style>
+</head>
+<body>
+
+<canvas id="simCanvas"></canvas>
+
+<div id="fps-counter">FPS: --</div>
+
+<div id="ui-panel">
+  <h2>Settings</h2>
+
+  <div class="control-group">
+    <div class="control-label">Particle Count <span id="val-count">400</span></div>
+    <input type="range" id="input-count" min="50" max="1500" value="400">
+  </div>
+
+  <div class="control-group">
+    <div class="control-label">Gravity <span id="val-gravity">0.4</span></div>
+    <input type="range" id="input-gravity" min="0" max="1.5" step="0.05" value="0.4">
+  </div>
+
+  <div class="control-group">
+    <div class="control-label">Mouse Attraction <span id="val-attraction">2.5</span></div>
+    <input type="range" id="input-attraction" min="0" max="8" step="0.1" value="2.5">
+  </div>
+
+  <div class="control-group">
+    <div class="control-label">Particle Size <span id="val-size">2.5</span></div>
+    <input type="range" id="input-size" min="1" max="5" step="0.5" value="2.5">
+  </div>
+
+  <div class="hint">Move your mouse to interact</div>
+</div>
+
+<script>
+  const canvas = document.getElementById('simCanvas');
+  const ctx = canvas.getContext('2d');
+  const fpsEl = document.getElementById('fps-counter');
+
+  // --- Configuration ---
+  let config = {
+    count: 400,
+    gravity: 0.4,
+    attraction: 2.5,
+    size: 2.5,
+    mouseRadius: 150
+  };
+
+  // --- State ---
+  let particles = [];
+  let mouse = { x: -1000, y: -1000, active: false };
+  let lastTime = performance.now();
+  let frames = 0;
+
+  // --- Resize Handling ---
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // --- Input Listeners ---
+  function updateConfig() {
+    config.count = parseInt(document.getElementById('input-count').value);
+    config.gravity = parseFloat(document.getElementById('input-gravity').value);
+    config.attraction = parseFloat(document.getElementById('input-attraction').value);
+    config.size = parseFloat(document.getElementById('input-size').value);
+    
+    // Update label values
+    document.getElementById('val-count').textContent = config.count;
+    document.getElementById('val-gravity').textContent = config.gravity;
+    document.getElementById('val-attraction').textContent = config.attraction;
+    document.getElementById('val-size').textContent = config.size;
+    
+    initParticles();
+  }
+
+  document.getElementById('input-count').addEventListener('input', updateConfig);
+  document.getElementById('input-gravity').addEventListener('input', () => {
+    config.gravity = parseFloat(document.getElementById('input-gravity').value);
+    document.getElementById('val-gravity').textContent = config.gravity;
+  });
+  document.getElementById('input-attraction').addEventListener('input', () => {
+    config.attraction = parseFloat(document.getElementById('input-attraction').value);
+    document.getElementById('val-attraction').textContent = config.attraction;
+  });
+  document.getElementById('input-size').addEventListener('input', () => {
+    config.size = parseFloat(document.getElementById('input-size').value);
+    document.getElementById('val-size').textContent = config.size;
+  });
+
+  // --- Mouse Events ---
+  window.addEventListener('mousemove', (e) => {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+    mouse.active = true;
+  });
+  window.addEventListener('mouseout', () => { mouse.active = false; });
+  window.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    mouse.x = e.touches[0].clientX;
+    mouse.y = e.touches[0].clientY;
+    mouse.active = true;
+  }, { passive: false });
+
+  // --- Particle Class ---
+  class Particle {
+    constructor() {
+      this.reset();
+    }
+    reset() {
+      this.x = Math.random() * canvas.width;
+      this.y = Math.random() * canvas.height;
+      this.vx = (Math.random() - 0.5) * 2;
+      this.vy = (Math.random() - 0.5) * 2;
+      this.radius = config.size * (0.8 + Math.random() * 0.5);
+      // Subtle random hues
+      const hue = Math.floor(Math.random() * 360);
+      this.color = `hsla(${hue}, 70%, 60%, 0.8)`;
+    }
+    update() {
+      // Physics: Gravity
+      this.vy += config.gravity;
+
+      // Physics: Mouse Interaction
+      if (mouse.active) {
+        const dx = mouse.x - this.x;
+        const dy = mouse.y - this.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist < config.mouseRadius) {
+          const force = (config.mouseRadius - dist) / config.mouseRadius;
+          const angle = Math.atan2(dy, dx);
+          const ax = Math.cos(angle) * force * config.attraction;
+          const ay = Math.sin(angle) * force * config.attraction;
+          this.vx += ax;
+          this.vy += ay;
+        }
+      }
+
+      // Update Position
+      this.x += this.vx;
+      this.y += this.vy;
+
+      // Bounce / Wrap logic
+      if (this.x < 0) { this.x = 0; this.vx *= -1; }
+      if (this.x > canvas.width) { this.x = canvas.width; this.vx *= -1; }
+      if (this.y < 0) { this.y = 0; this.vy *= -1; }
+      if (this.y > canvas.height) { this.y = canvas.height; this.vy *= -1; }
+    }
+    draw() {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+      ctx.fillStyle = this.color;
+      ctx.fill();
+    }
+  }
+
+  // --- Init ---
+  function initParticles() {
+    particles = [];
+    for (let i = 0; i < config.count; i++) {
+      particles.push(new Particle());
+    }
+  }
+
+  // --- FPS Calculation ---
+  function updateFPS() {
+    frames++;
+    const now = performance.now();
+    if (now - lastTime >= 1000) {
+      fpsEl.textContent = `FPS: ${frames}`;
+      frames = 0;
+      lastTime = now;
+    }
+  }
+
+  // --- Animation Loop ---
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (let p of particles) {
+      p.update();
+      p.draw();
+    }
+
+    updateFPS();
+    requestAnimationFrame(animate);
+  }
+
+  // --- Boot ---
+  initParticles();
+  animate();
+
+</script>
+</body>
+</html>

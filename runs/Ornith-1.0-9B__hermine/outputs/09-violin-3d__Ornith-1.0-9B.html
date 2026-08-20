@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interactive 3D Violin</title>
+<style>
+  body { margin: 0; overflow: hidden; background: #111; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  #hud {
+    position: absolute; top: 20px; left: 20px; color: #e0d0c0; pointer-events: none;
+    background: rgba(0, 0, 0, 0.6); padding: 15px 20px; border-radius: 10px;
+    border: 1px solid rgba(200, 180, 160, 0.3); box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    transition: opacity 0.3s;
+  }
+  #hud h1 { margin: 0 0 8px 0; font-size: 1.3rem; color: #f5e0c0; letter-spacing: 1px; }
+  #hud p { margin: 4px 0; font-size: 0.85rem; line-height: 1.4; }
+  .key {
+    display: inline-block; background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 4px;
+    margin: 0 2px; border: 1px solid rgba(255,255,255,0.25); font-weight: bold; min-width: 22px; text-align: center;
+  }
+  #active-label {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 2rem; font-weight: bold; color: #fff; text-shadow: 0 0 20px #000, 0 0 40px #f5e0c0;
+    pointer-events: none; opacity: 0; transition: opacity 0.3s;
+    text-align: center; z-index: 10;
+  }
+  #active-label span { display: block; font-size: 0.6rem; color: #aaa; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <h1>Virtual Violin</h1>
+  <p>Drag to orbit &bull; Scroll to zoom</p>
+  <p>Click strings or use keyboard:</p>
+  <p><span class="key">G</span> <span class="key">D</span> <span class="key">A</span> <span class="key">E</span></p>
+</div>
+<div id="active-label"></div>
+
+<script>
+/**
+ * Interactive 3D Violin - Raw WebGL + Web Audio API
+ * No external dependencies.
+ */
+
+// ============================================================
+// 1. MATH HELPERS
+// ============================================================
+const M4 = {
+  identity: () => new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]),
+  multiply: (a, b) => {
+    const out = new Float32Array(16);
+    for (let row = 0; row < 4; row++) {
+      for (let col = 0; col < 4; col++) {
+        let sum = 0;
+        for (let k = 0; k < 4; k++) sum += a[row*4+k] * b[k*4+col];
+        out[row*4+col] = sum;
+      }
+    }
+    return out;
+  },
+  translate: (m, v) => {
+    const out = new Float32Array(16);
+    for (let i = 0; i < 16; i++) out[i] = m[i];
+    out[12] = m[0]*v[0] + m[4]*v[1] + m[8]*v[2] + m[12];
+    out[13] = m[1]*v[0] + m[5]*v[1] + m[9]*v[2] + m[13];
+    out[14] = m[2]*v[0] + m[6]*v[1] + m[10]*v[2] + m[14];
+    out[15] = m[3]*v[0] + m[7]*v[1] + m[11]*v[2] + m[15];
+    return out;
+  },
+  rotateX: (m, angle) => {
+    const c = Math.cos(angle), s = Math.sin(angle);
+    const out = new Float32Array(16);
+    for (let i = 0; i < 16; i++) out[i] = m[i];
+    out[5]  = c; out[6] = s; out[9] = -s; out[10] = c;
+    return out;
+  },
+  rotateY: (m, angle) => {
+    const c = Math.cos(angle), s = Math.sin(angle);
+    const out = new Float32Array(16);
+    for (let i = 0; i < 16; i++) out[i] = m[i];
+    out[0]  = c; out[2] = -s; out[8] = s; out[10] = c;
+    return out;
+  },
+  scale: (m, v) => {
+    const out = new Float32Array(16);
+    for (let i = 0; i < 16; i++) out[i] = m[i];
+    out[0] *= v[0]; out[5] *= v[1]; out[10] *= v[2];
+    return out;
+  },
+  perspective: (fov, aspect, near, far) => {
+    const f = 1.0 / Math.tan(fov / 2);
+    const out = new Float32Array(16);
+    out[0] = f / aspect; out[5] = f; out[10] = (far + near) / (near - far);
+    out[11] = -1; out[14] = (2 * far * near) / (near - far);
+    return out;
+  },
+  lookAt: (eye, center, up) => {
+    const z = new Float32Array(eye).slice();
+    for (let i = 0; i < 3; i++) z[i] -= center[i];
+    const x = new Float32Array(up).slice();
+    for (let i = 0; i < 3; i++) x[i] -= center[i];
+    const zLen = Math.sqrt(z[0]*z[0]+z[1]*z[1]+z[2]*z[2]);
+    for (let i = 0; i < 3; i++) z[i] /= zLen;
+    const xLen = Math.sqrt(x[0]*x[0]+x[1]*x[1]+x[2]*x[2]);
+    for (let i = 0; i < 3; i++) x[i] /= xLen;
+    const y = new Float32Array(3);
+    for (let i = 0; i < 3; i++) y[i] = x[1]*z[2] - x[2]*z[1];
+    y[0] = y[1]*z[2] - y[2]*z[1]; y[1] = y[2]*z[0] - y[0]*z[2]; y[2] = y[0]*z[1] - y[1]*z[0];
+    const out = new Float32Array(16);
+    out[0]=x[0]; out[1]=x[1]; out[2]=x[2]; out[3]=0;
+    out[4]=y[0]; out[5]=y[1]; out[6]=y[2]; out[7]=0;
+    out[8]=z[0]; out[9]=z[1]; out[10]=z[2]; out[11]=0;
+    out[12] = -(x[0]*eye[0]+x[1]*eye[1]+x[2]*eye[2]);
+    out[13] = -(y[0]*eye[0]+y[1]*eye[1]+y[2]*eye[2]);
+    out[14] = -(z[0]*eye[0]+z[1]*eye[1]+z[2]*eye[2]);
+    out[15] = 1;
+    return out;
+  },
+  mat3: (m) => new Float32Array([m[0],m[4],m[8], 0, m[1],m[5],m[9], 0, m[2],m[6],m[10], 0, m[3],m[7],m[11], 0])
+};
+
+/**
+ * 2. GEOMETRY GENERATORS
+ */
+
+// Lathe geometry: sweeps a 2D profile (x,z) around Y axis.
+function createLathe(profile, segments, radiusSegs) {
+  const v = new Float32Array(profile.length * radiusSegs * 3);
+  const n = new Float32Array(profile.length * radiusSegs * 3);
+  let idx = 0;
+  const stride = radiusSegs * 3;
+  
+  for (let i = 0; i < profile.length; i++) {
+    const [px, pz] = profile[i];
+    for (let j = 0; j <= radiusSegs; j++) {
+      const t = j / radiusSegs;
+      const angle = t * Math.PI * 2;
+      const rx = px * Math.cos(angle);
+      const ry = px * Math.sin(angle);
+      v[idx] = rx; v[idx+1] = ry; v[idx+2] = pz;
+      n[idx] = Math.cos(angle); n[idx+1] = 0; n[idx+2] = Math.sin(angle);
+      idx += stride;
+    }
+  }
+
+  const indices = new Uint16Array(profile.length * (radiusSegs+1) * 6); // 2 triangles per quad
+  let iIdx = 0;
+  for (let i = 0; i < profile.length; i++) {
+    for (let j = 0; j < radiusSegs; j++) {
+      const base = i * (radiusSegs+1) * 3;
+      const a = base + j*3;
+      const b = base + (j+1)*3;
+      const c = base + (j+1)*3 + stride;
+      const d = base + j*3 + stride;
+      indices[iIdx++] = a; indices[iIdx++] = b; indices[iIdx++] = d;
+      indices[iIdx++] = b; indices[iIdx++] = c; indices[iIdx++] = d;
+    }
+  }
+  return { vertices: v, normals: n, indices: indices };
+}
+
+// Box geometry
+function createBox(w, h, d, rotX=0, rotZ=0) {
+  // 8 vertices, 12 indices
+  const v = new Float32Array(24);
+  const n = new Float32Array(24);
+  const indices = new Uint16Array(36);
+  let idx = 0;
+  
+  const verts = [
+    [-w/2, -h/2, -d/2], [w/2, -h/2, -d/2], [w/2, h/2, -d/2], [-w/2, h/2, -d/2],
+    [-w/2, -h/2, d/2],  [w/2, -h/2, d/2],  [w/2, h/2, d/2],  [-w/2, h/2, d/2],
+  ];
+  // Normals for faces
+  const faceNormals = [
+    [0,0,-1],[0,0,1], [1,0,0],[-1,0,0], [0,1,0],[0,-1,0]
+  ];
+  const faceVerts = [
+    [0,1,2,3],[4,5,6,7],[0,1,5,4],[2,3,7,6],[0,3,7,4],[1,2,6,5]
+  ];
+  const faceIndices = [
+    [0,1,2,3],[4,5,6,7],[0,1,5,4],[2,3,7,6],[0,3,7,4],[1,2,6,5]
+  ];
+  
+  // Simple rotation matrix for box
+  const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+  const cosZ = Math.cos(rotZ), sinZ = Math.sin(rotZ);
+  
+  for (let i = 0; i < 8; i++) {
+    let [x,y,z] = verts[i];
+    // Rotate X then Z
+    let rx = x, ry = y*cosX - z*sinX, rz = y*sinX + z*cosX;
+    let x2 = rx*cosZ - rz*sinZ;
+    let y2 = ry;
+    let z2 = rx*sinZ + rz*cosZ;
+    v[idx] = x2; v[idx+1] = y2; v[idx+2] = z2;
+    n[idx] = faceNormals[i][0]; n[idx+1] = faceNormals[i][1]; n[idx+2] = faceNormals[i][2];
+    idx += 3;
+  }
+  
+  // Indices (2 triangles per quad * 6 quads)
+  let iIdx = 0;
+  for (let f = 0; f < 6; f++) {
+    for (let k = 0; k < 4; k++) {
+      indices[iIdx++] = f*4 + faceVerts[f][k];
+      indices[iIdx++] = f*4 + faceVerts[f][(k+1)%4];
+    }
+  }
+  return { vertices: v, normals: n, indices: indices };
+}
+
+// Capped Cylinder (for neck/scroll)
+function createCappedCylinder(r, h, segments) {
+  const v = new Float32Array((segments*2+2)*3);
+  const n = new Float32Array((segments*2+2)*3);
+  const indices = new Uint16Array(segments*6 + 2*segments);
+  let idx = 0;
+  const stride = 3;
+  
+  // Bottom cap
+  for (let i = 0; i <= segments; i++) {
+    const a = i * Math.PI * 2 / segments;
+    v[idx] = r*Math.cos(a); v[idx+1] = 0; v[idx+2] = -h/2;
+    n[idx] = Math.cos(a); n[idx+1] = 0; n[idx+2] = -Math.sin(a);
+    idx += stride;
+  }
+  // Sides
+  for (let i = 0; i < segments; i++) {
+    const a1 = i * Math.PI * 2 / segments;
+    const a2 = (i+1) * Math.PI * 2 / segments;
+    v[idx] = r*Math.cos(a1); v[idx+1] = h/2; v[idx+2] = -h/2;
+    n[idx] = Math.cos(a1); n[idx+1] = 0; n[idx+2] = -Math.sin(a1);
+    idx += stride;
+    v[idx] = r*Math.cos(a2); v[idx+1] = h/2; v[idx+2] = -h/2;
+    n[idx] = Math.cos(a2); n[idx+1] = 0; n[idx+2] = -Math.sin(a2);
+    idx += stride;
+    // Triangles
+    indices[iIdx++] = i*2; indices[iIdx++] = i*2+1; indices[iIdx++] = i*2+stride+1;
+    indices[iIdx++] = i*2+1; indices[iIdx++] = i*2+stride+2; indices[iIdx++] = i*2+stride+1;
+  }
+  // Top cap
+  for (let i = 0; i <= segments; i++) {
+    const a = i * Math.PI * 2 / segments;
+    v[idx] = r*Math.cos(a); v[idx+1] = h/2; v[idx+2] = -h/2;
+    n[idx] = Math.cos(a); n[idx+1] = 0; n[idx+2] = -Math.sin(a);
+    idx += stride;
+  }
+  // Top cap triangles
+  for (let i = 0; i < segments; i++) {
+    indices[iIdx++] = i*2+stride; indices[iIdx++] = i*2+stride+1; indices[iIdx++] = (i+1)*2+stride;
+    indices[iIdx++] = i*2+stride+1; indices[iIdx++] = (i+1)*2+stride+1; indices[iIdx++] = (i+1)*2+stride;
+  }
+  return { vertices: v, normals: n, indices: indices };
+}
+
+// ============================================================
+// 3. WEBGL SETUP
+// ============================================================
+const canvas = document.createElement('canvas');
+document.body.appendChild(canvas);
+const gl = canvas.getContext('webgl', { antialias: true, alpha: false });
+if (!gl) { alert("WebGL not supported"); return; }
+
+const vsSrc = `
+  attribute vec3 aPos;
+  attribute vec3 aNorm;
+  attribute vec3 aColor;
+  uniform mat4 uModel;
+  uniform mat4 uView;
+  uniform mat4 uProj;
+  uniform vec3 uLightPos;
+  varying vec3 vColor;
+  varying vec3 vNorm;
+  varying vec3 vWorldPos;
+  void main() {
+    vec4 wp = uModel * vec4(aPos, 1.0);
+    vWorldPos = wp.xyz;
+    vNorm = mat3(uModel) * aNorm;
+    vec4 vp = uView * wp;
+    gl_Position = uProj * vp;
+    vColor = aColor;
+    vNorm = normalize(vNorm);
+  }
+`;
+const fsSrc = `
+  precision mediump float;
+  varying vec3 vColor;
+  varying vec3 vNorm;
+  varying vec3 vWorldPos;
+  uniform vec3 uLightPos;
+  void main() {
+    vec3 lightDir = normalize(uLightPos - vWorldPos);
+    float diff = max(dot(vNorm, lightDir), 0.0);
+    vec3 viewDir = normalize(-vWorldPos); // Simplified view dir (from origin)
+    vec3 halfDir = normalize(lightDir + viewDir);
+    float spec = pow(max(dot(vNorm, halfDir), 0.0), 64.0);
+    vec3 ambient = vec3(0.3, 0.25, 0.2);
+    vec3 diffuse = vColor * vec3(0.8) * diff;
+    vec3 specular = vec3(0.9, 0.9, 0.9) * spec * 0.5;
+    gl_FragColor = vec4(ambient + diffuse + specular, 1.0);
+  }
+`;
+
+function createShader(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.error(gl.getShaderInfoLog(s)); return null; }
+  return s;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, createShader(gl.VERTEX_SHADER, vsSrc));
+gl.attachShader(prog, createShader(gl.FRAGMENT_SHADER, fsSrc));
+gl.linkProgram(prog);
+gl.useProgram(prog);
+
+const locs = {
+  aPos: gl.getAttribLocation(prog, 'aPos'),
+  aNorm: gl.getAttribLocation(prog, 'aNorm'),
+  aColor: gl.getAttribLocation(prog, 'aColor'),
+  uModel: gl.getUniformLocation(prog, 'uModel'),
+  uView: gl.getUniformLocation(prog, 'uView'),
+  uProj: gl.getUniformLocation(prog, 'uProj'),
+  uLightPos: gl.getUniformLocation(prog, 'uLightPos'),
+};
+
+// ============================================================
+// 4. GEOMETRY DATA
+// ============================================================
+const COLORS = {
+  body: [0.70, 0.37, 0.12],     // Dark wood
+  scroll: [0.85, 0.62, 0.35],   // Lighter wood
+  fingerboard: [0.15, 0.15, 0.15], // Ebony
+  bridge: [0.5, 0.3, 0.1],
+  string: [0.9, 0.9, 0.95],
+  fhole: [0.95, 0.9, 0.7],
+  black: [0.05, 0.05, 0.05],
+};
+
+// Violin Parts
+const bodyGeo = createLathe([
+  [0, 0.45],    // Top bout
+  [0.3, 0.2],   // Shoulder
+  [0.18, 0.05], // Waist
+  [0.18, -0.05],
+  [0.3, -0.2],  // Bottom shoulder
+  [0, -0.45],   // Bottom bout
+], 64, 32);
+
+// Neck + Scroll
+// Neck: Cylinder from z=0.15 to z=0.5 (length 0.35)
+// Scroll: Twisted top of neck
+const neckGeo = createCappedCylinder(0.05, 0.35, 32);
+
+// Fingerboard: Box
+const fbGeo = createBox(0.08, 0.04, 0.45, 0, Math.PI/2); // Flat on top
+
+// Bridge: Two thin boxes
+// Left bridge
+const b1Geo = createBox(0.02, 0.06, 0.03, 0, Math.PI/2); 
+// Right bridge
+const b2Geo = createBox(0.02, 0.06, 0.03, 0, Math.PI/2);
+
+// Strings (4 thin cylinders)
+const stringGeos = [];
+const stringColors = [COLORS.string, COLORS.string, COLORS.string, COLORS.string];
+// G3 (Low, thick), D4, A4, E5 (High, thin)
+const stringRadii = [0.01, 0.008, 0.006, 0.005];
+const stringPositions = [
+  { x: 0.28, z: 0.18 }, // G
+  { x: 0.20, z: 0.18 }, // D
+  { x: 0.12, z: 0.15 }, // A
+  { x: 0.05, z: 0.15 }, // E
+];
+for (let i = 0; i < 4; i++) {
+  const [sx, sz] = stringPositions[i];
+  // Cylinder along Z axis
+  const verts = new Float32Array(6*3); // 6 vertices for cap+side+cap
+  const normals = new Float32Array(6*3);
+  const indices = new Uint16Array(12);
+  let idx = 0;
+  const r = stringRadii[i];
+  // Side
+  for (let j = 0; j < 6; j++) {
+    const a = (j/5)*Math.PI*2;
+    verts[idx] = sx; verts[idx+1] = 0; verts[idx+2] = -0.15 + j*(0.30/5);
+    normals[idx] = 1; normals[idx+1] = 0; normals[idx+2] = 0;
+    idx += 3;
+  }
+  // Left Cap
+  for (let j = 0; j < 6; j++) {
+    const a = (j/5)*Math.PI*2;
+    verts[idx] = sx; verts[idx+1] = 0; verts[idx+2] = -0.15 + j*(0.30/5);
+    normals[idx] = -1; normals[idx+1] = 0; normals[idx+2] = 0;
+    idx += 3;
+  }
+  // Right Cap
+  for (let j = 0; j < 6; j++) {
+    const a = (j/5)*Math.PI*2;
+    verts[idx] = sx; verts[idx+1] = 0; verts[idx+2] = -0.15 + j*(0.30/5);
+    normals[idx] = 1; normals[idx+1] = 0; normals[idx+2] = 0;
+    idx += 3;
+  }
+  // Triangles (simplified: just connect side to caps)
+  let iIdx = 0;
+  for (let j = 0; j < 5; j++) {
+    indices[iIdx++] = j*3; indices[iIdx++] = (j+1)*3; indices[iIdx++] = (j+1)*3+3; // Left
+    indices[iIdx++] = (j+1)*3; indices[iIdx++] = (j+1)*3+3; indices[iIdx++] = (j+1)*3+6; // Right
+  }
+  stringGeos.push({ vertices: verts, normals: normals, indices: indices, baseX: sx, baseZ: -0.15, length: 0.30 });
+}
+
+// F-Holes (2 thin boxes)
+const fhGeo = createBox(0.15, 0.04, 0.01, 0, Math.PI/2); // x, y, z
+// Position them on body surface
+const fhPositions = [
+  { x: 0.1, z: 0.1 }, // Left
+  { x: -0.1, z: 0.1 }, // Right
+];
+const fhGeos = [];
+for (let i = 0; i < fhPositions.length; i++) {
+  // Offset slightly up to sit on body
+  const b = createBox(0.15, 0.04, 0.01, 0, Math.PI/2);
+  b.vertices[0] = fhPositions[i].x; b.vertices[1] = 0; b.vertices[2] = fhPositions[i].z;
+  b.vertices[4] = fhPositions[i].x; b.vertices[5] = 0; b.vertices[6] = fhPositions[i].z;
+  b.vertices[8] = fhPositions[i].x; b.vertices[9] = 0; b.vertices[10] = fhPositions[i].z;
+  b.vertices[12] = fhPositions[i].x; b.vertices[13] = 0; b.vertices[14] = fhPositions[i].z;
+  b.vertices[16] = fhPositions[i].x; b.vertices[17] = 0; b.vertices[18] = fhPositions[i].z;
+  b.vertices[20] = fhPositions[i].x; b.vertices[21] = 0; b.vertices[22] = fhPositions[i].z;
+  b.normals[0] = 0; b.normals[1] = 1; b.normals[2] = 0; // Face up
+  fhGeos.push(b);
+}
+
+// ============================================================
+// 5. RENDERING
+// ============================================================
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  gl.viewport(0, 0, canvas.width, canvas.height);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Buffers
+function createBuffer(data, type=gl.FLOAT) {
+  const buf = gl.createBuffer();
+  gl.bindBuffer(type, buf);
+  gl.bufferData(type, data, gl.STATIC_DRAW);
+  return buf;
+}
+
+gl.bindBuffer(gl.ARRAY_BUFFER, createBuffer(bodyGeo.vertices));
+gl.enableVertexAttribArray(locs.aPos);
+gl.vertexAttribPointer(locs.aPos, 3, gl.FLOAT, false, 0, 0);
+
+gl.bindBuffer(gl.ARRAY_BUFFER, createBuffer(bodyGeo.normals));
+gl.enableVertexAttribArray(locs.aNorm);
+gl.vertexAttribPointer(locs.aNorm, 3, gl.FLOAT, false, 0, 0);
+
+gl.bindBuffer(gl.ARRAY_BUFFER, createBuffer(bodyGeo.indices, gl.UNSIGNED_SHORT));
+gl.enableVertexAttribArray(locs.aColor);
+gl.vertexAttribPointer(locs.aColor, 3, gl.FLOAT, false, 0, 0);
+
+// Helper to draw a mesh
+let drawLists = [];
+function addList(geo, color) {
+  drawLists.push({
+    geo: geo,
+    color: color,
+    draw: function() {
+      gl.bindBuffer(gl.ARRAY_BUFFER, createBuffer(this.geo.vertices));
+      gl.bindBuffer(gl.ARRAY_BUFFER, createBuffer(this.geo.normals));
+      gl.bindBuffer(gl.ARRAY_BUFFER, createBuffer(this.geo.indices, gl.UNSIGNED_SHORT));
+      gl.drawArrays(gl.TRIANGLES, 0, this.geo.indices.length / 3);
+    }
+  });
+}
+
+// Add body
+addList(bodyGeo, COLORS.body);
+
+// Add neck (capped cylinder)
+addList(neckGeo, COLORS.scroll);
+
+// Add fingerboard
+addList(fbGeo, COLORS.fingerboard);
+
+// Add bridges
+addList(b1Geo, COLORS.bridge);
+addList(b2Geo, COLORS.bridge);
+
+// Add F-Holes
+for (let i = 0; i < fhGeos.length; i++) addList(fhGeos[i], COLORS.fhole);
+
+// Strings (dynamic)
+// We create a "string list" that updates every frame based on pluck animation
+let stringMeshes = [];
+for (let i = 0; i < stringGeos.length; i++) {
+  // Create a mesh that deforms vertices
+  let v = new Float32Array(stringGeos[i].vertices.length);
+  let n = new Float32Array(stringGeos[i].normals.length);
+  let idx = new Uint16Array(stringGeos[i].indices);
+  let animOffset = 0;
+  
+  // Copy initial geometry
+  for (let j = 0; j < v.length; j++) {
+    v[j] = stringGeos[i].vertices[j];
+    n[j] = stringGeos[i].normals[j];
+  }
+  
+  stringMeshes.push({
+    vertices: v,
+    normals: n,
+    indices: idx,
+    animOffset: 0,
+    length: stringGeos[i].length,
+    baseX: stringGeos[i].baseX,
+    draw: function() {
+      gl.bindBuffer(gl.ARRAY_BUFFER, createBuffer(this.vertices));
+      gl.bindBuffer(gl.ARRAY_BUFFER, createBuffer(this.normals));
+      gl.bindBuffer(gl.ARRAY_BUFFER, createBuffer(this.indices, gl.UNSIGNED_SHORT));
+      gl.drawArrays(gl.TRIANGLES, 0, this.indices.length / 3);
+    }
+  });
+}
+
+// ============================================================
+// 6. CAMERA & INTERACTION
+// ============================================================
+const camera = {
+  theta: Math.PI / 4,
+  phi: Math.PI / 3,
+  dist: 3.5,
+  target: [0, 0, 0]
+};
+
+let isDragging = false;
+let lastMouse = { x: 0, y: 0 };
+let hoveredString = -1;
+let targetString = -1; // For click detection
+let playingNote = -1;
+
+// Mouse Orbit
+canvas.addEventListener('mousedown', e => { isDragging = true; lastMouse = { x: e.clientX, y: e.clientY }; });
+window.addEventListener('mouseup', () => isDragging = false);
+canvas.addEventListener('mousemove', e => {
+  if (isDragging) {
+    const dx = e.clientX - lastMouse.x;
+    const dy = e.clientY - lastMouse.y;
+    camera.theta -= dx * 0.005;
+    camera.phi -= dy * 0.005;
+    camera.phi = Math.max(0.1, Math.min(Math.PI - 0.1, camera.phi));
+    lastMouse = { x: e.clientX, y: e.clientY };
+  }
+});
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  camera.dist += e.deltaY * 0.01;
+  camera.dist = Math.max(1.5, Math.min(8, camera.dist));
+});
+
+// Keyboard
+window.addEventListener('keydown', e => {
+  if (e.repeat) return;
+  const map = { 'g': 0, 'd': 1, 'a': 2, 'e': 3, 'G': 0, 'D': 1, 'A': 2, 'E': 3 };
+  if (map[e.key] !== undefined) playString(map[e.key]);
+});
+
+// String Play
+function playString(index) {
+  if (index < 0 || index >= 4) return;
+  targetString = index;
+  playingNote = index;
+  const freqs = [196.0, 293.66, 440.0, 659.25];
+  playAudio(freqs[index]);
+  
+  // Visual feedback
+  const label = document.getElementById('active-label');
+  const names = ['G3', 'D4', 'A4', 'E5'];
+  label.innerHTML = names[index] + '<span>Playing...</span>';
+  label.style.opacity = '1';
+  setTimeout(() => label.style.opacity = '0', 1000);
+}
+
+function playAudio(freq) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+    
+    osc.type = 'sawtooth';
+    osc.frequency.value = freq;
+    
+    // Violin-like resonance
+    filter.type = 'bandpass';
+    filter.frequency.value = freq;
+    filter.Q.value = 8;
+    
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5);
+    
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    
+    osc.start();
+    osc.stop(ctx.currentTime + 1.5);
+  } catch(e) {}
+}
+
+// ============================================================
+// 7. MAIN LOOP
+// ============================================================
+const time = Date.now();
+function render(now) {
+  gl.clearColor(0.05, 0.05, 0.08, 1.0);
+  gl.clearDepth(1);
+  gl.enable(gl.DEPTH_TEST);
+  gl.depthFunc(gl.LEQUAL);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  // Animate strings
+  const t = now * 0.002;
+  for (let i = 0; i < stringMeshes.length; i++) {
+    const m = stringMeshes[i];
+    // Vibrate based on playing state
+    let offset = 0;
+    if (playingNote === i) {
+      // Active pluck
+      const phase = (Math.sin(t * 15 + i) + Math.sin(t * 5 + i) * 0.5) * 0.02;
+      // Move X and Z slightly
+      const len = m.length;
+      for (let j = 0; j < m.vertices.length; j += 3) {
+        const localZ = (m.vertices[j+2] - m.baseZ) / len; // 0 to 1
+        const wave = Math.sin(t * 10 + i * 2 + localZ * 10) * phase;
+        m.vertices[j] = m.baseX + wave; // X wobble
+        m.vertices[j+2] = m.baseZ + len * localZ + wave * 0.5; // Z wobble
+      }
+    } else {
+      // Decay / Idle
+      if (m.animOffset > 0) {
+        m.animOffset -= 0.005;
+        if (m.animOffset < 0) m.animOffset = 0;
+        const len = m.length;
+        for (let j = 0; j < m.vertices.length; j += 3) {
+          const localZ = (m.vertices[j+2] - m.baseZ) / len;
+          m.vertices[j] = m.baseX + Math.sin(t * 3 + i + localZ * 5) * m.animOffset;
+        }
+      }
+    }
+    m.draw();
+  }
+
+  // Projection
+  const aspect = canvas.width / canvas.height;
+  const proj = M4.perspective(Math.PI / 4, aspect, 0.1, 100);
+  gl.uniformMatrix4fv(locs.uProj, false, proj);
+
+  // View
+  const eyeX = camera.dist * Math.sin(camera.phi) * Math.cos(camera.theta);
+  const eyeY = camera.dist * Math.cos(camera.phi);
+  const eyeZ = camera.dist * Math.sin(camera.phi) * Math.sin(camera.theta);
+  const view = M4.lookAt([eyeX, eyeY, eyeZ], [0, 0, 0], [0, 1, 0]);
+  gl.uniformMatrix4fv(locs.uView, false, view);
+
+  // Light
+  gl.uniform3f(locs.uLightPos, 5, 5, 5);
+
+  // Draw everything
+  const model = M4.identity();
+  for (let i = 0; i < drawLists.length; i++) {
+    const l = drawLists[i];
+    gl.bindBuffer(gl.ARRAY_BUFFER, createBuffer(l.geo.vertices));
+    gl.bindBuffer(gl.ARRAY_BUFFER, createBuffer(l.geo.normals));
+    gl.bindBuffer(gl.ARRAY_BUFFER, createBuffer(l.geo.indices, gl.UNSIGNED_SHORT));
+    gl.uniformMatrix4fv(locs.uModel, false, model);
+    l.draw();
+  }
+
+  requestAnimationFrame(render);
+}
+
+// Idle rotation
+let idleTime = 0;
+function animateIdle() {
+  idleTime += 0.01;
+  if (Math.sin(idleTime) > 0.95) {
+    // Slowly rotate camera around Y
+    // Actually let's just keep camera fixed but rotate the violin slightly?
+    // No, let's just keep it still. The user controls it.
+  }
+  requestAnimationFrame(animateIdle);
+}
+
+// Start
+animateIdle();
+requestAnimationFrame(render);
+
+</script>
+</body>
+</html>

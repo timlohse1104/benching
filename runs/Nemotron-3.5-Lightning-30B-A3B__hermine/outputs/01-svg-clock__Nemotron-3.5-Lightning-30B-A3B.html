@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analog Clock</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #121212;
+      color: #e0e0e0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    .digital {
+      margin-top: 20px;
+      font-size: 2rem;
+      letter-spacing: 2px;
+    }
+    svg {
+      background: #1e1e1e;
+      border-radius: 50%;
+      padding: 4px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    }
+  </style>
+</head>
+<body>
+  <svg id="clock" width="320" height="320" viewBox="0 0 200 200"></svg>
+  <div class="digital" id="timeDisplay">00:00:00</div>
+  
+  <script>
+    const svg = document.getElementById('clock');
+    const center = 100;
+    
+    // Create tick marks
+    for (let i = 0; i < 60; i++) {
+      const angle = i * 6 * Math.PI / 180;
+      const isHour = i % 5 === 0;
+      const outerR = isHour ? 95 : 92;
+      const innerR = isHour ? 88 : 90;
+      const x1 = center + innerR * Math.sin(angle);
+      const y1 = center - innerR * Math.cos(angle);
+      const x2 = center + outerR * Math.sin(angle);
+      const y2 = center - outerR * Math.cos(angle);
+      const color = isHour ? '#e0e0e0' : '#555555';
+      const width = isHour ? 2 : 1;
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', x1.toFixed(2));
+      line.setAttribute('y1', y1.toFixed(2));
+      line.setAttribute('x2', x2.toFixed(2));
+      line.setAttribute('y2', y2.toFixed(2));
+      line.setAttribute('stroke', color);
+      line.setAttribute('stroke-width', width);
+      line.setAttribute('stroke-linecap', 'round');
+      svg.appendChild(line);
+    }
+    
+    // Create hands
+    const handConfigs = [
+      { id: 'second', length: 70, width: 1, color: '#ff2a2a' },
+      { id: 'minute', length: 60, width: 2, color: '#ffffff' },
+      { id: 'hour', length: 45, width: 4, color: '#ffffff' }
+    ];
+    
+    const hands = {};
+    handConfigs.forEach(cfg => {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('id', cfg.id);
+      line.setAttribute('stroke', cfg.color);
+      line.setAttribute('stroke-width', cfg.width);
+      line.setAttribute('stroke-linecap', 'round');
+      line.setAttribute('x1', center);
+      line.setAttribute('y1', center);
+      line.setAttribute('x2', center);
+      line.setAttribute('y2', center - cfg.length);
+      svg.appendChild(line);
+      hands[cfg.id] = line;
+    });
+    
+    function updateClock() {
+      const now = new Date();
+      const hDisplay = now.getHours();
+      const h = hDisplay % 12;
+      const m = now.getMinutes();
+      const s = now.getSeconds();
+      
+      const sAngle = s * 6;
+      const mAngle = m * 6 + s * 0.1;
+      const hAngle = h * 30 + m * 0.5 + s / 120;
+      
+      hands.second.setAttribute('transform', `rotate(${sAngle} ${center} ${center})`);
+      hands.minute.setAttribute('transform', `rotate(${mAngle} ${center} ${center})`);
+      hands.hour.setAttribute('transform', `rotate(${hAngle} ${center} ${center})`);
+      
+      const pad = n => String(n).padStart(2, '0');
+      const disp = `${pad(hDisplay)}:${pad(m)}:${pad(s)}`;
+      document.getElementById('timeDisplay').textContent = disp;
+    }
+    
+    updateClock();
+    setInterval(updateClock, 1000);
+  </script>
+</body>
+</html>

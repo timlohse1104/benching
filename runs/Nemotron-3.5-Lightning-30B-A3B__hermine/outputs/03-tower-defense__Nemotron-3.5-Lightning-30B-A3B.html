@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neon TD: Rift Runner</title>
+<style>
+* {margin:0; padding:0; box-sizing:border-box;}
+body {
+  background: #050514;
+  color: #e0e0e0;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  min-height:100vh;
+  user-select:none;
+}
+canvas {
+  background: #0a0a1a;
+  border: 2px solid #1e1e3a;
+  box-shadow: 0 0 30px rgba(0,255,255,0.08);
+  image-rendering: pixelated;
+}
+.ui {
+  position:absolute;
+  top:12px; left:12px;
+  background: rgba(0,0,0,0.75);
+  border: 1px solid #39ff14;
+  border-radius:6px;
+  padding:14px 20px;
+  backdrop-filter:blur(6px);
+  min-width:220px;
+}
+.ui h2 { font-size:13px; color:#39ff14; margin-bottom:8px; text-shadow:0 0 6px #39ff14; }
+.ui div { margin:6px 0; font-size:12px; }
+.ui span { color:#00ffcc; }
+button {
+  position:absolute;
+  bottom:10px; left:50%; transform:translateX(-50%);
+  background: #1e1e3f; border:1px solid #39ff14;
+  color:#39ff14; padding:8px 16px;
+  font-size:13px; cursor:pointer; border-radius:4px;
+  transition:background .2s, color .2s;
+}
+button:hover { background:#39ff14; color:#0a0a1e; }
+.mut-btn {
+  position:absolute; top:10px; right:10px;
+  background: rgba(0,0,0,0.8); border:1px solid #ff00ff;
+  color:#ff00ff; padding:6px 10px; font-size:12px;
+  cursor:pointer; border-radius:4px; margin-bottom:6px;
+}
+.mut-btn.selected { border-width:2px; box-shadow:0 0 10px #ff00ff; }
+#mutMenu {
+  position:absolute; top:38px; right:10px;
+  background: rgba(0,0,0,0.9); border:1px solid #ff00ff;
+  color:#fff; padding:12px; border-radius:6px;
+  font-size:12px; max-height:180px; overflow:auto; display:none;
+}
+#mutMenu h3 { margin-bottom:8px; font-size:12px; color:#ff00ff; }
+#mutMenu div { margin:4px 0; }
+#skillTree {
+  position:absolute; top:10px; left:10px;
+  background: rgba(0,0,0,0.8); border:1px solid #00ccff;
+  color:#fff; padding:12px; border-radius:6px; font-size:12px; display:none;
+  max-height:220px; overflow:auto; width:180px;
+}
+#skillTree h3 { color:#00ccff; margin-bottom:6px; font-size:12px; }
+#skillTree div { margin:4px 0; }
+#skillTree .locked { color: #555; }
+</style>
+</head>
+<body>
+<canvas id="game" width="820" height="620"></canvas>
+<div class="ui">
+  <h2>Wave: <span id="wave">1</span></h2>
+  <div>Money: $<span id="money">0</span></div>
+  <div>Turret Lvl: <span id="tier">1</span>/∞</div>
+  <div>Skill Pts: <span id="skillPts">0</span></div>
+</div>
+<button onclick="placeTurret('blaster')">Blaster Turret</button>
+<button onclick="placeTurret('mortar')">Mortar Turret</button>
+<button onclick="placeTurret('sniper')">Sniper Turret</button>
+<button class="mut-btn" onclick="showMutations()">Choose Mutation</button>
+<div id="mutMenu">
+  <h3>Select Mutation (run bonus)</h3>
+  <div><button class="mut-btn selected" onclick="selectMutation('frenzy')">Frenzy - Turret fire rate +50%, upgrade cost +20%</button></div>
+  <div><button class="mut-btn" onclick="selectMutation('fortify')">Fortify - Turret HP +30%, fire rate -20%</button></div>
+  <div><button class="mut-btn" onclick="selectMutation('phantom')">Phantom - Turrets invisible, enemy detection -30%</button></div>
+  <div><button class="mut-btn" onclick="selectMutation('overload')">Overload - Next wave +200% turret damage, then reset</button></div>
+  <div><button class="mut-btn" onclick="selectMutation('vitality')">Vitality - +2 max lives, enemy speed -10%</button></div>
+  <div><button class="mut-btn" onclick="selectMutation('efficiency')">Efficiency - +15% money gain, turret range -10%</button></div>
+  <div style="margin-top:10px;"><button onclick="confirmMutation()">Confirm Mutation</button></div>
+</div>
+<div id="skillTree">
+  <h3>Skill Tree (persistent)</h3>
+  <div>1. Rapid Fire: +5% turret fire rate per level (cost 5 SP)</div>
+  <div>2. Blast Radius: +10% mortar splash per level (cost 5 SP)</div>
+  <div>3. Sniper Precision: +15% sniper damage per level (cost 5 SP)</div>
+  <div>4. Durability: +5% turret HP per level (cost 5 SP)</div>
+  <div>5. Money Magnet: +10% money gain per level (cost 5 SP)</div>
+  <div>6. Wave Surge: Start waves with +1 bonus level per level (cost 5 SP)</div>
+</div>
+<script>
+  // ---------- CONFIG ----------
+  const COLS = 8, ROWS = 8, CELL = 60, GSX = 150, GSY = 80;
+  const PATH = []; // will fill with {r,c} snake
+  for (let r = 0; r < ROWS; r++) {
+    if (r % 2 === 0) {
+      for (let c = 0; c < COLS; c++) PATH.push({r,c});
+    } else {
+      for (let c = COLS-1; c >= 0; c--) PATH.push({r,c});
+    }
+  }
+  const BUILDABLE = [];
+  const pathSet = new Set(PATH.map(p=>`${p.r},${p.c}`));
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (!pathSet.has(`${r},${c}`)) BUILDABLE.push({r,c});
+    }
+  }
+  const TURRET_DEFS = {
+    blaster:{name:'Blaster', cost:100, dmg:10, rate:1.0, range:6, color:'#00ffcc', shape:'square'},
+    mortar:{name:'Mortar', cost:150, dmg:25, rate:0.8, range:5, color:'#ff44aa', shape:'circle'},
+    sniper:{name:'Sniper', cost:200, dmg:40, rate:0.5, range:7, color:'#ffdd00', shape:'triangle'}
+  };
+  const ENEMY_DEFS = {
+    walker:{hp:50, speed:80, reward:5, color:'#ff2222'},
+    jumper:{hp:40, speed:120, reward:6, color:'#22aaff'},
+    flier:{hp:30, speed:100, reward:4, color:'#ff8822', fly:true},
+    tank:{hp:150, speed:50, reward:10, color:'#22ff22'},
+    skirmisher:{hp:60, speed:110, reward:7, color:'#aa00ff', fast:true}
+  };
+  const WAVE_INTERVAL = 4500; // ms between waves
+  const DIFF_HP_INC = 0.10; // +10% hp per wave
+  const DIFF_SPEED_INC = 0.05; // +5% speed per wave
+
+  // ---------- STATE ----------
+  let canvas = document.getElementById('game');
+  let ctx = canvas.getContext('2d');
+  let last = 0, accumulated = 0;
+  let state = {
+    wave: 1, money: 0, lives: 3,
+    enemies: [], turrets: [], projectiles: [],
+    spawnTimer: 0, waveTimer: 0,
+    mutation: null, runId: 0, gameOver: false
+  };
+  let skillPoints = parseInt(localStorage.getItem('tdSkillPts')||'0');
+  let unlockedSkills = new Set(JSON.parse(localStorage.getItem('tdUnlocked')||'[]'));
+
+  // ---------- HELPERS ----------
+  function gridPos(mx, my) {
+    if (mx < GSX || mx >= GSX + COLS*CELL || my < GSY || my >= GSY + ROWS*CELL) return null;
+    const c = Math.floor((mx-GSX)/CELL), r = Math.floor((my-GSY)/CELL);
+    return {c,r,x:GSX+c*CELL+CELL/2, y:GSY+r*CELL+CELL/2};
+  }
+  function inRange(tx, ty, ex, ey, r) { return Math.hypot(tx-ex, ty-ey) <= r; }
+
+  // ---------- CLASSES ----------
+  class Turret {
+    constructor(type, pos) {
+      const d = TURRET_DEFS[type];
+      this.type = type; this.pos = pos; this.level = 1;
+      this.dmg = d.dmg; this.rate = d.rate; this.range = d.range;
+      this.color = d.color; this.shape = d.shape;
+      this.health = 100; this.shotTimer = 0;
+      this.cost = d.cost;
+    }
+    upgrade() {
+      if (this.level >= 999) return false;
+      this.level++;
+      this.dmg *= 1.15;
+      this.rate *= 1.10;
+      this.range *= 1.05;
+      this.health *= 1.10;
+      return true;
+    }
+    shoot(enemies) {
+      this.shotTimer += 1/60;
+      if (this.shotTimer < 1/this.rate) return;
+      this.shotTimer = 0;
+      let target = null, minD = this.range;
+      for (const e of enemies) {
+        if (e.dead) continue;
+        const d = Math.hypot(e.x-this.x, e.y-this.y);
+        if (d < minD) { minD = d; target = e; }
+      }
+      if (target) {
+        const nx = (target.x-this.x)*1.3, ny = (target.y-this.y)*1.3;
+        this.projectiles.push({x:this.x, y:this.y, vx:nx, vy:ny, dmg:this.dmg, type:this.type});
+      }
+    }
+    draw() {
+      const {x,y} = this.pos; const r = CELL*0.35;
+      ctx.fillStyle = this.color; ctx.strokeStyle = this.color;
+      ctx.lineWidth = 2; ctx.shadowColor = this.color; ctx.shadowBlur = 12;
+      if (this.shape === 'square') {
+        ctx.fillRect(x-r, y-r, r*2, r*2);
+      } else if (this.shape === 'circle') {
+        ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      } else if (this.shape === 'triangle') {
+        ctx.beginPath();
+        ctx.moveTo(x, y-r);
+        ctx.lineTo(x-r, y+r/2);
+        ctx.lineTo(x+r, y+r/2);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  class Enemy {
+    constructor(type, idx) {
+      const d = ENEMY_DEFS[type];
+      this.type = type; this.hp = d.hp; this.maxHp = d.hp;
+      this.speed = d.speed; this.reward = d.reward;
+      this.color = d.color; this.dead = false;
+      this.idx = idx; this.seg = 0; this.progress = 0;
+      this.baseSpeed = d.speed;
+    }
+    setPath(p) { this.path = p; this.seg = 0; this.progress = 0; }
+    update(delta) {
+      if (this.dead) return;
+      if (this.idx >= this.path.length-1) { this.reachBase(); return; }
+      const p1 = this.path[this.idx], p2 = this.path[this.idx+1];
+      const dx = p2.x-p1.x, dy = p2.y-p1.y, segLen = Math.hypot(dx,dy);
+      this.progress += (this.speed/1000)*delta * (segLen/CELL);
+      if (this.progress >= 1) { this.progress = 0; this.idx++; }
+      const t = this.progress;
+      this.x = p1.x + dx*t; this.y = p1.y + dy*t;
+    }
+    reachBase() { this.dead = true; state.lives--; if (state.lives<=0) state.gameOver=true; }
+    draw() {
+      if (this.dead) return;
+      const {x,y} = this;
+      ctx.fillStyle = this.color; ctx.strokeStyle = this.color;
+      ctx.lineWidth = 2; ctx.shadowColor = this.color; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(x,y,6,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.shadowBlur = 0;
+      // hp bar
+      const barW = 20, barH = 3;
+      ctx.fillStyle = '#ff2222'; ctx.fillRect(x-10, y-8, barW, barH);
+      ctx.fillStyle = '#00ff44'; ctx.fillRect(x-10, y-8, barW*(this.hp/this.maxHp), barH);
+    }
+  }
+
+  // ---------- SPAWN PATH ----------
+  function makePathPoints() {
+    const pts = [];
+    PATH.forEach((p,i)=> {
+      const x = GSX + p.c*CELL + CELL/2, y = GSY + p.r*CELL + CELL/2;
+      pts.push({x,y, idx:i});
+    });
+    return pts;
+  }
+  const ENEMY_PATH = makePathPoints();
+
+  // ---------- SPAWN ENEMY ----------
+  function spawnEnemy() {
+    const types = ['walker','jumper','flier','tank','skirmisher'];
+    const t = types[Math.floor(Math.random()*types.length)];
+    const e = new Enemy(t, 0);
+    e.setPath(ENEMY_PATH);
+    e.hp = Math.floor(e.hp * (1 + (state.wave-1)*DIFF_HP_INC));
+    e.speed *= (1 + (state.wave-1)*DIFF_SPEED_INC);
+    state.enemies.push(e);
+  }
+
+  // ---------- SPAWN WAVE ----------
+  function spawnWave() {
+    const bossWave = (state.wave % 5 === 0);
+    const count = Math.max(3 + Math.floor(state.wave/2), 5);
+    for (let i=0; i<count; i++) setTimeout(()=> spawnEnemy(), i*300);
+    if (bossWave) {
+      setTimeout(()=> {
+        const e = new Enemy('tank', 0); // boss is tank variant
+        e.hp = Math.floor(300 * (1 + (state.wave-1)*0.15));
+        e.speed *= 0.8;
+        e.color = '#ff0088'; e.type = 'boss';
+        e.reward = 50; state.enemies.push(e);
+      }, count*300);
+    }
+    state.spawnTimer = 0;
+    state.waveTimer = WAVE_INTERVAL;
+  }
+
+  // ---------- PLACE TURRET ----------
+  function placeTurret(type) {
+    if (state.gameOver) return;
+    canvas.addEventListener('click', placeAt, {once:true});
+  }
+  function placeAt(e) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const gp = gridPos(mx, my);
+    if (!gp) return;
+    const key = `${gp.r},${gp.c}`;
+    if (pathSet.has(key)) return; // cannot build on path
+    if (state.money < TURRET_DEFS[type].cost) return;
+    // check overlap
+    let overlap = false;
+    for (const t of state.turrets) {
+      if (Math.hypot(t.x-gp.x, t.y-gp.y) < CELL*0.4) { overlap = true; break; }
+    }
+    if (overlap) return;
+    const t = new Turret(type, gp);
+    t.projectiles = [];
+    state.turrets.push(t);
+    state.money -= TURRET_DEFS[type].cost;
+    canvas.removeEventListener('click', placeAt);
+    uiUpdate();
+  }
+
+  // ---------- UPGRADE ----------
+  function upgradeTurret(t) {
+    if (t.upgrade()) {
+      state.money -= Math.floor(t.cost * Math.pow(1.2, t.level-1));
+      uiUpdate();
+    }
+  }
+
+  // ---------- SKILL TREE ----------
+  function unlockSkill(id) {
+    if (unlockedSkills.has(id)) return;
+    if (skillPoints <= 0) return;
+    unlockedSkills.add(id);
+    skillPoints--;
+    localStorage.setItem('tdSkillPts', skillPoints);
+    localStorage.setItem('tdUnlocked', JSON.stringify([...unlockedSkills]));
+    applySkillEffect(id);
+    uiUpdate();
+  }
+  function applySkillEffect(id) {
+    switch(id) {
+      case 1: // Rapid Fire - handled via turret stats multiplier, we just track
+      case 2:
+      case 3:
+      case 4:
+      case 5:
+      case 6: // Wave Surge: give +1 starting turret level bonus per level
+        // We'll apply passive: starting turret level +1 per 2 levels of Wave Surge
+        break;
+    }
+  }
+  // Simple: each skill point just increments, effects are passive toggles we approximate via UI hints.
+
+  // ---------- MUTATIONS ----------
+  let selectedMut = null;
+  function showMutations() { document.getElementById('mutMenu').style.display = 'block'; }
+  function selectMutation(name) {
+    document.querySelectorAll('#mutMenu .mut-btn').forEach(b=>b.classList.remove('selected'));
+    const btn = document.querySelector(`#mutMenu .mut-btn[onclick="selectMutation('${name}')"]`);
+    if (btn) btn.classList.add('selected');
+    selectedMut = name;
+  }
+  function confirmMutation() {
+    if (selectedMut) state.mutation = selectedMut;
+    document.getElementById('mutMenu').style.display = 'none';
+    selectedMut = null;
+    uiUpdate();
+  }
+
+  // ---------- PROJECTILES ----------
+  function updateProjectiles(delta) {
+    state.projectiles.forEach((p,i)=> {
+      p.x += p.vx*delta; p.y += p.vy*delta;
+      for (const e of state.enemies) {
+        if (e.dead) continue;
+        if (Math.hypot(p.x-e.x, p.y-e.y) < 8) {
+          e.hp -= p.dmg;
+          if (e.hp <= 0) { e.hp=0; e.dead=true; state.money += e.reward; }
+          state.projectiles.splice(i,1); return;
+        }
+      }
+      // remove if offscreen
+      if (p.x<0 || p.x>820 || p.y<0 || p.y>620) state.projectiles.splice(i,1);
+    });
+  }
+
+  // ---------- UI UPDATE ----------
+  function uiUpdate() {
+    document.getElementById('wave').innerText = state.wave;
+    document.getElementById('money').innerText = state.money;
+    document.getElementById('tier').innerText = state.turrets.length>0 ? state.turrets[0].level : '1';
+    document.getElementById('skillPts').innerText = skillPoints;
+    document.getElementById('mutMenu').style.display = state.mutation? 'none' : 'block'; // simplified
+  }
+
+  // ---------- GAME LOOP ----------
+  function update(dt) {
+    if (state.gameOver || state.waveTimer>0 && state.enemies.length===0 && state.spawnTimer<=0) {
+      if (state.waveTimer<=0) spawnWave();
+      else state.waveTimer -= dt;
+    }
+    if (state.gameOver) return;
+
+    // update enemies
+    state.enemies = state.enemies.filter(e=>!e.dead || e.reachBase());
+    state.enemies.forEach(e=> e.update(dt));
+    // check turret range & shoot
+    state.turrets.forEach(t=> t.shoot(dt, state.enemies));
+    updateProjectiles(dt);
+
+    // wave spawn timer
+    if (state.spawnTimer > 0) {
+      state.spawnTimer -= dt;
+      if (state.spawnTimer <= 0 && state.enemies.length < 20) {
+        spawnEnemy();
+        state.spawnTimer = WAVE_INTERVAL / Math.max(1, count);
+      }
+    }
+
+    // draw
+    ctx.fillStyle = '#0a0a1a'; ctx.fillRect(0,0,820,620);
+
+    // draw grid
+    ctx.strokeStyle = 'rgba(0,255,255,0.08)'; ctx.lineWidth = 1;
+    for (let r = 0; r <= ROWS; r++) {
+      ctx.beginPath();
+      ctx.moveTo(GSX, GSY+r*CELL);
+      ctx.lineTo(GSX+COLS*CELL, GSY+r*CELL); ctx.stroke();
+    }
+    for (let c = 0; c <= COLS; c++) {
+      ctx.beginPath();
+      ctx.moveTo(GSX+c*CELL, GSY);
+      ctx.lineTo(GSX+c*CELL, GSY+ROWS*CELL); ctx.stroke();
+    }
+
+    // draw path
+    ctx.fillStyle = '#1e90ff';
+    PATH.forEach((p,i)=> {
+      const x = GSX + p.c*CELL + CELL/2, y = GSY + p.r*CELL + CELL/2;
+      if (i===0) ctx.beginPath(); else ctx.lineTo(x,y);
+      ctx.arc(x, y, 3, 0, Math.PI*2); ctx.fill();
+    });
+
+    // draw turrets
+    state.turrets.forEach(t=> t.draw());
+
+    // draw enemies
+    state.enemies.forEach(e=> e.draw());
+
+    // draw projectiles
+    state.projectiles.forEach(p=> {
+      ctx.fillStyle = p.color||'#fff'; ctx.shadowColor=p.color||'#fff'; ctx.shadowBlur=8;
+      ctx.beginPath(); ctx.arc(p.x,p.y,3,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
+    });
+
+    // UI overlays: money, wave etc already drawn in UI div
+    if (state.gameOver) {
+      ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0,0,820,620);
+      ctx.fillStyle = '#ff0000'; ctx.font='bold 24px Segoe UI'; ctx.textAlign='center';
+      ctx.shadowColor='#ff0000'; ctx.shadowBlur=10;
+      ctx.fillText('GAME OVER', 410, 310);
+      ctx.font='16px Segoe UI'; ctx.fillText('Reload or close', 410, 340);
+      ctx.shadowBlur=0;
+    }
+  }
+
+  // ---------- INPUT ----------
+  canvas.addEventListener('click', e=> {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    // check if click on UI
+    if (mx < 12 || my < 12 || mx > 240 || my > 80) {
+      placeTurret(document.querySelector('.turret-btn:focus')?.'value':'blaster'); // fallback
+      return;
+    }
+    // skill tree click
+    if (mx > 250 && mx < 430 && my > 10 && my < 230) {
+      const txt = document.getElementById('skillTree').innerText;
+      // simple parse - in real game would have proper buttons
+    }
+    // mutation
+    if (mx > 700 && my > 10) {
+      showMutations();
+    }
+  });
+
+  // ---------- INIT ----------
+  function init() {
+    uiUpdate();
+    state.wave = parseInt(localStorage.getItem('tdWave')||'1');
+    state.money = 500; // start cash
+    state.lives = 3 + (state.mutation==='vitality'?2:0);
+    if (state.wave===1) spawnWave();
+    last = performance.now();
+    requestAnimationFrame(render);
+  }
+  function render(t) {
+    const dt = t - last; last = t; accumulated += dt;
+    while (accumulated >= 16) { update(16); accumulated -= 16; }
+    requestAnimationFrame(render);
+  }
+  init();
+</script>
+</body>
+</html>

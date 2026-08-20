@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Markdown Editor</title>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --text: #333;
+    --accent: #4a90e2;
+    --border: #ddd;
+    --editor-bg: #1e1e1e;
+    --editor-text: #d4d4d4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* Header */
+  header { background: #fff; border-bottom: 1px solid var(--border); padding: 0 1.5rem; display: flex; align-items: center; justify-content: space-between; height: 56px; flex-shrink: 0; z-index: 10; }
+  header h1 { font-size: 1.1rem; color: var(--accent); font-weight: 700; }
+  .stats { font-size: 0.85rem; color: #777; display: flex; gap: 1.5rem; }
+  .btn-copy { background: var(--accent); color: #fff; border: none; padding: 0.5rem 1.2rem; border-radius: 4px; cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: background 0.2s; }
+  .btn-copy:hover { background: #357abd; }
+
+  /* Layout */
+  main { display: flex; flex: 1; overflow: hidden; }
+  .pane { display: flex; flex-direction: column; flex: 1; height: 100%; min-width: 0; }
+  .pane-header { padding: 0.5rem 1rem; background: #fafafa; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; }
+
+  /* Editor */
+  textarea { flex: 1; width: 100%; border: none; padding: 1.5rem; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 0.95rem; line-height: 1.6; resize: none; outline: none; tab-size: 2; background: var(--editor-bg); color: var(--editor-text); }
+  textarea::placeholder { color: #555; }
+
+  /* Preview */
+  #preview { flex: 1; padding: 2rem; overflow-y: auto; line-height: 1.7; }
+  #preview h1 { font-size: 2rem; border-bottom: 2px solid var(--accent); padding-bottom: 0.3rem; margin: 1.5rem 0 0.8rem; color: #111; }
+  #preview h2 { font-size: 1.5rem; margin: 1.3rem 0 0.6rem; color: #222; }
+  #preview h3 { font-size: 1.25rem; margin: 1.1rem 0 0.5rem; color: #333; }
+  #preview h4 { font-size: 1.05rem; margin: 0.9rem 0 0.5rem; color: #444; }
+  #preview p { margin-bottom: 1rem; }
+  #preview code { background: #e9ecef; padding: 0.2em 0.4em; border-radius: 3px; font-size: 0.9em; font-family: 'SFMono-Regular', Consolas, monospace; color: #e83e8c; }
+  #preview pre { background: #282c34; color: #abb2bf; padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 1rem 0; font-size: 0.9rem; }
+  #preview pre code { background: transparent; padding: 0; color: inherit; }
+  #preview blockquote { border-left: 4px solid var(--accent); margin: 1rem 0; padding: 0.5rem 1rem; background: #f8f9fa; color: #555; font-style: italic; }
+  #preview img { max-width: 100%; height: auto; border-radius: 4px; }
+  #preview a { color: var(--accent); text-decoration: none; }
+  #preview a:hover { text-decoration: underline; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    main { flex-direction: column; }
+    .pane { height: 50vh; }
+    header { padding: 0 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Markdown Editor</h1>
+  <div class="stats">
+    <span id="char-count">0 chars</span>
+    <span id="word-count">0 words</span>
+  </div>
+  <button class="btn-copy" onclick="copyHTML()">Copy HTML</button>
+</header>
+
+<main>
+  <div class="pane">
+    <div class="pane-header">Source</div>
+    <textarea id="editor" spellcheck="false"></textarea>
+  </div>
+  <div class="pane">
+    <div class="pane-header">Preview</div>
+    <div id="preview"></div>
+  </div>
+</main>
+
+<script>
+(function() {
+  const editor = document.getElementById('editor');
+  const preview = document.getElementById('preview');
+  const charCount = document.getElementById('char-count');
+  const wordCount = document.getElementById('word-count');
+
+  // Sample Markdown Content
+  const sample = `# Welcome to the Editor
+
+This is a **Markdown** editor with live preview capabilities.
+Start typing on the left to see the changes instantly on the right.
+
+## Features
+
+1. **Bold** and *Italic* text
+2. \`Inline code\` support
+3. Fenced code blocks:
+
+\`\`\`javascript
+console.log("Hello World");
+const x = 42;
+\`\`\`
+
+### Heading Levels
+
+Here is a quick reference for all heading levels:
+
+1. H1
+2. H2
+3. H3
+4. H4
+5. H5
+6. H6
+
+### Unordered List
+
+- Item one
+- Item two
+- Item three
+- Item four
+
+### Ordered List
+
+1. First step
+2. Second step
+3. Third step
+
+### Blockquote
+
+> This is a blockquote.
+> It can span multiple lines.
+> And it supports **bold** text inside!
+
+### Links and Images
+
+Check out [Google](https://google.com) or [GitHub](https://github.com).
+
+![Placeholder Image](https://via.placeholder.com/150x100)
+
+---
+
+### Horizontal Rule
+
+This is the bottom of the document. Thank you for reading.`;
+
+  // --- Markdown Parser ---
+
+  function processInline(text) {
+    // Images
+    text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
+    // Links (must come before bold/italic to avoid wrapping link text)
+    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    // Inline Code
+    text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+    // Bold (**text** or __text__)
+    text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/__(.+?)__/g, '<strong>$1</strong>');
+    // Italic (*text* or _text_)
+    text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    text = text.replace(/_(.+?)_/g, '<em>$1</em>');
+    return text;
+  }
+
+  function parseMarkdown(text) {
+    // 1. Basic XSS Safety: Escape HTML entities
+    text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    // 2. Sanitize dangerous href attributes
+    text = text.replace(/href="javascript:[^"]*"/g, 'href="#"');
+
+    const lines = text.split('\n');
+    let html = '';
+    let paragraphBuffer = '';
+    let isParagraph = false;
+
+    function flushParagraph() {
+      if (paragraphBuffer.trim() === '') return;
+      paragraphBuffer = processInline(paragraphBuffer);
+      html += `<p>${paragraphBuffer}</p>`;
+      paragraphBuffer = '';
+      isParagraph = false;
+    }
+
+    let i = 0;
+    while (i < lines.length) {
+      let line = lines[i];
+      let trimmed = line.trim();
+
+      // Empty line
+      if (!trimmed) {
+        flushParagraph();
+        html += '<br>';
+        i++;
+        continue;
+      }
+
+      // Code Block
+      if (trimmed.startsWith('```')) {
+        flushParagraph();
+        let lang = '';
+        if (trimmed.length > 3) lang = trimmed.substring(3).trim();
+        let codeContent = '';
+        let depth = 1;
+        i++; // Skip opening line
+        while (i < lines.length && depth > 0) {
+          codeContent += lines[i] + '\n';
+          let matches = (lines[i].match(/```/g) || []).length;
+          depth -= matches;
+          i++;
+        }
+        html += `<pre><code class="language-${lang}">${codeContent}</code></pre>`;
+        continue;
+      }
+
+      // Headings
+      if (/^#{1,6}\s/.test(trimmed)) {
+        flushParagraph();
+        let level = trimmed.match(/^#{1,6}/)[0].length;
+        let text = trimmed.replace(/^#{1,6}\s/, '');
+        html += `<h${level} class="heading-${level}">${processInline(text)}</h${level}>`;
+        isParagraph = false;
+        i++;
+        continue;
+      }
+
+      // Horizontal Rule
+      if (/^[-]{3,}|^\*{3,}|^_{3,}/.test(trimmed)) {
+        flushParagraph();
+        html += '<hr>';
+        isParagraph = false;
+        i++;
+        continue;
+      }
+
+      // Blockquote
+      if (trimmed.startsWith('>')) {
+        flushParagraph();
+        let quoteLines = [];
+        while (i < lines.length && lines[i].trim().startsWith('>')) {
+          let qLine = lines[i].trim();
+          qLine = qLine.replace(/^>\s+/, ''); // Remove '>' syntax
+          quoteLines.push(qLine);
+          i++;
+        }
+        html += `<blockquote>${quoteLines.join('<br>')}</blockquote>`;
+        isParagraph = false;
+        continue;
+      }
+
+      // Lists (Unordered or Ordered)
+      if (/^[-*+]\s/.test(trimmed) || /^\d+\.\s/.test(trimmed)) {
+        flushParagraph();
+        let items = [];
+        while (i < lines.length) {
+          let lTrimmed = lines[i].trim();
+          if (lTrimmed.startsWith('- ') || lTrimmed.startsWith('* ') || lTrimmed.startsWith('+ ') || /^\d+\.\s/.test(lTrimmed)) {
+            let lContent = lTrimmed;
+            if (lContent.startsWith('- ') || lContent.startsWith('* ') || lContent.startsWith('+ ')) {
+              lContent = lContent.replace(/[-*+]\s+/, '');
+            } else if (/^\d+\.\s/.test(lContent)) {
+              lContent = lContent.replace(/^\d+\.\s+/, '');
+            }
+            items.push(lContent);
+            i++;
+          } else {
+            break;
+          }
+        }
+        html += `<ul>${items.join('<br>')}</ul>`;
+        isParagraph = false;
+        continue;
+      }
+
+      // Paragraph (default)
+      paragraphBuffer += line + '\n';
+      i++;
+    }
+    flushParagraph();
+
+    return html;
+  }
+
+  // --- UI Logic ---
+
+  function updateStats() {
+    const text = editor.value;
+    charCount.textContent = `${text.length} chars`;
+    wordCount.textContent = `${text.trim() === '' ? 0 : text.trim().split(/\s+/).length} words`;
+  }
+
+  function render() {
+    const html = parseMarkdown(editor.value);
+    preview.innerHTML = html;
+    updateStats();
+  }
+
+  editor.addEventListener('input', render);
+
+  // Initial Load
+  editor.value = sample;
+  render();
+
+  // Copy HTML
+  window.copyHTML = function() {
+    const html = parseMarkdown(editor.value);
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(html).then(() => {
+        const btn = document.querySelector('.btn-copy');
+        const original = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = original, 1500);
+      });
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = html;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      alert('HTML copied to clipboard');
+    }
+  };
+})();
+</script>
+</body>
+</html>

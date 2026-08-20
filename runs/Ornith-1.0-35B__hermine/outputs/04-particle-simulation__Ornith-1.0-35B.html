@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Particle Simulation</title>
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #0a0a0f;
+    overflow: hidden;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: #c8c8d0;
+}
+
+canvas {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+}
+
+#controls {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    background: rgba(15, 15, 25, 0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(100, 120, 255, 0.15);
+    border-radius: 12px;
+    padding: 18px 22px;
+    min-width: 240px;
+    z-index: 10;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+#controls h3 {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: #7b8cff;
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(100, 120, 255, 0.12);
+}
+
+.control-group {
+    margin-bottom: 12px;
+}
+
+.control-group label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: #8888a0;
+    margin-bottom: 5px;
+}
+
+.control-group label span.value {
+    color: #b0b8ff;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(100, 120, 255, 0.15);
+    outline: none;
+    cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #6b7cff;
+    border: 2px solid #1a1a2e;
+    box-shadow: 0 0 8px rgba(107, 124, 255, 0.4);
+    transition: box-shadow 0.15s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 14px rgba(107, 124, 255, 0.7);
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #6b7cff;
+    border: 2px solid #1a1a2e;
+    box-shadow: 0 0 8px rgba(107, 124, 255, 0.4);
+    cursor: pointer;
+}
+
+select {
+    width: 100%;
+    padding: 5px 8px;
+    background: rgba(100, 120, 255, 0.08);
+    border: 1px solid rgba(100, 120, 255, 0.2);
+    border-radius: 6px;
+    color: #c8c8d0;
+    font-size: 12px;
+    outline: none;
+    cursor: pointer;
+}
+
+select option {
+    background: #1a1a2e;
+    color: #c8c8d0;
+}
+
+#fps {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    background: rgba(15, 15, 25, 0.75);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(100, 120, 255, 0.12);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#fps .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 6px rgba(74, 222, 128, 0.5);
+}
+
+#fps .fps-value {
+    color: #b0b8ff;
+    font-weight: 600;
+}
+
+#fps .fps-label {
+    color: #666680;
+    font-size: 11px;
+}
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div id="fps">
+    <div class="dot"></div>
+    <span class="fps-value" id="fpsValue">0</span>
+    <span class="fps-label">FPS</span>
+</div>
+
+<div id="controls">
+    <h3>Particle Controls</h3>
+    <div class="control-group">
+        <label>Particle Count <span class="value" id="countVal">400</span></label>
+        <input type="range" id="particleCount" min="50" max="1000" value="400" step="10">
+    </div>
+    <div class="control-group">
+        <label>Gravity <span class="value" id="gravityVal">0.10</span></label>
+        <input type="range" id="gravity" min="0" max="0.5" value="0.1" step="0.01">
+    </div>
+    <div class="control-group">
+        <label>Attraction Force <span class="value" id="forceVal">0.50</span></label>
+        <input type="range" id="attraction" min="-2" max="2" value="0.5" step="0.05">
+    </div>
+    <div class="control-group">
+        <label>Particle Size <span class="value" id="sizeVal">2.5</span></label>
+        <input type="range" id="particleSize" min="1" max="6" value="2.5" step="0.5">
+    </div>
+    <div class="control-group">
+        <label>Interaction Mode</label>
+        <select id="interactionMode">
+            <option value="attract">Attract</option>
+            <option value="repel">Repel</option>
+            <option value="vortex">Vortex</option>
+        </select>
+    </div>
+    <div class="control-group">
+        <label>Edge Behavior</label>
+        <select id="edgeBehavior">
+            <option value="wrap">Wrap Around</option>
+            <option value="bounce">Bounce</option>
+        </select>
+    </div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    let W, H;
+    function resize() {
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    // State
+    var particles = [];
+    var mouse = { x: -9999, y: -9999, active: false };
+
+    // Parameters
+    var params = {
+        count: 400,
+        gravity: 0.1,
+        attraction: 0.5,
+        size: 2.5,
+        mode: 'attract',
+        edge: 'wrap'
+    };
+
+    // Color palette
+    var palette = [
+        [107, 124, 255],
+        [120, 200, 255],
+        [180, 140, 255],
+        [100, 230, 200],
+        [255, 140, 200],
+        [255, 200, 100],
+        [140, 220, 140]
+    ];
+
+    function createParticle() {
+        var c = palette[Math.floor(Math.random() * palette.length)];
+        return {
+            x: Math.random() * W,
+            y: Math.random() * H,
+            vx: (Math.random() - 0.5) * 2,
+            vy: (Math.random() - 0.5) * 2,
+            r: params.size * (0.5 + Math.random() * 0.5),
+            color: c,
+            alpha: 0.6 + Math.random() * 0.4
+        };
+    }
+
+    function initParticles(count) {
+        particles = [];
+        for (var i = 0; i < count; i++) {
+            particles.push(createParticle());
+        }
+    }
+
+    initParticles(params.count);
+
+    // Mouse events
+    canvas.addEventListener('mousemove', function(e) {
+        mouse.x = e.clientX;
+        mouse.y = e.clientY;
+        mouse.active = true;
+    });
+    canvas.addEventListener('mouseleave', function() {
+        mouse.active = false;
+    });
+    canvas.addEventListener('touchmove', function(e) {
+        e.preventDefault();
+        var t = e.touches[0];
+        mouse.x = t.clientX;
+        mouse.y = t.clientY;
+        mouse.active = true;
+    }, { passive: false });
+    canvas.addEventListener('touchend', function() {
+        mouse.active = false;
+    });
+
+    // Controls
+    var sliderCount = document.getElementById('particleCount');
+    var sliderGravity = document.getElementById('gravity');
+    var sliderAttraction = document.getElementById('attraction');
+    var sliderSize = document.getElementById('particleSize');
+    var selectMode = document.getElementById('interactionMode');
+    var selectEdge = document.getElementById('edgeBehavior');
+
+    sliderCount.addEventListener('input', function() {
+        var v = parseInt(this.value);
+        document.getElementById('countVal').textContent = v;
+        params.count = v;
+        while (particles.length < params.count) particles.push(createParticle());
+        while (particles.length > params.count) particles.pop();
+    });
+
+    sliderGravity.addEventListener('input', function() {
+        var v = parseFloat(this.value);
+        document.getElementById('gravityVal').textContent = v.toFixed(2);
+        params.gravity = v;
+    });
+
+    sliderAttraction.addEventListener('input', function() {
+        var v = parseFloat(this.value);
+        document.getElementById('forceVal').textContent = v.toFixed(2);
+        params.attraction = v;
+    });
+
+    sliderSize.addEventListener('input', function() {
+        var v = parseFloat(this.value);
+        document.getElementById('sizeVal').textContent = v.toFixed(1);
+        params.size = v;
+        for (var i = 0; i < particles.length; i++) {
+            particles[i].r = v * (0.5 + Math.random() * 0.5);
+        }
+    });
+
+    selectMode.addEventListener('change', function() {
+        params.mode = this.value;
+    });
+
+    selectEdge.addEventListener('change', function() {
+        params.edge = this.value;
+    });
+
+    // FPS
+    var fpsEl = document.getElementById('fpsValue');
+    var lastTime = performance.now();
+    var frameCount = 0;
+    var fps = 0;
+
+    // Physics update
+    function update() {
+        var gx = 0;
+        var gy = params.gravity;
+
+        for (var i = 0; i < particles.length; i++) {
+            var p = particles[i];
+
+            // Gravity
+            p.vy += gy * 0.05;
+
+            // Mouse interaction
+            if (mouse.active) {
+                var dx = mouse.x - p.x;
+                var dy = mouse.y - p.y;
+                var distSq = dx * dx + dy * dy;
+                var dist = Math.sqrt(distSq);
+
+                if (dist < 300 && dist > 1) {
+                    var force = params.attraction / distSq * 5000;
+
+                    if (params.mode === 'attract') {
+                        p.vx += (dx / dist) * force;
+                        p.vy += (dy / dist) * force;
+                    } else if (params.mode === 'repel') {
+                        p.vx -= (dx / dist) * force;
+                        p.vy -= (dy / dist) * force;
+                    } else if (params.mode === 'vortex') {
+                        p.vx += (-dy / dist) * force * 0.5;
+                        p.vy += (dx / dist) * force * 0.5;
+                    }
+                }
+            }
+
+            // Damping
+            p.vx *= 0.99;
+            p.vy *= 0.99;
+
+            // Speed limit
+            var speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+            if (speed > 12) {
+                p.vx = (p.vx / speed) * 12;
+                p.vy = (p.vy / speed) * 12;
+            }
+
+            // Position update
+            p.x += p.vx;
+            p.y += p.vy;
+
+            // Edge handling
+            if (params.edge === 'wrap') {
+                if (p.x < -10) p.x = W + 10;
+                if (p.x > W + 10) p.x = -10;
+                if (p.y < -10) p.y = H + 10;
+                if (p.y > H + 10) p.y = -10;
+            } else {
+                if (p.x < p.r) { p.x = p.r; p.vx *= -0.8; }
+                if (p.x > W - p.r) { p.x = W - p.r; p.vx *= -0.8; }
+                if (p.y < p.r) { p.y = p.r; p.vy *= -0.8; }
+                if (p.y > H - p.r) { p.y = H - p.r; p.vy *= -0.8; }
+            }
+        }
+    }
+
+    // Draw
+    function draw() {
+        ctx.fillStyle = 'rgba(10, 10, 15, 0.25)';
+        ctx.fillRect(0, 0, W, H);
+
+        for (var i = 0; i < particles.length; i++) {
+            var p = particles[i];
+            var c = p.color;
+
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + p.alpha + ')';
+            ctx.fill();
+
+            // Glow effect
+            if (p.r > 2) {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r * 2.5, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + (p.alpha * 0.08) + ')';
+                ctx.fill();
+            }
+        }
+
+        // Draw mouse influence indicator
+        if (mouse.active) {
+            ctx.beginPath();
+            ctx.arc(mouse.x, mouse.y, 6, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(200, 210, 255, 0.5)';
+            ctx.fill();
+        }
+    }
+
+    // Main loop
+    function loop(now) {
+        requestAnimationFrame(loop);
+
+        frameCount++;
+        if (now - lastTime >= 500) {
+            fps = Math.round(frameCount / ((now - lastTime) / 1000));
+            fpsEl.textContent = fps;
+            frameCount = 0;
+            lastTime = now;
+        }
+
+        update();
+        draw();
+    }
+
+    requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

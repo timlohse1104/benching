@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Canvas Paint</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f5f7fa;color:#222}
+.app{max-width:1100px;margin:24px auto;padding:0 16px}
+.toolbar{background:#fff;border:1px solid #e2e6ea;border-radius:10px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.toolbar .group{display:flex;align-items:center;gap:8px}
+button, input[type="color"]{cursor:pointer}
+button{border:1px solid #d0d7de;background:#fff;border-radius:8px;padding:6px 10px;font-size:14px}
+button.active{background:#eef2ff;border-color:#8aa4ff}
+button:hover{background:#f6f8fa}
+.stage{background:#fff;border:2px solid #d9dee3;border-radius:8px;padding:8px;display:flex;justify-content:center}
+canvas{background:#fff;display:block;touch-action:none;cursor:crosshair}
+.info{font-size:13px;color:#555}
+.swatch{width:20px;height:20px;border-radius:4px;border:1px solid #ccc;display:inline-block;vertical-align:middle;margin-left:4px}
+.palette{display:flex;gap:6px}
+.palette button{width:22px;height:22px;border-radius:4px;border:1px solid #ddd;padding:0}
+.slider{accent-color:#4a7cff}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="toolbar">
+<div class="group">
+<button id="toolBrush" class="active">Brush</button>
+<button id="toolEraser">Eraser</button>
+</div>
+<div class="group">
+<span>Size</span>
+<input id="sizeSlider" class="slider" type="range" min="1" max="60" value="8">
+<span id="sizeValue" class="info">8 px</span>
+</div>
+<div class="group">
+<span>Color</span>
+<input id="colorPicker" type="color" value="#222222">
+<span id="colorSwatch" class="swatch" style="background:#222222"></span>
+</div>
+<div class="group palette" id="palette">
+<button data-color="#222222" style="background:#222222"></button>
+<button data-color="#e53935" style="background:#e53935"></button>
+<button data-color="#fdd835" style="background:#fdd835"></button>
+<button data-color="#43a047" style="background:#43a047"></button>
+<button data-color="#1e88e5" style="background:#1e88e5"></button>
+<button data-color="#8e24aa" style="background:#8e24aa"></button>
+</div>
+<div class="group">
+<button id="undoBtn">Undo</button>
+<button id="redoBtn">Redo</button>
+<button id="clearBtn">Clear</button>
+<button id="saveBtn">Save as PNG</button>
+</div>
+</div>
+<div class="stage">
+<canvas id="canvas" width="900" height="600"></canvas>
+</div>
+</div>
+<script>
+(() => {
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+ctx.lineCap = 'round';
+ctx.lineJoin = 'round';
+
+let erasing = false;
+let brushSize = 8;
+let currentColor = '#222222';
+
+ctx.fillStyle = '#ffffff';
+ctx.fillRect(0,0,canvas.width,canvas.height);
+
+const history = [];
+let historyIndex = -1;
+function saveState(){
+  history.length = historyIndex + 1;
+  history.push(ctx.getImageData(0,0,canvas.width,canvas.height));
+  historyIndex = history.length - 1;
+}
+saveState();
+
+const sizeSlider = document.getElementById('sizeSlider');
+const sizeValue = document.getElementById('sizeValue');
+const colorPicker = document.getElementById('colorPicker');
+const colorSwatch = document.getElementById('colorSwatch');
+const toolBrush = document.getElementById('toolBrush');
+const toolEraser = document.getElementById('toolEraser');
+const undoBtn = document.getElementById('undoBtn');
+const redoBtn = document.getElementById('redoBtn');
+const clearBtn = document.getElementById('clearBtn');
+const saveBtn = document.getElementById('saveBtn');
+const palette = document.getElementById('palette');
+
+function updateContext(){
+  ctx.lineWidth = brushSize;
+  ctx.strokeStyle = erasing ? '#ffffff' : currentColor;
+}
+updateContext();
+
+sizeSlider.addEventListener('input', e=>{
+  brushSize = +e.target.value;
+  sizeValue.textContent = brushSize + ' px';
+  updateContext();
+});
+colorPicker.addEventListener('input', e=>{
+  currentColor = e.target.value;
+  colorSwatch.style.background = currentColor;
+  updateContext();
+});
+palette.addEventListener('click', e=>{
+  const btn = e.target.closest('button[data-color]');
+  if(!btn) return;
+  const col = btn.getAttribute('data-color');
+  currentColor = col;
+  colorPicker.value = col;
+  colorSwatch.style.background = col;
+  updateContext();
+});
+
+toolBrush.addEventListener('click', ()=>{
+  erasing = false;
+  toolBrush.classList.add('active');
+  toolEraser.classList.remove('active');
+  updateContext();
+});
+toolEraser.addEventListener('click', ()=>{
+  erasing = true;
+  toolEraser.classList.add('active');
+  toolBrush.classList.remove('active');
+  updateContext();
+});
+
+function getPos(e){
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const clientX = e.clientX ?? (e.touches && e.touches[0].clientX);
+  const clientY = e.clientY ?? (e.touches && e.touches[0].clientY);
+  return {
+    x: (clientX - rect.left) * scaleX,
+    y: (clientY - rect.top) * scaleY
+  };
+}
+
+let drawing = false;
+let lastX = 0, lastY = 0;
+
+function startDraw(e){
+  drawing = true;
+  const p = getPos(e);
+  lastX = p.x; lastY = p.y;
+  ctx.beginPath();
+  ctx.moveTo(lastX, lastY);
+}
+function drawMove(e){
+  if(!drawing) return;
+  const p = getPos(e);
+  ctx.lineTo(p.x, p.y);
+  ctx.stroke();
+  lastX = p.x; lastY = p.y;
+}
+function endDraw(){
+  if(!drawing) return;
+  drawing = false;
+  ctx.closePath();
+  saveState();
+}
+
+canvas.addEventListener('pointerdown', e=>{ canvas.setPointerCapture(e.pointerId); startDraw(e); });
+canvas.addEventListener('pointermove', drawMove);
+canvas.addEventListener('pointerup', endDraw);
+canvas.addEventListener('pointerleave', endDraw);
+
+undoBtn.addEventListener('click', ()=>{
+  if(historyIndex > 0){
+    historyIndex--;
+    ctx.putImageData(history[historyIndex],0,0);
+  }
+});
+redoBtn.addEventListener('click', ()=>{
+  if(historyIndex < history.length - 1){
+    historyIndex++;
+    ctx.putImageData(history[historyIndex],0,0);
+  }
+});
+clearBtn.addEventListener('click', ()=>{
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  saveState();
+});
+saveBtn.addEventListener('click', ()=>{
+  const a = document.createElement('a');
+  a.download = 'drawing.png';
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+});
+})();
+</script>
+</body>
+</html>

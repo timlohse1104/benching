@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conway's Game of Life</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        h1 {
+            text-align: center;
+            color: #00d9ff;
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            background: #16213e;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+        }
+        .stat-item { text-align: center; }
+        .stat-label { color: #888; font-size: 0.85rem; }
+        .stat-value { color: #00d9ff; font-weight: bold; }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            background: #16213e;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        button {
+            background: #0f3460;
+            color: #fff;
+            border: 2px solid #00d9ff;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #00d9ff;
+            color: #1a1a2e;
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        select {
+            background: #0f3460;
+            color: #fff;
+            border: 2px solid #00d9ff;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        select:hover {
+            border-color: #fff;
+        }
+        .speed-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        input[type="range"] {
+            width: 100px;
+            background: #0f3460;
+            height: 6px;
+            -webkit-appearance: none;
+            border-radius: 3px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #00d9ff;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .speed-value {
+            color: #00d9ff;
+            font-weight: bold;
+            min-width: 40px;
+            text-align: center;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            background: #0a0a1a;
+            border: 2px solid #00d9ff;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Conway's Game of Life</h1>
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-label">Generation</div>
+                <div class="stat-value" id="generation">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Population</div>
+                <div class="stat-value" id="population">0</div>
+            </div>
+        </div>
+        <div class="controls">
+            <button id="startBtn">Start</button>
+            <button id="stepBtn">Step</button>
+            <button id="clearBtn">Clear</button>
+            <select id="patternSelect">
+                <option value="">Load Pattern...</option>
+                <option value="glider">Glider</option>
+                <option value="pulsar">Pulsar</option>
+            </select>
+            <div class="speed-container">
+                <label for="speedSlider">Speed:</label>
+                <input type="range" id="speedSlider" min="1" max="100" value="50">
+                <span class="speed-value" id="speedValue">50</span>
+            </div>
+        </div>
+        <canvas id="gameCanvas" width="600" height="400"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const startBtn = document.getElementById('startBtn');
+        const stepBtn = document.getElementById('stepBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const patternSelect = document.getElementById('patternSelect');
+        const speedSlider = document.getElementById('speedSlider');
+        const speedValue = document.getElementById('speedValue');
+        const generationDisplay = document.getElementById('generation');
+        const populationDisplay = document.getElementById('population');
+
+        const ROWS = 40;
+        const COLS = 60;
+        const CELL_SIZE = 10;
+        const CELL_BORDER = 1;
+
+        let grid = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+        let isRunning = false;
+        let generation = 0;
+        let animationFrameId = null;
+        let intervalId = null;
+
+        const patterns = {
+            glider: [
+                [0, 1, 0],
+                [0, 0, 1],
+                [1, 1, 1]
+            ],
+            pulsar: [
+                [0, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+                [0, 1, 0, 0, 0, 0, 0, 0, 1, 0],
+                [1, 0, 0, 0, 1, 1, 0, 0, 0, 1],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [1, 0, 0, 0, 1, 1, 0, 0, 0, 1],
+                [0, 1, 0, 0, 0, 0, 0, 0, 1, 0],
+                [0, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+                [0, 1, 0, 0, 0, 0, 0, 0, 1, 0],
+                [1, 0, 0, 0, 1, 1, 0, 0, 0, 1],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [1, 0, 0, 0, 1, 1, 0, 0, 0, 1],
+                [0, 1, 0, 0, 0, 0, 0, 0, 1, 0],
+                [0, 0, 1, 0, 0, 0, 0, 1, 0, 0]
+            ]
+        };
+
+        function drawGrid() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.strokeStyle = '#2a2a4a';
+            ctx.lineWidth = 1;
+            
+            for (let row = 0; row <= ROWS; row++) {
+                ctx.beginPath();
+                ctx.moveTo(0, row * CELL_SIZE);
+                ctx.lineTo(COLS * CELL_SIZE, row * CELL_SIZE);
+                ctx.stroke();
+            }
+            
+            for (let col = 0; col <= COLS; col++) {
+                ctx.beginPath();
+                ctx.moveTo(col * CELL_SIZE, 0);
+                ctx.lineTo(col * CELL_SIZE, ROWS * CELL_SIZE);
+                ctx.stroke();
+            }
+            
+            ctx.fillStyle = '#00d9ff';
+            for (let row = 0; row < ROWS; row++) {
+                for (let col = 0; col < COLS; col++) {
+                    if (grid[row][col] === 1) {
+                        ctx.fillRect(col * CELL_SIZE + 0.5, row * CELL_SIZE + 0.5, CELL_SIZE - 1, CELL_SIZE - 1);
+                    }
+                }
+            }
+        }
+
+        function countPopulation() {
+            let count = 0;
+            for (let row = 0; row < ROWS; row++) {
+                for (let col = 0; col < COLS; col++) {
+                    if (grid[row][col] === 1) count++;
+                }
+            }
+            return count;
+        }
+
+        function getAliveNeighbors(row, col) {
+            let count = 0;
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    if (dr === 0 && dc === 0) continue;
+                    const newRow = row + dr;
+                    const newCol = col + dc;
+                    if (newRow >= 0 && newRow < ROWS && newCol >= 0 && newCol < COLS) {
+                        if (grid[newRow][newCol] === 1) count++;
+                    }
+                }
+            }
+            return count;
+        }
+
+        function update() {
+            const newGrid = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+            
+            for (let row = 0; row < ROWS; row++) {
+                for (let col = 0; col < COLS; col++) {
+                    const aliveNeighbors = getAliveNeighbors(row, col);
+                    if (grid[row][col] === 1) {
+                        if (aliveNeighbors === 2 || aliveNeighbors === 3) {
+                            newGrid[row][col] = 1;
+                        }
+                    } else {
+                        if (aliveNeighbors === 3) {
+                            newGrid[row][col] = 1;
+                        }
+                    }
+                }
+            }
+            
+            grid = newGrid;
+            generation++;
+            updateStats();
+        }
+
+        function updateStats() {
+            generationDisplay.textContent = generation;
+            populationDisplay.textContent = countPopulation();
+        }
+
+        function gameLoop() {
+            update();
+            drawGrid();
+        }
+
+        function start() {
+            if (!isRunning) {
+                isRunning = true;
+                startBtn.textContent = 'Pause';
+                const speed = parseInt(speedSlider.value);
+                const interval = Math.round(1000 / (speed / 10));
+                intervalId = setInterval(gameLoop, interval);
+            }
+        }
+
+        function pause() {
+            isRunning = false;
+            startBtn.textContent = 'Start';
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+        }
+
+        function togglePlayPause() {
+            if (isRunning) {
+                pause();
+            } else {
+                start();
+            }
+        }
+
+        function step() {
+            if (!isRunning) {
+                update();
+                drawGrid();
+            }
+        }
+
+        function clear() {
+            pause();
+            grid = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+            generation = 0;
+            updateStats();
+            drawGrid();
+        }
+
+        function randomize() {
+            pause();
+            grid = Array(ROWS).fill().map(() => 
+                Array(COLS).fill(0).map(() => Math.random() > 0.6 ? 1 : 0)
+            );
+            updateStats();
+            drawGrid();
+        }
+
+        function loadPattern(patternName) {
+            if (!patternName || !patterns[patternName]) return;
+            
+            pause();
+            const pattern = patterns[patternName];
+            const patternRows = pattern.length;
+            const patternCols = pattern[0].length;
+            
+            grid = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+            
+            const startRow = Math.floor((ROWS - patternRows) / 2);
+            const startCol = Math.floor((COLS - patternCols) / 2);
+            
+            for (let row = 0; row < patternRows; row++) {
+                for (let col = 0; col < patternCols; col++) {
+                    if (pattern[row][col] === 1) {
+                        grid[startRow + row][startCol + col] = 1;
+                    }
+                }
+            }
+            
+            generation = 0;
+            updateStats();
+            drawGrid();
+            patternSelect.value = '';
+        }
+
+        function handleCanvasClick(e) {
+            if (isRunning) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const col = Math.floor(x / CELL_SIZE);
+            const row = Math.floor(y / CELL_SIZE);
+            
+            if (row >= 0 && row < ROWS && col >= 0 && col < COLS) {
+                grid[row][col] = grid[row][col] === 1 ? 0 : 1;
+                updateStats();
+                drawGrid();
+            }
+        }
+
+        function handleCanvasDrag(e) {
+            if (isRunning) return;
+            handleCanvasClick(e);
+        }
+
+        function updateSpeed() {
+            const speed = parseInt(speedSlider.value);
+            speedValue.textContent = speed;
+            if (isRunning) {
+                pause();
+                start();
+            }
+        }
+
+        startBtn.addEventListener('click', togglePlayPause);
+        stepBtn.addEventListener('click', step);
+        clearBtn.addEventListener('click', clear);
+        speedSlider.addEventListener('input', updateSpeed);
+        patternSelect.addEventListener('change', loadPattern);
+        canvas.addEventListener('click', handleCanvasClick);
+        canvas.addEventListener('mousedown', handleCanvasDrag);
+        canvas.addEventListener('mousemove', handleCanvasDrag);
+
+        drawGrid();
+        updateStats();
+    </script>
+</body>
+</html>

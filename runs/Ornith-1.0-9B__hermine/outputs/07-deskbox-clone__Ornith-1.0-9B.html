@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>desk.box – Die smarte Bürosoftware für die Landwirtschaft</title>
+<style>
+    /* --- RESET & VARIABLES --- */
+    :root {
+        --primary: #2e7d32;
+        --primary-dark: #1b5e20;
+        --primary-light: #e8f5e9;
+        --accent: #ff6f00;
+        --text: #212121;
+        --text-light: #757575;
+        --bg: #ffffff;
+        --bg-off: #f5f5f5;
+        --border: #e0e0e0;
+        --radius: 4px;
+        --shadow: 0 2px 8px rgba(0,0,0,0.08);
+        --max-width: 1200px;
+        --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+        font-family: var(--font-stack);
+        color: var(--text);
+        background: var(--bg);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    a { text-decoration: none; color: inherit; transition: color 0.2s; }
+    ul { list-style: none; }
+    img, svg { display: block; max-width: 100%; }
+
+    /* --- UTILITIES --- */
+    .container { max-width: var(--max-width); margin: 0 auto; padding: 0 20px; }
+    .section-padding { padding: 80px 0; }
+    .text-center { text-align: center; }
+    .section-label { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-light); margin-bottom: 8px; }
+    .section-title { font-size: 2rem; font-weight: 700; margin-bottom: 16px; color: var(--text); }
+
+    .btn {
+        display: inline-block;
+        padding: 12px 24px;
+        border-radius: var(--radius);
+        font-weight: 600;
+        font-size: 0.95rem;
+        cursor: pointer;
+        border: 2px solid transparent;
+        transition: all 0.2s;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-outline { border-color: var(--primary); color: var(--primary); background: transparent; }
+    .btn-outline:hover { background: var(--primary); color: #fff; }
+    .btn-accent { background: var(--accent); color: #fff; }
+    .btn-accent:hover { background: #e65100; }
+
+    /* --- HEADER --- */
+    .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        background: #fff;
+        border-bottom: 1px solid var(--border);
+        height: 70px;
+        display: flex;
+        align-items: center;
+    }
+    .header-inner {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+    }
+    .logo {
+        font-size: 1.5rem;
+        font-weight: 900;
+        color: var(--primary);
+        letter-spacing: -0.5px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .logo svg { height: 32px; width: auto; fill: var(--primary); }
+
+    .nav-menu { display: flex; gap: 32px; align-items: center; }
+    .nav-item { position: relative; font-weight: 500; font-size: 0.95rem; cursor: pointer; user-select: none; }
+    .nav-item:hover > .dropdown { display: block; }
+
+    .dropdown {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        min-width: 180px;
+        padding: 8px 0;
+        z-index: 100;
+    }
+    .dropdown a { display: block; padding: 10px 20px; font-size: 0.9rem; color: var(--text); }
+    .dropdown a:hover { background: var(--primary-light); color: var(--primary); }
+
+    .header-actions { display: flex; align-items: center; gap: 16px; }
+    .login-link { font-size: 0.9rem; font-weight: 500; }
+    .login-link:hover { color: var(--primary); }
+    .cta-button { background: var(--primary); color: #fff; padding: 10px 20px; border-radius: var(--radius); font-size: 0.9rem; font-weight: 600; }
+    .cta-button:hover { background: var(--primary-dark); }
+
+    .hamburger { display: none; background: none; border: none; cursor: pointer; padding: 8px; }
+    .hamburger span { display: block; width: 24px; height: 2px; background: var(--text); margin: 4px 0; transition: 0.3s; }
+
+    /* --- HERO --- */
+    .hero {
+        background: #fff;
+        padding: 60px 0 80px;
+        overflow: hidden;
+    }
+    .hero-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 60px;
+        align-items: center;
+    }
+    .hero-badge-row { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+    .badge {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: var(--primary-light); color: var(--primary-dark);
+        padding: 6px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;
+    }
+    .hero h1 {
+        font-size: 3rem;
+        font-weight: 800;
+        line-height: 1.15;
+        margin-bottom: 20px;
+        color: var(--text);
+    }
+    .hero p { font-size: 1.15rem; color: var(--text-light); margin-bottom: 32px; max-width: 480px; }
+    .hero-btns { display: flex; gap: 16px; margin-bottom: 48px; flex-wrap: wrap; }
+    
+    .hero-visual { position: relative; }
+    .hero-img-placeholder {
+        width: 100%;
+        height: 450px;
+        background: var(--bg-off);
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .hero-img-placeholder svg { height: 100%; width: auto; max-height: 100%; }
+    .play-overlay {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.3);
+        display: flex; align-items: center; justify-content: center;
+        opacity: 0; transition: opacity 0.3s;
+    }
+    .hero-img-placeholder:hover .play-overlay { opacity: 1; }
+    .play-btn { width: 64px; height: 64px; background: rgba(255,255,255,0.9); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    .play-btn svg { width: 24px; height: 24px; fill: var(--primary); margin-left: 4px; }
+
+    /* --- FEATURE BULLETS --- */
+    .features-row {
+        background: var(--primary-light);
+        padding: 40px 0;
+        border-top: 1px solid var(--primary-light);
+        border-bottom: 1px solid var(--primary-light);
+    }
+    .feature-bullets {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 40px;
+    }
+    .bullet-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 500;
+        font-size: 0.95rem;
+        color: var(--primary-dark);
+    }
+    .bullet-item svg { width: 24px; height: 24px; fill: var(--primary); flex-shrink: 0; }
+
+    /* --- DAS Bietet DIR --- */
+    .das-bietet { background: #fff; }
+    .cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 24px;
+        margin-top: 40px;
+    }
+    .card {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 32px 24px;
+        text-align: center;
+        transition: box-shadow 0.2s, transform 0.2s;
+        background: #fff;
+    }
+    .card:hover { box-shadow: var(--shadow); transform: translateY(-4px); }
+    .card-icon {
+        width: 56px; height: 56px;
+        background: var(--primary-light);
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        margin: 0 auto 20px;
+    }
+    .card-icon svg { width: 28px; height: 28px; fill: var(--primary); }
+    .card h3 { font-size: 1.1rem; margin-bottom: 10px; }
+    .card p { font-size: 0.9rem; color: var(--text-light); margin-bottom: 16px; }
+    .card-link { color: var(--primary); font-weight: 600; font-size: 0.9rem; }
+    .card-link:hover { text-decoration: underline; }
+
+    /* --- TESTIMONIALS --- */
+    .testimonials { background: var(--bg-off); }
+    .test-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 24px;
+        margin-top: 40px;
+    }
+    .test-card {
+        background: #fff;
+        padding: 32px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+    }
+    .test-quote { font-style: italic; color: var(--text-light); margin-bottom: 16px; font-size: 0.95rem; }
+    .test-author { font-weight: 700; font-size: 0.9rem; }
+    .test-role { font-size: 0.8rem; color: var(--text-light); }
+
+    /* --- BLOG --- */
+    .blog-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 24px;
+        margin-top: 40px;
+    }
+    .blog-card {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+        transition: box-shadow 0.2s;
+    }
+    .blog-card:hover { box-shadow: var(--shadow); }
+    .blog-img {
+        height: 180px;
+        background: var(--bg-off);
+        display: flex; align-items: center; justify-content: center;
+    }
+    .blog-img svg { opacity: 0.3; width: 48px; height: 48px; fill: var(--text); }
+    .blog-body { padding: 20px; }
+    .blog-body h4 { font-size: 1.1rem; margin-bottom: 8px; }
+    .blog-body p { font-size: 0.9rem; color: var(--text-light); margin-bottom: 12px; }
+    .blog-body a { font-weight: 600; font-size: 0.9rem; color: var(--primary); }
+
+    /* --- CTA BAND --- */
+    .cta-band {
+        background: var(--primary);
+        color: #fff;
+        padding: 60px 0;
+        text-align: center;
+    }
+    .cta-band h2 { font-size: 2rem; margin-bottom: 12px; }
+    .cta-band p { font-size: 1.1rem; margin-bottom: 24px; opacity: 0.9; }
+    .cta-band .btn { background: #fff; color: var(--primary); border: none; padding: 16px 32px; font-size: 1.1rem; }
+    .cta-band .btn:hover { background: var(--bg-off); }
+
+    /* --- FOOTER --- */
+    .site-footer {
+        background: #1a1a1a;
+        color: #ccc;
+        padding: 60px 0 30px;
+        font-size: 0.9rem;
+    }
+    .footer-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr 1fr;
+        gap: 40px;
+        margin-bottom: 40px;
+    }
+    .footer-col h4 { color: #fff; margin-bottom: 16px; font-size: 1rem; }
+    .footer-col p { margin-bottom: 8px; }
+    .footer-col a { display: block; color: #999; margin-bottom: 8px; }
+    .footer-col a:hover { color: #fff; }
+    .footer-social { display: flex; gap: 12px; margin-top: 16px; }
+    .footer-social svg { width: 20px; height: 20px; fill: #777; }
+    .footer-social svg:hover { fill: #ccc; }
+    .footer-bottom {
+        border-top: 1px solid #333;
+        padding-top: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .cert-row { display: flex; gap: 16px; margin-top: 16px; }
+    .cert-row svg { width: 32px; height: 32px; fill: #666; }
+
+    /* --- RESPONSIVE --- */
+    @media (max-width: 900px) {
+        .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+        .hero h1 { font-size: 2.2rem; }
+        .hero-img-placeholder { height: 300px; }
+        .hero-btns { justify-content: center; }
+        .footer-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 768px) {
+        .hamburger { display: block; }
+        .nav-menu {
+            position: fixed; top: 70px; left: 0; right: 0; bottom: 0;
+            background: #fff; flex-direction: column;
+            padding: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            transform: translateY(-100%); transition: transform 0.3s;
+            overflow-y: auto;
+        }
+        .nav-menu.open { transform: translateY(0); }
+        .nav-menu .header-actions { display: none; }
+        .nav-item { width: 100%; border-bottom: 1px solid var(--border); padding: 12px 0; }
+        .dropdown { position: static; box-shadow: none; border: none; padding-left: 20px; background: var(--bg-off); }
+        .footer-grid { grid-template-columns: 1fr; }
+        .footer-bottom { flex-direction: column; gap: 10px; text-align: center; }
+        .hero h1 { font-size: 1.8rem; }
+        .feature-bullets { gap: 20px; }
+    }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="site-header">
+    <div class="container header-inner">
+        <a href="#" class="logo">
+            <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                <rect width="40" height="40" rx="4" fill="#2e7d32"/>
+                <path d="M10 14 L20 4 L30 14 L30 26 L20 36 L10 26 Z" fill="#fff"/>
+                <text x="20" y="32" font-family="sans-serif" font-weight="bold" font-size="18" fill="#2e7d32" text-anchor="middle">DB</text>
+            </svg>
+            desk.box
+        </a>
+
+        <button class="hamburger" aria-label="Menü" onclick="toggleMenu()">
+            <span></span><span></span><span></span>
+        </button>
+
+        <nav>
+            <ul class="nav-menu" id="navMenu">
+                <li class="nav-item">
+                    Funktionen
+                    <ul class="dropdown">
+                        <li><a href="#">Kernmodul</a></li>
+                        <li><a href="#">Banking</a></li>
+                        <li><a href="#">Adressbuch</a></li>
+                        <li><a href="#">Faktura</a></li>
+                        <li><a href="#">Aktenmanagement</a></li>
+                        <li><a href="#">Berichte</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item">
+                    Preise
+                    <ul class="dropdown">
+                        <li><a href="#">Kernmodul</a></li>
+                        <li><a href="#">Banking</a></li>
+                        <li><a href="#">Adressbuch</a></li>
+                        <li><a href="#">Faktura</a></li>
+                        <li><a href="#">Aktenmanagement</a></li>
+                        <li><a href="#">Berichte</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item">
+                    Service
+                    <ul class="dropdown">
+                        <li><a href="#">Support</a></li>
+                        <li><a href="#">Updates</a></li>
+                        <li><a href="#">Training</a></li>
+                    </ul>
+                </li>
+                <li class="header-actions">
+                    <a href="#" class="login-link">Login</a>
+                    <a href="#" class="cta-button">Jetzt testen</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+    <div class="container hero-grid">
+        <div class="hero-content">
+            <div class="hero-badge-row">
+                <span class="badge">GoBD zertifiziert</span>
+                <span class="badge">Server in Deutschland</span>
+                <span class="badge">E-Rechnung</span>
+            </div>
+            <h1>desk.box – Die smarte Bürosoftware für die Landwirtschaft</h1>
+            <p>Verwalten Sie Ihre Betriebe effizient, sichern Sie sich GoBD-konform und profitieren Sie von der E-Rechnung – alles an einem Ort.</p>
+            <div class="hero-btns">
+                <a href="#" class="btn btn-primary">Kostenlos beraten lassen</a>
+                <a href="#" class="btn btn-outline">Jetzt kostenlos testen</a>
+            </div>
+        </div>
+        <div class="hero-visual">
+            <div class="hero-img-placeholder">
+                <!-- Person Placeholder -->
+                <svg viewBox="0 0 500 400" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="500" height="400" rx="12" fill="#E3F2FD" />
+                    <circle cx="100" cy="120" r="40" fill="#BBDEFB" />
+                    <rect x="80" y="160" width="80" height="120" rx="10" fill="#90CAF9" />
+                    <rect x="250" y="150" width="180" height="180" rx="8" fill="#E0E0E0" />
+                    <rect x="280" y="170" width="120" height="10" rx="5" fill="#BDBDBD" />
+                    <rect x="310" y="200" width="80" height="10" rx="5" fill="#BDBDBD" />
+                    <rect x="310" y="220" width="100" height="10" rx="5" fill="#BDBDBD" />
+                    <text x="250" y="380" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#999">Produkt-Screenshot</text>
+                </svg>
+                <div class="play-overlay">
+                    <div class="play-btn">
+                        <svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21" /></svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FEATURE BULLETS -->
+<div class="features-row">
+    <div class="container">
+        <div class="feature-bullets">
+            <div class="bullet-item">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                Direkte Schnittstelle zu deinem Steuerbüro
+            </div>
+            <div class="bullet-item">
+                <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
+                E-Rechnung inklusive
+            </div>
+            <div class="bullet-item">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
+                Vollständiges Banking
+            </div>
+            <div class="bullet-item">
+                <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                Intelligente Volltextsuche
+            </div>
+            <div class="bullet-item">
+                <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
+                Alle deine Betriebe auf einen Blick
+            </div>
+            <div class="bullet-item">
+                <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                Einfacher Workflow
+            </div>
+            <div class="bullet-item">
+                <svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.11-.9-2-2-2H4c-1.11 0-2 .89-2 2v10c0 1.1.89 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
+                Dokumente in der Hosentasche
+            </div>
+            <div class="bullet-item">
+                <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+                Sichere Archivierung
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- DAS BOTIET DIR -->
+<section class="section-padding das-bietet">
+    <div class="container">
+        <div class="text-center">
+            <div class="section-label">Features</div>
+            <h2 class="section-title">Das bietet dir desk.box</h2>
+        </div>
+        <div class="cards-grid">
+            <div class="card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8l8 5 8-5v10z"/></svg>
+                </div>
+                <h3>Schreibtisch</h3>
+                <p>Verwalten Sie alle Dokumente, Akten und Briefe in einer zentralen Übersicht.</p>
+                <a href="#" class="card-link">Mehr erfahren</a>
+            </div>
+            <div class="card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24"><path d="M16 6c0-1.1-.9-2-2-2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2V6zm-6 0h6v4H8V6zm0 6h6v4H8v-4z"/></svg>
+                </div>
+                <h3>Banking</h3>
+                <p>Verknüpfen Sie Ihre Bankverbindung und übertragen Sie Kontoauszüge automatisch.</p>
+                <a href="#" class="card-link">Mehr erfahren</a>
+            </div>
+            <div class="card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 10h6v4H6zM6 4h6v2H6zM14 10h4v4h-4zM14 4h4v2h-4z"/></svg>
+                </div>
+                <h3>Aktenschrank</h3>
+                <p>Strukturieren Sie Ihre Akten in Ordner und Unterordner mit einfachen Tags.</p>
+                <a href="#" class="card-link">Mehr erfahren</a>
+            </div>
+            <div class="card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+                </div>
+                <h3>Faktura</h3>
+                <p>Erstellen und versenden Sie Rechnungen direkt aus der Software.</p>
+                <a href="#" class="card-link">Mehr erfahren</a>
+            </div>
+            <div class="card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24"><path d="M15.8 8.1c-.9-.6-1.8-1.1-2.7-1.5-.5-1.1-1.7-1.9-3.1-1.9-2.3 0-4.2 1.9-4.2 4.2 0 1.4.8 2.6 1.9 3.1-.4.9-1 1.8-1.5 2.7-1.1-.5-1.9-1.7-1.9-3.1 0-2.3 1.9-4.2 4.2-4.2 1.4 0 2.6.8 3.1 1.9.5 1.1.8 2.2 1 3.3h.1c.2-1.1.5-2.2 1-3.3.1-.2.2-.3.3-.5z"/></svg>
+                </div>
+                <h3>Adressbuch</h3>
+                <p>Zentraler Ansprechpartner-Datenbank mit allen wichtigen Kontakten.</p>
+                <a href="#" class="card-link">Mehr erfahren</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="section-padding testimonials">
+    <div class="container">
+        <div class="text-center">
+            <div class="section-label">Erfahrungen</div>
+            <h2 class="section-title">Das sagen unsere Kunden</h2>
+        </div>
+        <div class="test-grid">
+            <div class="test-card">
+                <p class="test-quote">"Mit desk.box ist mein Arbeitsaufwand deutlich gesunken. Die E-Rechnung funktioniert einwandfrei und das Banking spart mir Stunden."</p>
+                <div class="test-author">Nico Ahlmann</div>
+                <div class="test-role">Hof Ahlmann, Groß Tessin</div>
+            </div>
+            <div class="test-card">
+                <p class="test-quote">"Endlich eine Software, die auf unsere Bedürfnisse zugeschnitten ist. Die Archivierung ist GoBD-konform und der Support ist top."</p>
+                <div class="test-author">Maria Weber</div>
+                <div class="test-role">Hof Weber, Holstein</div>
+            </div>
+            <div class="test-card">
+                <p class="test-quote">"Die Volltextsuche ist ein absolutes Highlight. Ich finde in Sekunden das Dokument, das ich brauche. Sehr intuitiv."</p>
+                <div class="test-author">Thomas Klein</div>
+                <div class="test-role">Klein & Klein, Landwirtschaft</div>
+            </div>
+            <div class="test-card">
+                <p class="test-quote">"Wir nutzen seit 3 Jahren desk.box für alle unsere Standorte. Die Übersicht über alle Betriebe in einem Dashboard ist unschlagbar."</p>
+                <div class="test-author">Sabine Müller</div>
+                <div class="test-role">Müller AG, Landwirtschaft</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- BLOG -->
+<section class="section-padding">
+    <div class="container">
+        <div class="text-center">
+            <div class="section-label">News</div>
+            <h2 class="section-title">Blog & News</h2>
+        </div>
+        <div class="blog-grid">
+            <div class="blog-card">
+                <div class="blog-img">
+                    <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
+                </div>
+                <div class="blog-body">
+                    <h4>Neues Update: E-Rechnung 2.0</h4>
+                    <p>Wir haben das neue Format für E-Rechnungen implementiert. So bleiben Sie immer auf dem neuesten Stand der Gesetzgebung.</p>
+                    <a href="#">Weiterlesen</a>
+                </div>
+            </div>
+            <div class="blog-card">
+                <div class="blog-img">
+                    <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6z"/></svg>
+                </div>
+                <div class="blog-body">
+                    <h4>Tipps zur GoBD-konformen Archivierung</h4>
+                    <p>Erfahren Sie, wie Sie Ihre Betriebswirtschaft einfach und sicher digital archivieren können.</p>
+                    <a href="#">Weiterlesen</a>
+                </div>
+            </div>
+            <div class="blog-card">
+                <div class="blog-img">
+                    <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm4.24 16L12 15.44 7.77 18l1.12-4.81-3.73-3.23 4.92-.42L12 5l1.92 4.55 4.92.42-3.73 3.23L16.23 18z"/></svg>
+                </div>
+                <div class="blog-body">
+                    <h4>Workshop: Banking-Integration</h4>
+                    <p>Unsere Berater zeigen Ihnen, wie Sie Ihre Bankverbindung sicher und schnell in desk.box einrichten.</p>
+                    <a href="#">Weiterlesen</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA BAND -->
+<section class="cta-band">
+    <div class="container">
+        <h2>60 Tage kostenlos testen</h2>
+        <p>Risikofrei die smarte Bürosoftware für die Landwirtschaft erleben.</p>
+        <a href="#" class="btn">Jetzt registrieren</a>
+    </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="site-footer">
+    <div class="container">
+        <div class="footer-grid">
+            <div class="footer-col">
+                <a href="#" class="logo" style="color:#fff; margin-bottom:16px;">
+                    <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="40" height="40" rx="4" fill="#2e7d32"/>
+                        <path d="M10 14 L20 4 L30 14 L30 26 L20 36 L10 26 Z" fill="#fff"/>
+                        <text x="20" y="32" font-family="sans-serif" font-weight="bold" font-size="18" fill="#2e7d32" text-anchor="middle">DB</text>
+                    </svg>
+                    desk.box
+                </a>
+                <p>Die smarte Bürosoftware für die Landwirtschaft.</p>
+                <div class="footer-social">
+                    <a href="#"><svg viewBox="0 0 24 24"><path d="M12 2.04c-5.5 0-10 4.49-10 10.02 0 5 3.66 9.15 8.44 9.9v-7H7.9v-2.9h2.54V9.85c0-2.51 1.49-3.89 3.78-3.89 1.09 0 2.23.19 2.23.19v2.47h-1.26c-1.24 0-1.63.77-1.63 1.56v1.88h2.78l-.45 2.9h-2.33v7a10 10 0 0 0 8.44-9.9c0-5.53-4.5-10.02-10-10.02z"/></svg></a>
+                    <a href="#"><svg viewBox="0 0 24 24"><path d="M7.08 20.61a3.55 3.55 0 0 1-3.23-1.97 3.55 3.55 0 0 1 .4-3.73l11.54-12.47A3.55 3.55 0 0 1 19 3.5h1.5a3.55 3.55 0 0 1 3.34 4.75l-1.5 3.95a3.55 3.55 0 0 1-4.5 2.14l-1.5 2.2a3.55 3.55 0 0 1-4.5 1.05l-1.5 2.2a3.55 3.55 0 0 1-3.25 1.87zM7.98 19.8h2.02a.7.7 0 0 0 .64-.38l1.5-2.22a.7.7 0 0 0-.89-1.04l-1.5 2.22a.7.7 0 0 0-.64.38H7.98a.7.7 0 0 0-.64.38l-1.5-2.22a.7.7 0 0 0-.89 1.04l1.5 2.22a.7.7 0 0 0 .64.38zm6.64-7.24a.7.7 0 0 0 .71-.69v-4.1a.7.7 0 0 0-.71-.7H10.6a.7.7 0 0 0-.71.7v4.1a.7.7 0 0 0 .71.69h3.99zm2.84-4.1a.7.7 0 0 0-.71-.7H14.5a.7.7 0 0 0-.71.7v4.1a.7.7 0 0 0 .71.69h3.99a.7.7 0 0 0 .71-.69v-4.1zM9.16 3.41a.7.7 0 0 0-.71-.69H5.46a.7.7 0 0 0-.71.69v4.1a.7.7 0 0 0 .71.69h3.99a.7.7 0 0 0 .71-.69V3.41z"/></svg></a>
+                    <a href="#"><svg viewBox="0 0 24 24"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg></a>
+                    <a href="#"><svg viewBox="0 0 24 24"><path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z"/></svg></a>
+                    <a href="#"><svg viewBox="0 0 24 24"><path d="M.057 24l1-2.37c3.34-.49 6.025-1.572 7.965-3.344 1.905-1.733 3.01-3.79 3.298-6.165.017-.14.025-.28.025-.42 0-.17-.01-.34-.025-.505-.26-2.36-1.33-4.41-3.22-6.128-1.89-1.72-4.56-2.79-7.905-3.22l1.075-2.38 1.475.67c3.09.73 5.59 2.2 7.49 4.4 1.9 2.19 2.97 4.82 3.21 7.88.26 2.66-.21 5.04-1.41 7.13-1.2 2.1-2.89 3.75-5.07 4.96-2.18 1.2-4.66 1.82-7.43 1.87h-.76zm15.51 0l1.075-2.38 3.795.92c.33.08.57-.12.57-.39 0-.2-.16-.34-.57-.42l-3.795-.92-1.075 2.37.795.8zm-7.39 0l-1.075 2.38-3.795-.92c-.33-.08-.57.12-.57.39 0 .2.16.34.57.42l3.795.92 1.075-2.37-.795-.8z"/></svg></a>
+                </div>
+            </div>
+            <div class="footer-col">
+                <h4>Produkt</h4>
+                <a href="#">Funktionen</a>
+                <a href="#">Preise</a>
+                <a href="#">Banking</a>
+                <a href="#">Faktura</a>
+                <a href="#">Adressbuch</a>
+            </div>
+            <div class="footer-col">
+                <h4>Service</h4>
+                <a href="#">Support</a>
+                <a href="#">Updates</a>
+                <a href="#">Training</a>
+                <a href="#">Datenschutz</a>
+                <a href="#">Impressum</a>
+            </div>
+            <div class="footer-col">
+                <h4>Kontakt</h4>
+                <p>+49(0)431 / 530 154 18</p>
+                <p>support(at)deskbox-office.de</p>
+                <p>Supportzeiten: Mo bis Fr: 08:00 - 16:00 Uhr</p>
+                <div class="cert-row">
+                    <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                    <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <span>© 2026 stadt.werk konzeption.text.gestaltung GmbH</span>
+            <span><a href="#">Impressum</a> | <a href="#">Datenschutz</a></span>
+        </div>
+    </div>
+</footer>
+
+<script>
+    function toggleMenu() {
+        const menu = document.getElementById('navMenu');
+        menu.classList.toggle('open');
+    }
+
+    // Close menu on click outside
+    document.addEventListener('click', function(event) {
+        const menu = document.getElementById('navMenu');
+        const btn = document.querySelector('.hamburger');
+        if (!menu.contains(event.target) && !btn.contains(event.target) && menu.classList.contains('open')) {
+            menu.classList.remove('open');
+        }
+    });
+</script>
+
+</body>
+</html>
+```
