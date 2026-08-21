@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2D Physics Sandbox</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0d1117; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: #e6edf3; }
+  canvas { display: block; position: fixed; top: 0; left: 0; }
+  .panel {
+    position: fixed; top: 16px; left: 16px; width: 264px;
+    background: rgba(22, 27, 34, 0.92); border: 1px solid #30363d;
+    border-radius: 12px; padding: 16px; backdrop-filter: blur(6px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+    user-select: none;
+  }
+  .panel h1 { font-size: 15px; margin-bottom: 14px; font-weight: 600; letter-spacing: 0.2px; }
+  .control { margin-bottom: 14px; }
+  .control label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; color: #9da7b3; }
+  .control label span { color: #58a6ff; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: #58a6ff; cursor: pointer; }
+  .buttons { display: flex; gap: 8px; margin-top: 16px; }
+  button {
+    flex: 1; padding: 9px 8px; font-size: 12px; border-radius: 8px;
+    border: 1px solid #30363d; background: #21262d; color: #e6edf3; cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  button:hover { background: #30363d; }
+  button.active { background: #1f6feb; border-color: #1f6feb; }
+  .count { font-size: 12px; color: #9da7b3; margin-top: 14px; }
+  .count b { color: #58a6ff; font-variant-numeric: tabular-nums; }
+  .hint { font-size: 11px; color: #6e7681; margin-top: 10px; line-height: 1.45; }
+</style>
+</head>
+<body>
+<canvas id="sim"></canvas>
+<div class="panel">
+  <h1>⚽ Physics Sandbox</h1>
+  <div class="control">
+    <label>Gravity <span id="gravVal">0.45</span></label>
+    <input type="range" id="gravity" min="0" max="1.5" step="0.01" value="0.45">
+  </div>
+  <div class="control">
+    <label>Restitution <span id="restVal">0.75</span></label>
+    <input type="range" id="restitution" min="0" max="1" step="0.01" value="0.75">
+  </div>
+  <div class="control">
+    <label>Friction <span id="fricVal">0.02</span></label>
+    <input type="range" id="friction" min="0" max="0.2" step="0.005" value="0.02">
+  </div>
+  <div class="buttons">
+    <button id="resetBtn">Reset</button>
+    <button id="collBtn" class="active">Collisions: ON</button>
+  </div>
+  <div class="count">Active balls: <b id="count">0</b></div>
+  <div class="hint">Click to spawn a ball. Drag &amp; release to fling it.</div>
+</div>
+<script>
+(function () {
+  "use strict";
+
+  var canvas = document.getElementById("sim");
+  var ctx = canvas.getContext("2d");
+
+  var W = canvas.width = window.innerWidth;
+  var H = canvas.height = window.innerHeight;
+
+  window.addEventListener("resize", function () {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  });
+
+  // ---- Parameters ----
+  var gravity = 0.45;
+  var restitution = 0.75;
+  var friction = 0.02;
+  var collisionsEnabled = true;
+
+  var balls = [];
+
+  function randomColor() {
+    var hue = Math.floor(Math.random() * 360);
+    return "hsl(" + hue + ", 72%, 62%)";
+  }
+
+  function spawnBall(x, y, vx, vy, r) {
+    balls.push({
+      x: x, y: y, vx: vx, vy: vy, r: r,
+      color: randomColor(),
+      mass: r * r
+    });
+  }
+
+  function seedScene() {
+    balls.length = 0;
+    for (var i = 0; i < 8; i++) {
+      var r = 12 + Math.random() * 24;
+      spawnBall(r + Math.random() * Math.max(1, W - 2 * r),
+                r + Math.random() * (H * 0.4), 0, 0, r);
+    }
+    updateCount();
+  }
+
+  // ---- Physics ----
+  function wallCollisions() {
+    for (var i = 0; i < balls.length; i++) {
+      var b = balls[i];
+      // Floor
+      if (b.y + b.r > H) {
+        b.y = H - b.r;
+        if (b.vy > 0) {
+          b.vy = -b.vy * restitution;
+          b.vx *= (1 - friction);
+          if (Math.abs(b.vy) < 1.6) { b.vy = 0; }
+        }
+      }
+      // Ceiling
+      if (b.y - b.r < 0) {
+        b.y = b.r;
+        if (b.vy < 0) {
+          b.vy = -b.vy * restitution;
+          b.vx *= (1 - friction);
+          if (Math.abs(b.vy) < 1.6) { b.vy = 0; }
+        }
+      }
+      // Right
+      if (b.x + b.r > W) {
+        b.x = W - b.r;
+        if (b.vx > 0) {
+          b.vx = -b.vx * restitution;
+          b.vy *= (1 - friction);
+          if (Math.abs(b.vy) < 1.6) { b.vy = 0; }
+        }
+      }
+      // Left
+      if (b.x - b.r < 0) {
+        b.x = b.r;
+        if (b.vx < 0) {
+          b.vx = -b.vx * restitution;
+          b.vy *= (1 - friction);
+          if (Math.abs(b.vy) < 1.6) { b.vy = 0; }
+        }
+      }
+    }
+  }
+
+  function circleCollisions() {
+    for (var i = 0; i < balls.length; i++) {
+      var a = balls[i];
+      for (var j = i + 1; j < balls.length; j++) {
+        var b = balls[j];
+        var dx = b.x - a.x;
+        var dy = b.y - a.y;
+        var distSq = dx * dx + dy * dy;
+        var minDist = a.r + b.r;
+        if (distSq < minDist * minDist && distSq > 0.0001) {
+          var dist = Math.sqrt(distSq);
+          var nx = dx / dist;
+          var ny = dy / dist;
+
+          // Positional correction (mass-weighted)
+          var overlap = minDist - dist;
+          var totalMass = a.mass + b.mass;
+          var aShare = b.mass / totalMass;
+          var bShare = a.mass / totalMass;
+          a.x -= nx * overlap * aShare;
+          a.y -= ny * overlap * aShare;
+          b.x += nx * overlap * bShare;
+          b.y += ny * overlap * bShare;
+
+          // Impulse along normal
+          var rvx = b.vx - a.vx;
+          var rvy = b.vy - a.vy;
+          var velAlongNormal = rvx * nx + rvy * ny;
+          if (velAlongNormal > 0) { continue; }
+
+          var e = restitution;
+          var invAMass = 1 / a.mass;
+          var invBMass = 1 / b.mass;
+          var impulse = -(1 + e) * velAlongNormal / (invAMass + invBMass);
+          var ix = impulse * nx;
+          var iy = impulse * ny;
+          a.vx -= ix * invAMass;
+          a.vy -= iy * invAMass;
+          b.vx += ix * invBMass;
+          b.vy += iy * invBMass;
+        }
+      }
+    }
+  }
+
+  function update() {
+    // Apply gravity once per frame
+    for (var i = 0; i < balls.length; i++) {
+      balls[i].vy += gravity;
+    }
+
+    // Sub-step integration to avoid tunneling at high speed
+    var subSteps = 3;
+    var dt = 1 / subSteps;
+    for (var s = 0; s < subSteps; s++) {
+      for (var k = 0; k < balls.length; k++) {
+        var p = balls[k];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+      }
+      wallCollisions();
+      if (collisionsEnabled) {
+        circleCollisions();
+      }
+    }
+  }
+
+  // ---- Rendering ----
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+    for (var i = 0; i < balls.length; i++) {
+      var b = balls[i];
+      var grad = ctx.createRadialGradient(
+        b.x - b.r * 0.32, b.y - b.r * 0.32, b.r * 0.12,
+        b.x, b.y, b.r
+      );
+      grad.addColorStop(0, "rgba(255,255,255,0.30)");
+      grad.addColorStop(0.28, b.color);
+      grad.addColorStop(1, b.color);
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+    }
+
+    if (isDragging) {
+      ctx.beginPath();
+      ctx.moveTo(dragStart.x, dragStart.y);
+      ctx.lineTo(mouse.x, mouse.y);
+      ctx.strokeStyle = "rgba(88,166,255,0.55)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(dragStart.x, dragStart.y, previewR, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(88,166,255,0.85)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+
+  function loop() {
+    update();
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  // ---- Interaction ----
+  var isDragging = false;
+  var dragStart = { x: 0, y: 0 };
+  var mouse = { x: 0, y: 0 };
+  var previewR = 20;
+
+  function getPos(e) {
+    if (e.touches && e.touches.length) {
+      return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+    return { x: e.clientX, y: e.clientY };
+  }
+
+  function onDown(e) {
+    if (e.target.closest(".panel")) { return; }
+    e.preventDefault();
+    var p = getPos(e);
+    isDragging = true;
+    dragStart = { x: p.x, y: p.y };
+    mouse = { x: p.x, y: p.y };
+    previewR = 12 + Math.random() * 24;
+  }
+
+  function onMove(e) {
+    if (!isDragging) { return; }
+    var p = getPos(e);
+    mouse = { x: p.x, y: p.y };
+  }
+
+  function onUp(e) {
+    if (!isDragging) { return; }
+    isDragging = false;
+    var p = getPos(e.changedTouches ? e : e);
+    var vx = (dragStart.x - p.x) * 0.2;
+    var vy = (dragStart.y - p.y) * 0.2;
+    spawnBall(dragStart.x, dragStart.y, vx, vy, previewR);
+    updateCount();
+  }
+
+  canvas.addEventListener("mousedown", onDown);
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("mouseup", onUp);
+  canvas.addEventListener("touchstart", onDown, { passive: false });
+  window.addEventListener("touchmove", onMove, { passive: false });
+  window.addEventListener("touchend", onUp);
+
+  // ---- Controls ----
+  function bindSlider(el, valEl, setter, fmt) {
+    el.addEventListener("input", function () {
+      var v = parseFloat(el.value);
+      setter(v);
+      valEl.textContent = fmt(v);
+    });
+  }
+
+  bindSlider(document.getElementById("gravity"),
+             document.getElementById("gravVal"),
+             function (v) { gravity = v; },
+             function (v) { return v.toFixed(2); });
+
+  bindSlider(document.getElementById("restitution"),
+             document.getElementById("restVal"),
+             function (v) { restitution = v; },
+             function (v) { return v.toFixed(2); });
+
+  bindSlider(document.getElementById("friction"),
+             document.getElementById("fricVal"),
+             function (v) { friction = v; },
+             function (v) { return v.toFixed(3); });
+
+  document.getElementById("resetBtn").addEventListener("click", function () {
+    seedScene();
+  });
+
+  var collBtn = document.getElementById("collBtn");
+  collBtn.addEventListener("click", function () {
+    collisionsEnabled = !collisionsEnabled;
+    collBtn.textContent = "Collisions: " + (collisionsEnabled ? "ON" : "OFF");
+    collBtn.classList.toggle("active", collisionsEnabled);
+  });
+
+  function updateCount() {
+    document.getElementById("count").textContent = balls.length;
+  }
+
+  // ---- Go ----
+  seedScene();
+  loop();
+})();
+</script>
+</body>
+</html>

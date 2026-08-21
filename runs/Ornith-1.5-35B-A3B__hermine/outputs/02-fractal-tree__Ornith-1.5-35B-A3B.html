@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fractal Blossom · L-System Tree</title>
+<style>
+  :root{
+    --panel-bg: rgba(20, 18, 34, 0.55);
+    --panel-border: rgba(255,255,255,0.14);
+    --accent: #ffb3d1;
+    --text: #f4ecff;
+    --text-dim: #b9ade0;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html,body{ width:100%; height:100%; overflow:hidden; background:#0a0d23; }
+  canvas{ display:block; position:fixed; inset:0; }
+
+  .title{
+    position:fixed; top:22px; left:0; right:0; text-align:center;
+    color:var(--text); z-index:10; pointer-events:none;
+    text-shadow: 0 2px 18px rgba(0,0,0,0.55);
+  }
+  .title h1{
+    font: 300 26px/1 'Segoe UI', system-ui, sans-serif;
+    letter-spacing: 3px;
+  }
+  .title p{
+    margin-top:6px; font-size:12px; letter-spacing:2px;
+    color:var(--text-dim); text-transform:uppercase;
+  }
+
+  .panel{
+    position:fixed; left:18px; bottom:18px; z-index:20;
+    width:272px; padding:16px 16px 18px;
+    background:var(--panel-bg);
+    border:1px solid var(--panel-border);
+    border-radius:16px;
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+    color:var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+  }
+  .panel h2{
+    font-size:12px; font-weight:600; letter-spacing:2px;
+    text-transform:uppercase; color:var(--text-dim);
+    margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;
+  }
+  .panel h2 .seed{ color:var(--accent); font-weight:500; letter-spacing:1px; }
+
+  .row{ margin-bottom:12px; }
+  .row label{
+    display:flex; justify-content:space-between; font-size:12px;
+    color:var(--text-dim); margin-bottom:5px;
+  }
+  .row label .v{ color:var(--text); font-variant-numeric:tabular-nums; }
+
+  input[type=range]{
+    -webkit-appearance:none; appearance:none;
+    width:100%; height:5px; border-radius:5px;
+    background:linear-gradient(90deg, rgba(255,255,255,.18), rgba(255,255,255,.08));
+    outline:none; cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none;
+    width:15px; height:15px; border-radius:50%;
+    background:radial-gradient(circle at 30% 30%, #fff, var(--accent));
+    box-shadow:0 0 0 3px rgba(255,179,209,.25), 0 2px 6px rgba(0,0,0,.4);
+    transition: transform .1s ease;
+  }
+  input[type=range]::-webkit-slider-thumb:hover{ transform:scale(1.15); }
+  input[type=range]::-moz-range-thumb{
+    width:15px; height:15px; border:none; border-radius:50%;
+    background:radial-gradient(circle at 30% 30%, #fff, var(--accent));
+    box-shadow:0 0 0 3px rgba(255,179,209,.25);
+  }
+
+  .btn{
+    width:100%; margin-top:6px; padding:9px 12px;
+    font-size:13px; letter-spacing:1px; font-weight:600;
+    color:#2a1020; cursor:pointer; border:none; border-radius:10px;
+    background:linear-gradient(120deg,#ffd1e8,#ffb3d1,#ffc9e0);
+    box-shadow:0 6px 18px rgba(255,120,180,.35);
+    transition: filter .15s ease, transform .1s ease;
+  }
+  .btn:hover{ filter:brightness(1.06); }
+  .btn:active{ transform: translateY(1px); }
+
+  .hint{ font-size:10.5px; color:var(--text-dim); margin-top:11px; line-height:1.5; }
+  .hint b{ color:var(--text); font-weight:600; }
+</style>
+</head>
+<body>
+  <canvas id="tree"></canvas>
+
+  <div class="title">
+    <h1>FRACTAL&nbsp;BLOSSOM</h1>
+    <p>An animated L-system tree</p>
+  </div>
+
+  <div class="panel">
+    <h2>Controls <span class="seed" id="seedVal">—</span></h2>
+
+    <div class="row">
+      <label>Recursion depth <span class="v" id="depthVal">6</span></label>
+      <input type="range" id="depth" min="2" max="8" step="1" value="6">
+    </div>
+    <div class="row">
+      <label>Branch angle <span class="v" id="angleVal">24°</span></label>
+      <input type="range" id="angle" min="8" max="42" step="1" value="24">
+    </div>
+    <div class="row">
+      <label>Length ratio <span class="v" id="ratioVal">0.72</span></label>
+      <input type="range" id="ratio" min="0.55" max="0.88" step="0.01" value="0.72">
+    </div>
+    <div class="row">
+      <label>Jitter <span class="v" id="jitterVal">4.0</span></label>
+      <input type="range" id="jitter" min="0" max="15" step="0.5" value="4">
+    </div>
+    <div class="row">
+      <label>Blossoms <span class="v" id="leafVal">70%</span></label>
+      <input type="range" id="leaf" min="0" max="100" step="1" value="70">
+    </div>
+    <div class="row">
+      <label>Wind <span class="v" id="windVal">3.0</span></label>
+      <input type="range" id="wind" min="0" max="10" step="0.5" value="3">
+    </div>
+
+    <button class="btn" id="regen">✦ Regenerate</button>
+    <div class="hint">
+      Axiom <b>X</b> · Rules <b>F→FF</b>, <b>X→F+[[X]-X]-F[-FX]+X</b>.<br>
+      Drag sliders; the tree re-grows with a fresh seed on regenerate.
+    </div>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- Canvas ---------- */
+  const canvas = document.getElementById('tree');
+  const ctx = canvas.getContext('2d');
+  let width = 0, height = 0;
+
+  /* ---------- Constants ---------- */
+  const AXIOM = 'X';
+  const RULES = { F: 'FF', X: 'F+[[X]-X]-F[-FX]+X' };
+  const MAX_CHARS = 150000;
+  const BLOSSOM_COLORS = ['#ffb3d1','#ff8fc0','#ffd1e8','#ff9ecb','#ffe0ec','#ffc2d6'];
+
+  const params = {
+    depth: 6,
+    angle: 24,
+    ratio: 0.72,
+    jitter: 4,
+    leaf: 70,
+    wind: 3,
+    seed: (Math.random() * 1e9) | 0
+  };
+
+  /* ---------- Helpers ---------- */
+  function clamp(v, a, b){ return v < a ? a : (v > b ? b : v); }
+
+  function makeRng(seed){
+    let a = seed >>> 0;
+    return function(){
+      a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  /* ---------- Tree state ---------- */
+  let segments = [];
+  let segmentsByGen = [];
+  let generations = [];
+  let genIndexOf = {};
+  let tips = [];
+  let blossoms = [];
+  let maxD = 0;
+  let maxWidth = 22, minWidth = 1.2;
+  let genInterval = 500, genGrowWindow = 400;
+  let animStart = performance.now();
+  let stars = [];
+
+  /* ---------- L-system ---------- */
+  function buildString(iters){
+    let s = [AXIOM];
+    for (let i = 0; i < iters; i++){
+      const arr = [];
+      for (const c of s[0]){
+        const r = RULES[c];
+        arr.push(r ? r : c);
+      }
+      const next = arr.join('');
+      if (next.length > MAX_CHARS) break;
+      s = [next];
+    }
+    return s[0];
+  }
+
+  function interpret(str, opts){
+    const { originX, originY, baseLen, ratio, angleRad, jitter, rng } = opts;
+    const segs = [];
+    let x = originX, y = originY;
+    let angle = -Math.PI / 2;
+    let depth = 0, offset = 0;
+    const stack = [];
+    for (const c of str){
+      if (c === 'F'){
+        const len = baseLen * Math.pow(ratio, depth);
+        const a = angle + offset;
+        const x2 = x + Math.cos(a) * len;
+        const y2 = y + Math.sin(a) * len;
+        segs.push({ x1: x, y1: y, x2: x2, y2: y2, depth: depth });
+        x = x2; y = y2;
+      } else if (c === '+'){
+        angle -= angleRad;
+      } else if (c === '-'){
+        angle += angleRad;
+      } else if (c === '['){
+        stack.push({ x: x, y: y, angle: angle, depth: depth, offset: offset });
+        depth++;
+        offset += (rng() - 0.5) * jitter;
+      } else if (c === ']'){
+        const s = stack.pop();
+        x = s.x; y = s.y; angle = s.angle; depth = s.depth; offset = s.offset;
+      }
+    }
+    return segs;
+  }
+
+  function build(){
+    const str = buildString(params.depth);
+    const rng = makeRng(params.seed);
+    const originX = width / 2, originY = height;
+    const angleRad = params.angle * Math.PI / 180;
+    const baseLen = height * 0.15;
+
+    segments = interpret(str, {
+      originX: originX, originY: originY,
+      baseLen: baseLen, ratio: params.ratio,
+      angleRad: angleRad, jitter: params.jitter * Math.PI / 180, rng: rng
+    });
+
+    // Scale the whole tree so it fits the canvas height nicely.
+    let minY = Infinity;
+    for (const s of segments){
+      if (s.y1 < minY) minY = s.y1;
+      if (s.y2 < minY) minY = s.y2;
+    }
+    const treeH = Math.max(1, originY - minY);
+    const scale = clamp(0.86 * height / treeH, 0.25, 4);
+    for (const s of segments){
+      s.x1 = (s.x1 - originX) * scale + originX;
+      s.y1 = (s.y1 - originY) * scale + originY;
+      s.x2 = (s.x2 - originX) * scale + originX;
+      s.y2 = (s.y2 - originY) * scale + originY;
+    }
+
+    maxD = 0;
+    for (const s of segments) if (s.depth > maxD) maxD = s.depth;
+
+    const set = new Set();
+    for (const s of segments) set.add(s.depth);
+    generations = Array.from(set).sort((a, b) => a - b);
+    genIndexOf = {};
+    generations.forEach((d, i) => { genIndexOf[d] = i; });
+
+    segmentsByGen = generations.map(() => []);
+    for (const s of segments) segmentsByGen[genIndexOf[s.depth]].push(s);
+
+    tips = [];
+    for (const s of segments) if (s.depth === maxD) tips.push(s);
+
+    const rng2 = makeRng((params.seed ^ 0x9e3779b9) >>> 0);
+    blossoms = tips.map(s => ({
+      x: s.x2, y: s.y2,
+      size: 2.4 + rng2() * 2.2,
+      color: BLOSSOM_COLORS[(rng2() * BLOSSOM_COLORS.length) | 0]
+    }));
+
+    maxWidth = clamp(26 * scale, 4, 60);
+    minWidth = clamp(1.3 * scale, 0.5, 8);
+
+    genInterval = 4200 / Math.max(1, generations.length);
+    genGrowWindow = genInterval * 0.8;
+    animStart = performance.now();
+  }
+
+  /* ---------- Colors ---------- */
+  function depthColor(t){
+    const hue = 25 + t * 75;
+    const sat = 58 - t * 14;
+    const light = 18 + t * 34;
+    return 'hsl(' + hue + ',' + sat + '%,' + light + '%)';
+  }
+  function depthWidth(t){
+    return maxWidth + (minWidth - maxWidth) * t;
+  }
+
+  /* ---------- Background ---------- */
+  function makeStars(){
+    stars = [];
+    const n = 70;
+    for (let i = 0; i < n; i++){
+      stars.push({
+        x: Math.random(),
+        y: Math.random() * 0.55,
+        r: 0.4 + Math.random() * 1.3,
+        ph: Math.random() * Math.PI * 2,
+        sp: 0.6 + Math.random() * 2.2
+      });
+    }
+  }
+
+  function drawBackground(now){
+    const sky = ctx.createLinearGradient(0, 0, 0, height);
+    sky.addColorStop(0.00, '#0a0d23');
+    sky.addColorStop(0.42, '#221d4b');
+    sky.addColorStop(0.70, '#6a3d70');
+    sky.addColorStop(0.87, '#c66a5c');
+    sky.addColorStop(1.00, '#efaa6c');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, width, height);
+
+    // stars
+    const t = now * 0.001;
+    for (let i = 0; i < stars.length; i++){
+      const s = stars[i];
+      const tw = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(t * s.sp + s.ph));
+      ctx.globalAlpha = tw * 0.9;
+      ctx.fillStyle = '#eef2ff';
+      ctx.beginPath();
+      ctx.arc(s.x * width, s.y * height, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // sun glow near horizon
+    const sunX = width * 0.72, sunY = height * 0.83;
+    const glow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, height * 0.4);
+    glow.addColorStop(0, 'rgba(255,236,190,0.85)');
+    glow.addColorStop(0.35, 'rgba(255,205,140,0.35)');
+    glow.addColorStop(1, 'rgba(255,205,140,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, width, height);
+
+    // ground
+    const gy = height * 0.925;
+    const gg = ctx.createLinearGradient(0, gy - height * 0.05, 0, height);
+    gg.addColorStop(0, 'rgba(30,18,14,0)');
+    gg.addColorStop(1, 'rgba(22,13,10,0.92)');
+    ctx.fillStyle = gg;
+    ctx.fillRect(0, gy - height * 0.05, width, height - (gy - height * 0.05));
+    ctx.fillStyle = '#160d0a';
+    ctx.fillRect(0, height * 0.93, width, height * 0.07);
+  }
+
+  /* ---------- Blossoms ---------- */
+  function drawBlossom(x, y, scale, color){
+    const r = scale * 3.3;
+    if (r < 0.25) return;
+    ctx.fillStyle = color;
+    for (let k = 0; k < 5; k++){
+      const a = k / 5 * Math.PI * 2 + scale;
+      ctx.beginPath();
+      ctx.ellipse(x + Math.cos(a) * r, y + Math.sin(a) * r, r * 0.62, r * 0.40, a, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.30, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff2b0';
+    ctx.fill();
+  }
+
+  /* ---------- Render ---------- */
+  function fractionForGen(elapsed, gi){
+    const start = gi * genInterval;
+    return (elapsed - start) / genGrowWindow;
+  }
+
+  function render(now, elapsed){
+    drawBackground(now);
+
+    ctx.save();
+    // gentle wind sway pivoting around the base
+    ctx.translate(width / 2, height);
+    const windAmp = params.wind * 0.008;
+    const swing = Math.sin(now * 0.0007) * windAmp + Math.sin(now * 0.0019) * windAmp * 0.35;
+    ctx.rotate(swing);
+    ctx.translate(-width / 2, -height);
+
+    // branches, batched per generation with per-segment growth
+    ctx.lineCap = 'round';
+    for (let gi = 0; gi < generations.length; gi++){
+      let frac = fractionForGen(elapsed, gi);
+      if (frac <= 0) continue;
+      if (frac > 1) frac = 1;
+
+      const gen = generations[gi];
+      const t = gen / maxD;
+      const path = new Path2D();
+      const list = segmentsByGen[gi];
+      for (let i = 0; i < list.length; i++){
+        const s = list[i];
+        const ex = s.x1 + (s.x2 - s.x1) * frac;
+        const ey = s.y1 + (s.y2 - s.y1) * frac;
+        path.moveTo(s.x1, s.y1);
+        path.lineTo(ex, ey);
+      }
+      ctx.lineWidth = depthWidth(t);
+      ctx.strokeStyle = depthColor(t);
+      ctx.stroke(path);
+    }
+
+    // blossoms at the tips
+    if (params.leaf > 0 && blossoms.length){
+      const target = Math.min(blossoms.length, (params.leaf / 100 * 500) | 0 + 8);
+      const stride = Math.max(1, Math.ceil(blossoms.length / target));
+      const giMax = genIndexOf[maxD];
+      for (let i = 0; i < blossoms.length; i += stride){
+        const b = blossoms[i];
+        // blossoms appear once their branch is mostly grown
+        let frac = fractionForGen(elapsed, genIndexOf[b.depth]);
+        if (frac > 1) frac = 1;
+        const lf = (frac - 0.45) / 0.55;
+        if (lf <= 0) continue;
+        drawBlossom(b.x, b.y, lf, b.color);
+      }
+    }
+
+    ctx.restore();
+  }
+
+  function loop(now){
+    render(now, now - animStart);
+    requestAnimationFrame(loop);
+  }
+
+  /* ---------- Controls ---------- */
+  function bindSlider(id, key, isInt, suffix){
+    const el = document.getElementById(id);
+    const val = document.getElementById(id + 'Val');
+    const show = () => { val.textContent = (isInt ? el.value : parseFloat(el.value).toFixed(2)) + (suffix || ''); };
+    show();
+    el.addEventListener('input', show);
+    el.addEventListener('change', () => {
+      params[key] = isInt ? parseInt(el.value, 10) : parseFloat(el.value);
+      if (['depth', 'angle', 'ratio', 'jitter'].indexOf(key) !== -1){
+        build();
+      }
+    });
+  }
+
+  bindSlider('depth', 'depth', true);
+  bindSlider('angle', 'angle', true, '°');
+  bindSlider('ratio', 'ratio', false);
+  bindSlider('jitter', 'jitter', false);
+  bindSlider('leaf', 'leaf', true, '%');
+  bindSlider('wind', 'wind', false);
+
+  document.getElementById('regen').addEventListener('click', () => {
+    params.seed = (Math.random() * 1e9) | 0;
+    document.getElementById('seedVal').textContent = '#' + params.seed;
+    build();
+  });
+
+  document.getElementById('seedVal').textContent = '#' + params.seed;
+
+  /* ---------- Resize ---------- */
+  function resize(){
+    const dpr = window.devicePixelRatio || 1;
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = Math.floor(width * dpr);
+    canvas.height = Math.floor(height * dpr);
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    makeStars();
+    build();
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+  requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>

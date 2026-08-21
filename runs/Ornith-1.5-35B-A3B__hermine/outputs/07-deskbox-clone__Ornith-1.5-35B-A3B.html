@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>desk.box – Die smarte Bürosoftware für die Landwirtschaft</title>
+<style>
+:root{
+  --primary:#1a8a47;
+  --primary-dark:#146b37;
+  --primary-darker:#0f5229;
+  --primary-light:#e8f5ec;
+  --accent:#f4a12a;
+  --ink:#1d2a21;
+  --ink-soft:#4a5a4e;
+  --muted:#6b7a6e;
+  --bg:#ffffff;
+  --bg-soft:#f3f7f3;
+  --bg-alt:#eaf3ec;
+  --line:#dce6dd;
+  --shadow:0 6px 24px rgba(20,60,30,0.10);
+  --shadow-lg:0 16px 44px rgba(20,60,30,0.16);
+  --radius:12px;
+  --radius-lg:20px;
+  --maxw:1180px;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  color:var(--ink);
+  background:var(--bg);
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:inherit;text-decoration:none;}
+img{max-width:100%;display:block;}
+ul{margin:0;padding:0;list-style:none;}
+h1,h2,h3,h4{line-height:1.2;margin:0 0 .4em;font-weight:700;}
+p{margin:0 0 1em;}
+.container{max-width:var(--maxw);margin:0 auto;padding:0 20px;}
+
+/* ---------- Buttons ---------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:14px 24px;border-radius:999px;font-weight:600;font-size:16px;
+  border:2px solid transparent;cursor:pointer;transition:transform .15s ease,background .2s ease,color .2s ease,box-shadow .2s ease;
+  text-align:center;line-height:1.1;
+}
+.btn:hover{transform:translateY(-2px);}
+.btn-primary{background:var(--primary);color:#fff;box-shadow:var(--shadow);}
+.btn-primary:hover{background:var(--primary-dark);box-shadow:var(--shadow-lg);}
+.btn-outline{background:#fff;color:var(--primary);border-color:var(--primary);}
+.btn-outline:hover{background:var(--primary);color:#fff;}
+.btn-white{background:#fff;color:var(--primary-darker);}
+.btn-white:hover{background:#f0f9f4;box-shadow:var(--shadow-lg);}
+.btn-lg{padding:17px 32px;font-size:17px;}
+
+/* ---------- Header ---------- */
+.site-header{
+  position:sticky;top:0;z-index:1000;
+  background:rgba(255,255,255,.96);
+  backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line);
+  transition:box-shadow .2s ease;
+}
+.site-header.scrolled{box-shadow:var(--shadow);}
+.nav-wrap{
+  display:flex;align-items:center;justify-content:space-between;
+  height:74px;max-width:var(--maxw);margin:0 auto;padding:0 20px;gap:20px;
+}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:24px;color:var(--primary-darker);letter-spacing:-.5px;}
+.logo .logo-mark{width:40px;height:40px;flex:none;}
+.logo .logo-box{color:var(--primary);}
+.logo .logo-dot{color:var(--accent);}
+.nav-menu{display:flex;align-items:center;gap:6px;}
+.nav-item{position:relative;}
+.nav-link{
+  display:flex;align-items:center;gap:5px;
+  padding:10px 14px;border-radius:8px;font-weight:600;font-size:16px;color:var(--ink-soft);
+  background:none;border:none;cursor:pointer;font-family:inherit;transition:color .15s ease,background .15s ease;
+}
+.nav-link:hover,.nav-item.open > .nav-link{color:var(--primary-darker);background:var(--primary-light);}
+.nav-link .caret{width:12px;height:12px;transition:transform .2s ease;}
+.nav-item.open .caret{transform:rotate(180deg);}
+.dropdown{
+  position:absolute;top:calc(100% + 8px);left:0;min-width:240px;
+  background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow-lg);padding:8px;
+  opacity:0;visibility:hidden;transform:translateY(6px);transition:opacity .18s ease,transform .18s ease,visibility .18s;
+}
+.nav-item.open .dropdown{opacity:1;visibility:visible;transform:translateY(0);}
+.dropdown a{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:8px;color:var(--ink-soft);font-weight:500;font-size:15px;}
+.dropdown a:hover{background:var(--primary-light);color:var(--primary-darker);}
+.dropdown a .dd-ico{width:20px;height:20px;color:var(--primary);flex:none;}
+.nav-actions{display:flex;align-items:center;gap:14px;}
+.login-link{font-weight:600;color:var(--ink-soft);font-size:16px;padding:8px 4px;white-space:nowrap;}
+.login-link:hover{color:var(--primary-darker);}
+.hamburger{display:none;flex-direction:column;gap:5px;background:none;border:none;cursor:pointer;padding:10px;}
+.hamburger span{width:24px;height:2.5px;background:var(--ink);border-radius:2px;transition:transform .2s ease,opacity .2s ease;}
+
+/* ---------- Hero ---------- */
+.hero{
+  background:linear-gradient(160deg,var(--primary-light) 0%,#ffffff 55%);
+  padding:70px 0 60px;
+}
+.hero-grid{
+  display:grid;grid-template-columns:1.05fr .95fr;gap:50px;align-items:center;
+}
+.eyebrow{
+  display:inline-block;background:#fff;color:var(--primary-dark);border:1px solid var(--line);
+  padding:6px 14px;border-radius:999px;font-size:13px;font-weight:700;letter-spacing:.3px;margin-bottom:20px;
+  box-shadow:var(--shadow);
+}
+.hero h1{font-size:46px;letter-spacing:-1px;color:var(--ink);}
+.hero h1 .hl{color:var(--primary);}
+.hero .lead{font-size:19px;color:var(--ink-soft);max-width:34ch;}
+.trust-badges{display:flex;flex-wrap:wrap;gap:12px;margin:26px 0 30px;}
+.badge{
+  display:flex;align-items:center;gap:9px;background:#fff;border:1px solid var(--line);
+  padding:10px 15px;border-radius:10px;font-weight:600;font-size:14px;color:var(--ink);box-shadow:var(--shadow);
+}
+.badge .b-ico{width:22px;height:22px;color:var(--primary);flex:none;}
+.hero-cta{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;}
+
+/* hero visuals */
+.hero-visual{position:relative;}
+.person-placeholder{
+  background:linear-gradient(180deg,#cfe8d4,#a9d5b0);border-radius:var(--radius-lg);
+  aspect-ratio:1/1;display:flex;align-items:flex-end;justify-content:center;position:relative;overflow:hidden;
+  border:1px solid var(--line);box-shadow:var(--shadow);
+}
+.person-placeholder .p-label{
+  position:absolute;bottom:14px;left:14px;background:rgba(255,255,255,.85);color:var(--primary-darker);
+  padding:6px 12px;border-radius:8px;font-weight:600;font-size:13px;
+}
+.screenshot-placeholder{
+  position:absolute;right:-18px;bottom:-26px;width:62%;background:#fff;border:1px solid var(--line);
+  border-radius:14px;box-shadow:var(--shadow-lg);overflow:hidden;
+}
+.screenshot .scr-top{background:var(--primary-darker);height:26px;display:flex;align-items:center;padding:0 10px;gap:6px;}
+.screenshot .scr-dot{width:8px;height:8px;border-radius:50%;background:#7fd69a;}
+.screenshot .scr-body{padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;background:#f7faf7;}
+.screenshot .scr-line{height:10px;border-radius:5px;background:var(--bg-alt);}
+.screenshot .scr-line.short{width:60%;}
+.screenshot .scr-line.med{width:80%;}
+.screenshot .scr-content{padding:12px;display:grid;grid-template-rows:auto auto;gap:8px;}
+.screenshot .scr-card{border:1px solid var(--line);border-radius:8px;padding:10px;background:#fff;}
+.screenshot .scr-card .scr-line{margin-bottom:6px}
+.play-overlay{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  display:flex;flex-direction:column;align-items:center;gap:10px;color:#fff;z-index:3;
+}
+.play-btn{
+  width:72px;height:72px;border-radius:50%;background:rgba(20,107,55,.92);
+  display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-lg);
+  transition:transform .2s ease,background .2s ease;
+}
+.play-btn:hover{transform:scale(1.08);background:var(--primary-dark);}
+.play-btn svg{width:28px;height:28px;margin-left:4px;}
+.play-label{font-size:14px;font-weight:600;background:rgba(0,0,0,.35);padding:5px 12px;border-radius:999px;}
+
+/* ---------- Section base ---------- */
+section{padding:72px 0;}
+.section-head{text-align:center;max-width:720px;margin:0 auto 46px;}
+.section-head .kicker{color:var(--primary);font-weight:700;letter-spacing:.5px;text-transform:uppercase;font-size:13px;}
+.section-head h2{font-size:34px;letter-spacing:-.5px;}
+.section-head p{color:var(--ink-soft);font-size:17px;}
+
+/* ---------- Feature bullets ---------- */
+.features-band{background:var(--bg-soft);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+.features-grid{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:20px;
+}
+.feature-bullet{display:flex;align-items:flex-start;gap:12px;}
+.feature-bullet .f-ico{
+  width:40px;height:40px;border-radius:10px;background:#fff;color:var(--primary);
+  display:flex;align-items:center;justify-content:center;flex:none;box-shadow:var(--shadow);
+}
+.feature-bullet .f-ico svg{width:22px;height:22px;}
+.feature-bullet h4{font-size:15.5px;margin-bottom:2px;}
+.feature-bullet p{font-size:13.5px;color:var(--ink-soft);margin:0;}
+
+/* ---------- Offer cards ---------- */
+.cards-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:20px;}
+.offer-card{
+  background:#fff;border:1px solid var(--line);border-radius:var(--radius-lg);padding:26px 22px;
+  transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease;position:relative;
+}
+.offer-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);border-color:#b9ddc1;}
+.offer-card .o-ico{
+  width:56px;height:56px;border-radius:14px;background:var(--primary-light);color:var(--primary);
+  display:flex;align-items:center;justify-content:center;margin-bottom:18px;
+}
+.offer-card .o-ico svg{width:30px;height:30px;}
+.offer-card h3{font-size:20px;}
+.offer-card p{color:var(--ink-soft);font-size:14.5px;}
+.offer-card .more{font-weight:700;color:var(--primary-dark);font-size:14.5px;display:inline-flex;align-items:center;gap:6px;margin-top:6px;}
+.offer-card .more svg{width:15px;height:15px;transition:transform .15s ease;}
+.offer-card .more:hover svg{transform:translateX(3px);}
+
+/* ---------- Testimonials ---------- */
+.testi-band{background:linear-gradient(160deg,#0f5229,#146b37);color:#fff;}
+.testi-band .section-head h2{color:#fff;}
+.testi-band .section-head p{color:#c6e6cf;}
+.testi-band .section-head .kicker{color:#7fd69a;}
+.testi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:24px;}
+.testi-card{
+  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:var(--radius-lg);padding:30px;
+  backdrop-filter:blur(4px);
+}
+.testi-card .stars{color:var(--accent);margin-bottom:14px;letter-spacing:2px;font-size:18px;}
+.testi-card blockquote{font-size:17px;font-weight:500;margin-bottom:20px;color:#f3f9f5;font-style:italic;}
+.testi-card .cite{display:flex;align-items:center;gap:12px;}
+.testi-card .avatar{width:48px;height:48px;border-radius:50%;background:#7fd69a;color:#0f5229;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;flex:none;}
+.testi-card .cite-name{font-weight:700;font-size:15px;}
+.testi-card .cite-role{font-size:13px;color:#bfe3c9;}
+
+/* ---------- Blog ---------- */
+.blog-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;}
+.blog-card{background:#fff;border:1px solid var(--line);border-radius:var(--radius-lg);overflow:hidden;transition:transform .2s ease,box-shadow .2s ease;}
+.blog-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);}
+.blog-card .b-img{aspect-ratio:16/10;background:linear-gradient(135deg,#cfe8d4,#a9d5b0);display:flex;align-items:center;justify-content:center;position:relative;}
+.blog-card .b-img .img-label{background:rgba(255,255,255,.8);padding:6px 12px;border-radius:8px;font-weight:600;font-size:13px;color:var(--primary-darker);}
+.blog-card .b-body{padding:22px 24px;}
+.blog-card .b-cat{color:var(--primary);font-weight:700;font-size:12px;letter-spacing:.5px;text-transform:uppercase;}
+.blog-card h3{font-size:19px;margin:8px 0 10px;}
+.blog-card p{color:var(--ink-soft);font-size:14.5px;margin-bottom:14px;}
+.blog-card .read{font-weight:700;color:var(--primary-dark);font-size:14.5px;display:inline-flex;align-items:center;gap:6px;}
+.blog-card .read svg{width:15px;height:15px;transition:transform .15s ease;}
+.blog-card .read:hover svg{transform:translateX(3px);}
+
+/* ---------- CTA band ---------- */
+.cta-band{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;text-align:center;}
+.cta-band h2{font-size:34px;margin-bottom:10px;}
+.cta-band p{font-size:18px;color:#e4f5ea;max-width:560px;margin:0 auto 28px;}
+.cta-band .cta-feats{display:flex;flex-wrap:wrap;justify-content:center;gap:10px 28px;margin-bottom:30px;font-size:15px;color:#dff3e6;}
+.cta-band .cta-feats span{display:inline-flex;align-items:center;gap:8px;}
+.cta-band .cta-feats svg{width:18px;height:18px;color:#9be6ad;}
+
+/* ---------- Footer ---------- */
+.site-footer{background:#0d1f13;color:#c4d3c6;padding-top:60px;}
+.footer-grid{display:grid;grid-template-columns:1.4fr 1fr 1.1fr 1fr;gap:40px;padding-bottom:44px;}
+.footer-brand .logo{color:#fff;margin-bottom:16px;}
+.footer-brand .logo .logo-mark{filter:brightness(0) invert(1);}
+.footer-brand p{font-size:14.5px;color:#a9bdab;max-width:30ch;}
+.cert-badges{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;}
+.cert-badge{width:66px;height:66px;border:1px solid #2c4433;border-radius:10px;background:#122618;display:flex;align-items:center;justify-content:center;}
+.cert-badge svg{width:38px;height:38px;color:#7fd69a;}
+.footer-col h4{color:#fff;font-size:16px;margin-bottom:16px;}
+.footer-col a{display:block;color:#a9bdab;font-size:14.5px;padding:6px 0;transition:color .15s ease;}
+.footer-col a:hover{color:#7fd69a;}
+.contact-item{display:flex;gap:10px;margin-bottom:12px;font-size:14px;}
+.contact-item .c-ico{width:18px;height:18px;color:#7fd69a;flex:none;margin-top:2px;}
+.contact-item a{padding:0;}
+.socials{display:flex;gap:10px;margin-top:18px;}
+.socials a{width:40px;height:40px;border-radius:10px;background:#183021;display:flex;align-items:center;justify-content:center;color:#7fd69a;transition:background .15s ease,transform .15s ease;}
+.socials a:hover{background:#23472f;transform:translateY(-2px);}
+.socials a svg{width:20px;height:20px;}
+.footer-bottom{border-top:1px solid #1f3a2b;padding:22px 0;display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;font-size:13.5px;color:#8fa795;}
+.footer-bottom a{color:#8fa795;}
+.footer-bottom a:hover{color:#7fd69a;}
+
+/* ---------- Responsive ---------- */
+@media(max-width:1024px){
+  .cards-grid{grid-template-columns:repeat(3,1fr);}
+  .features-grid{grid-template-columns:repeat(2,1fr);}
+  .hero h1{font-size:38px;}
+}
+@media(max-width:860px){
+  .hero-grid{grid-template-columns:1fr;}
+  .hero-visual{order:-1;max-width:520px;margin:0 auto;width:100%;}
+  .testi-grid{grid-template-columns:1fr;}
+  .footer-grid{grid-template-columns:1fr 1fr;}
+}
+@media(max-width:720px){
+  .nav-menu{
+    position:fixed;top:74px;left:0;right:0;background:#fff;flex-direction:column;align-items:stretch;
+    gap:2px;padding:14px 20px 22px;box-shadow:var(--shadow-lg);border-bottom:1px solid var(--line);
+    max-height:calc(100vh - 74px);overflow-y:auto;
+    transform:translateY(-140%);transition:transform .25s ease;visibility:hidden;
+  }
+  .nav-menu.open{transform:translateY(0);visibility:visible;}
+  .nav-item{border-bottom:1px solid var(--line);}
+  .nav-item:last-child{border-bottom:none;}
+  .nav-link{width:100%;justify-content:space-between;padding:13px 6px;}
+  .dropdown{position:static;opacity:1;visibility:visible;transform:none;box-shadow:none;border:none;padding:0 0 4px 10px;display:none;min-width:0;}
+  .nav-item.open .dropdown{display:block;}
+  .nav-actions{flex-direction:column;width:100%;align-items:stretch;}
+  .login-link{text-align:center;padding:6px;}
+  .nav-actions .btn{width:100%;}
+  .hamburger{display:flex;}
+  .hamburger.active span:nth-child(1){transform:translateY(7.5px) rotate(45deg);}
+  .hamburger.active span:nth-child(2){opacity:0;}
+  .hamburger.active span:nth-child(3){transform:translateY(-7.5px) rotate(-45deg);}
+  .cards-grid{grid-template-columns:1fr 1fr;}
+  .blog-grid{grid-template-columns:1fr;}
+}
+@media(max-width:520px){
+  .hero h1{font-size:32px;}
+  .section-head h2{font-size:27px;}
+  .features-grid{grid-template-columns:1fr;}
+  .cards-grid{grid-template-columns:1fr;}
+  .footer-grid{grid-template-columns:1fr;}
+  .cta-band h2{font-size:27px;}
+  .screenshot-placeholder{display:none;}
+}
+</style>
+</head>
+<body>
+
+<!-- ===================== HEADER ===================== -->
+<header class="site-header" id="siteHeader">
+  <div class="nav-wrap">
+    <a href="#" class="logo" aria-label="desk.box Startseite">
+      <svg class="logo-mark" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+        <rect x="3" y="3" width="34" height="34" rx="9" fill="#1a8a47"/>
+        <rect x="10" y="11" width="9" height="18" rx="2" fill="#ffffff"/>
+        <rect x="21" y="11" width="9" height="9" rx="2" fill="#7fd69a"/>
+        <rect x="21" y="23" width="9" height="6" rx="2" fill="#ffffff"/>
+      </svg>
+      <span>desk<span class="logo-box">.box</span><span class="logo-dot">.</span></span>
+    </a>
+
+    <nav class="nav-menu" id="navMenu" aria-label="Hauptnavigation">
+      <div class="nav-item has-dropdown">
+        <button class="nav-link" aria-expanded="false" aria-haspopup="true">
+          Funktionen
+          <svg class="caret" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="dropdown" role="menu">
+          <a href="#"><svg class="dd-ico" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M3 9h18" stroke="currentColor" stroke-width="1.8"/></svg>Direktbuchung</a>
+          <a href="#"><svg class="dd-ico" viewBox="0 0 24 24" fill="none"><path d="M4 20h16M6 16l4-6 3 3 4-5 3 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="8" r="2" stroke="currentColor" stroke-width="1.8"/></svg>Berichte &amp; Auswertungen</a>
+          <a href="#"><svg class="dd-ico" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Belegverwaltung</a>
+          <a href="#"><svg class="dd-ico" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3 8-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 12v6a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2h9" stroke="currentColor" stroke-width="1.8"/></svg>ELSTER &amp; Übertragung</a>
+        </div>
+      </div>
+
+      <div class="nav-item has-dropdown">
+        <button class="nav-link" aria-expanded="false" aria-haspopup="true">
+          Preise
+          <svg class="caret" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="dropdown" role="menu">
+          <a href="#"><svg class="dd-ico" viewBox="0 0 24 24" fill="none"><path d="M3 7l9-4 9 4-9 4-9-4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M6 9v5M18 9v5M3 12l9 4 9-4" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg> Pakete &amp; Preise</a>
+          <a href="#"><svg class="dd-ico" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Kostenlos testen</a>
+          <a href="#"><svg class="dd-ico" viewBox="0 0 24 24" fill="none"><path d="M12 2l2.4 6.9L21 9l-5.6 4.3L17 20l-5-3.6L7 20l1.6-6.7L3 9l6.6-.1z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>Rabatte &amp; Aktionen</a>
+        </div>
+      </div>
+
+      <div class="nav-item has-dropdown">
+        <button class="nav-link" aria-expanded="false" aria-haspopup="true">
+          Service
+          <svg class="caret" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="dropdown" role="menu">
+          <a href="#"><svg class="dd-ico" viewBox="0 0 24 24" fill="none"><path d="M21 11.5a8.4 8.4 0 01-9.5 8.4L3 21l1.1-8.5A8.4 8.4 0 1121 11.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 10h8M8 14h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>FAQ &amp; Wissen</a>
+          <a href="#"><svg class="dd-ico" viewBox="0 0 24 24" fill="none"><path d="M4 4h16v12H5.2L4 18z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 9h8M8 12h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Kontakt</a>
+          <a href="#"><svg class="dd-ico" viewBox="0 0 24 24" fill="none"><path d="M12 2a7 7 0 00-7 7c0 5 7 11 7 11s7-6 7-11a7 7 0 00-7-7z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="9" r="2.5" stroke="currentColor" stroke-width="1.8"/></svg>Standort &amp; Anfahrt</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="nav-actions">
+      <a href="#" class="login-link">Login</a>
+      <a href="#" class="btn btn-primary">Jetzt testen</a>
+    </div>
+
+    <button class="hamburger" id="hamburger" aria-label="Menü öffnen" aria-expanded="false" aria-controls="navMenu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+
+<!-- ===================== HERO ===================== -->
+<section class="hero">
+  <div class="container hero-grid">
+    <div class="hero-text">
+      <span class="eyebrow">Die smarte Bürosoftware für die Landwirtschaft</span>
+      <h1>desk.box – Die smarte Bürosoftware für die <span class="hl">Landwirtschaft</span></h1>
+      <p class="lead">Mit desk.box buchen, archivieren und verwalten Sie alle Ihre Belege, Belege und Dokumente bequem von zu Hause aus – direkt mit Ihrem Steuerbüro vernetzt. Sparen Sie Zeit und behalten Sie überall die Kontrolle.</p>
+
+      <div class="trust-badges">
+        <div class="badge">
+          <svg class="b-ico" viewBox="0 0 24 24" fill="none"><path d="M12 2l2.4 6.9L21 9l-5.6 4.3L17 20l-5-3.6L7 20l1.6-6.7L3 9l6.6-.1z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          GoBD zertifiziert
+        </div>
+        <div class="badge">
+          <svg class="b-ico" viewBox="0 0 24 24" fill="none"><path d="M12 3c-4 0-8 3-8 8 0 6 8 10 8 10s8-4 8-10c0-5-4-8-8-8z" stroke="currentColor" stroke-width="1.8"/><path d="M4 11h16" stroke="currentColor" stroke-width="1.8"/></svg>
+          Server in Deutschland
+        </div>
+        <div class="badge">
+          <svg class="b-ico" viewBox="0 0 24 24" fill="none"><path d="M3 7l9-4 9 4-9 4-9-4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M6 9v5M18 9v5M3 12l9 4 9-4" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          E-Rechnung
+        </div>
+      </div>
+
+      <div class="hero-cta">
+        <a href="#" class="btn btn-primary btn-lg">Kostenlos beraten lassen</a>
+        <a href="#" class="btn btn-outline btn-lg">Jetzt kostenlos testen</a>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <div class="person-placeholder">
+        <svg viewBox="0 0 200 200" width="70%" aria-hidden="true" fill="none">
+          <circle cx="100" cy="72" r="38" fill="#0f5229"/>
+          <path d="M40 178c2-40 30-62 60-62s58 22 60 62z" fill="#0f5229"/>
+          <circle cx="100" cy="72" r="38" fill="#146b37" opacity="0.25"/>
+        </svg>
+        <span class="p-label">Bild: Landwirt bei der Arbeit</span>
+        <div class="screenshot-placeholder screenshot">
+          <div class="scr-top"><span class="scr-dot"></span><span class="scr-dot"></span><span class="scr-dot"></span></div>
+          <div class="scr-content">
+            <div class="scr-card"><div class="scr-line"></div><div class="scr-line short"></div></div>
+            <div class="scr-card"><div class="scr-line med"></div><div class="scr-line"></div></div>
+            <div class="scr-card"><div class="scr-line"></div><div class="scr-line short"></div></div>
+          </div>
+          <div class="scr-body"><div class="scr-line"></div><div class="scr-line short"></div><div class="scr-line med"></div><div class="scr-line"></div></div>
+        </div>
+        <div class="play-overlay">
+          <a href="#" class="play-btn" aria-label="Video abspielen">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          </a>
+          <span class="play-label">Video abspielen</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FEATURE BULLETS ===================== -->
+<section class="features-band" id="funktionen">
+  <div class="container">
+    <div class="section-head">
+      <span class="kicker">Was desk.box können muss</span>
+      <h2>Alles, was Ihre Landwirtschaftsbüro braucht</h2>
+    </div>
+    <div class="features-grid">
+      <div class="feature-bullet">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none"><path d="M7 11l-3 3 3 3M17 13l3-3-3-3M14 4l-4 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <div><h4>Direkte Schnittstelle zu deinem Steuerbüro</h4><p>Belege direkt und sicher an Ihren Steuerberater übertragen.</p></div>
+      </div>
+      <div class="feature-bullet">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none"><path d="M3 7l9-4 9 4-9 4-9-4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M6 9v5M18 9v5M3 12l9 4 9-4" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>
+        <div><h4>E-Rechnung inklusive</h4><p>Digitale E-Rechnungen automatisch einlesen und verwalten.</p></div>
+      </div>
+      <div class="feature-bullet">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none"><path d="M3 17l6-6 4 4 8-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 12v6a2 2 0 01-2 2H5a2 2 0 01-2-2V6" stroke="currentColor" stroke-width="1.8"/></svg></span>
+        <div><h4>Vollständiges Banking</h4><p>Kontoauszüge synchronisieren und Buchungen automatisieren.</p></div>
+      </div>
+      <div class="feature-bullet">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+        <div><h4>Intelligente Volltextsuche durch alle Dokumente</h4><p>Finden Sie jedes Dokument sekundenschnell per Suche.</p></div>
+      </div>
+      <div class="feature-bullet">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16v12H4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 6v3M12 6v6M16 6v9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+        <div><h4>Alle deine Betriebe auf einen Blick</h4><p>Mehrere Betriebe und Standorte zentral verwalten.</p></div>
+      </div>
+      <div class="feature-bullet">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M17 9l3 3-3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <div><h4>Einfacher Workflow</h4><p>Strukturierte Prozesse statt chaotischer Papierberge.</p></div>
+      </div>
+      <div class="feature-bullet">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none"><rect x="7" y="3" width="10" height="18" rx="3" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="17" r="1.2" fill="currentColor"/><path d="M10 6h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+        <div><h4>Alle Dokumente in deiner Hosentasche</h4><p>Greifen Sie unterwegs von überall darauf zu.</p></div>
+      </div>
+      <div class="feature-bullet">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2a7 7 0 00-7 7v3l-1 6h16l-1-6V9a7 7 0 00-7-7z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 12h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+        <div><h4>Sichere und gesetzeskonforme Archivierung</h4><p>GBD-konform, sicher gespeichert in Deutschland.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== OFFER CARDS ===================== -->
+<section id="angebote">
+  <div class="container">
+    <div class="section-head">
+      <span class="kicker">Die Leistungen</span>
+      <h2>Das bietet dir desk.box</h2>
+      <p>Fünf leistungsstarke Bereiche – eine Software. Entdecke, was desk.box für deinen Betrieb tun kann.</p>
+    </div>
+    <div class="cards-grid">
+      <div class="offer-card">
+        <span class="o-ico"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="12" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 20h8M12 16v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+        <h3>Schreibtisch</h3>
+        <p>Dein zentraler Arbeitsplatz für alle Belege, Aufgaben und Dokumente im Alltag.</p>
+        <a href="#" class="more">Mehr erfahren <svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      </div>
+      <div class="offer-card">
+        <span class="o-ico"><svg viewBox="0 0 24 24" fill="none"><path d="M3 17l6-6 4 4 8-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 12v6a2 2 0 01-2 2H5a2 2 0 01-2-2V6" stroke="currentColor" stroke-width="1.8"/></svg></span>
+        <h3>Banking</h3>
+        <p>Kontoauszüge synchronisieren, Buchungen ziehen und Zahlungen im Blick behalten.</p>
+        <a href="#" class="more">Mehr erfahren <svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      </div>
+      <div class="offer-card">
+        <span class="o-ico"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16v14H4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 6V4h8v2M8 10h8M8 14h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+        <h3>Aktenschrank</h3>
+        <p>Alle Dokumente sicher und gesetzeskonforme archivieren – durchsuchbar in Sekundenschnelle.</p>
+        <a href="#" class="more">Mehr erfahren <svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      </div>
+      <div class="offer-card">
+        <span class="o-ico"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3h9l3 3v15H6z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 9h6M9 13h6M9 17h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+        <h3>Faktura</h3>
+        <p>Rechnungen und Angebote professionell erstellen und direkt versenden.</p>
+        <a href="#" class="more">Mehr erfahren <svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      </div>
+      <div class="offer-card">
+        <span class="o-ico"><svg viewBox="0 0 24 24" fill="none"><path d="M16 12a4 4 0 10-8 0 4 4 0 008 0z" stroke="currentColor" stroke-width="1.8"/><path d="M20 21a8 8 0 00-16 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+        <h3>Adressbuch</h3>
+        <p>Kunden, Lieferanten und Kontakte übersichtlich verwalten und verbinden.</p>
+        <a href="#" class="more">Mehr erfahren <svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== TESTIMONIALS ===================== -->
+<section class="testi-band">
+  <div class="container">
+    <div class="section-head">
+      <span class="kicker">Stimmen unserer Kunden</span>
+      <h2>Was landwirtschaftliche Betriebe über desk.box sagen</h2>
+      <p>Hunderte Betriebe haben ihre Büroarbeit mit desk.box revolutioniert.</p>
+    </div>
+    <div class="testi-grid">
+      <div class="testi-card">
+        <div class="stars" aria-label="5 von 5 Sternen">★★★★★</div>
+        <blockquote>„Seit wir desk.box nutzen, ist das Thema Belege für uns kein Stress mehr. Alles ist digital und sofort durchsuchbar – und mein Steuerbüro freut sich über die saubere Übertragung."</blockquote>
+        <div class="cite">
+          <span class="avatar" aria-hidden="true">NA</span>
+          <div>
+            <div class="cite-name">Nico Ahlmann</div>
+            <div class="cite-role">Hof Ahlmann, Groß Tessin</div>
+          </div>
+        </div>
+      </div>
+      <div class="testi-card">
+        <div class="stars" aria-label="5 von 5 Sternen">★★★★★</div>
+        <blockquote>„Die direkte Schnittstelle zu meinem Steuerbüro spart mir jeden Woche Stunden. Ich buche alles bequem vom Schreibtisch zu Hause – total praktisch."</blockquote>
+        <div class="cite">
+          <span class="avatar" aria-hidden="true">TS</span>
+          <div>
+            <div class="cite-name">Thomas Schmidt</div>
+            <div class="cite-role">Landwirtschaftsbetrieb Schmidt, Niedersachsen</div>
+          </div>
+        </div>
+      </div>
+      <div class="testi-card">
+        <div class="stars" aria-label="5 von 5 Sternen">★★★★★</div>
+        <blockquote>„Endlich alle meine Belege, Fotos und Dokumente an einem Ort. Die Volltextsuche ist Gold wert, wenn man mal schnell einen Beleg für die KBL sucht."</blockquote>
+        <div class="cite">
+          <span class="avatar" aria-hidden="true">MK</span>
+          <div>
+            <div class="cite-name">Maria Kröger</div>
+            <div class="cite-role">Hof Kröger, Schleswig-Holstein</div>
+          </div>
+        </div>
+      </div>
+      <div class="testi-card">
+        <div class="stars" aria-label="5 von 5 Sternen">★★★★★</div>
+        <blockquote>„Der Support ist freundlich, die Einrichtung war unkompliziert und desk.box wächst mit mir mit. Ich fühle mich mit der Software gut aufgehoben."</blockquote>
+        <div class="cite">
+          <span class="avatar" aria-hidden="true">JB</span>
+          <div>
+            <div class="cite-name">Jens-Peter Bönisch</div>
+            <div class="cite-role">SB Agrardienst, Mecklenburg-Vorpommern</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== BLOG ===================== -->
+<section id="aktuelles">
+  <div class="container">
+    <div class="section-head">
+      <span class="kicker">Aktuelles &amp; Ratgeber</span>
+      <h2>Neues aus dem desk.box-Blog</h2>
+      <p>Tipps, News und Wissenswertes rund um die digitale Buchführung in der Landwirtschaft.</p>
+    </div>
+    <div class="blog-grid">
+      <article class="blog-card">
+        <div class="b-img">
+          <svg viewBox="0 0 24 24" width="46" height="46" fill="none" aria-hidden="true"><path d="M4 4h16v12H5.2L4 20z" stroke="#0f5229" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 9h8M8 12h5" stroke="#0f5229" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <span class="img-label">Bild: E-Rechnung</span>
+        </div>
+        <div class="b-body">
+          <span class="b-cat">News</span>
+          <h3>E-Rechnung ab 2025 – das musst du in der Landwirtschaft beachten</h3>
+          <p>Die digitale E-Rechnung kommt. Wir erklären, was das für landwirtschaftliche Betriebe bedeutet und wie desk.box dabei hilft.</p>
+          <a href="#" class="read">Weiterlesen <svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        </div>
+      </article>
+      <article class="blog-card">
+        <div class="b-img">
+          <svg viewBox="0 0 24 24" width="46" height="46" fill="none" aria-hidden="true"><path d="M4 6h16v12H4z" stroke="#0f5229" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 6v3M12 6v6M16 6v9" stroke="#0f5229" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <span class="img-label">Bild: Buchführung</span>
+        </div>
+        <div class="b-body">
+          <span class="b-cat">Ratgeber</span>
+          <h3>Belege digital – so gelingt die Umstellung auf desk.box</h3>
+          <p>Von Papierbergen zur digitalen Buchführung: Eine Schritt-für-Schritt-Anleitung für den entspannten Start.</p>
+          <a href="#" class="read">Weiterlesen <svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        </div>
+      </article>
+      <article class="blog-card">
+        <div class="b-img">
+          <svg viewBox="0 0 24 24" width="46" height="46" fill="none" aria-hidden="true"><path d="M12 2a7 7 0 00-7 7c0 5 7 11 7 11s7-6 7-11a7 7 0 00-7-7z" stroke="#0f5229" stroke-width="1.6"/><circle cx="12" cy="9" r="2.4" stroke="#0f5229" stroke-width="1.6"/></svg>
+          <span class="img-label">Bild: Server DE</span>
+        </div>
+        <div class="b-body">
+          <span class="b-cat">Datenschutz</span>
+          <h3>Warum deine Daten in Deutschland sicher sind</h3>
+          <p>GoBD-konforme Speicherung und deutsche Server: Warum desk.box deine Daten mit höchsten Standards schützt.</p>
+          <a href="#" class="read"> Weiterlesen <svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== CTA BAND ===================== -->
+<section class="cta-band">
+  <div class="container">
+    <h2>60 Tage kostenlos testen</h2>
+    <p>Überzeug dich selbst – ohne Verpflichtung und ohne Kreditkarte. Wir unterstützen dich bei der Einrichtung.</p>
+    <div class="cta-feats">
+      <span><svg viewBox="0 0 24 24" fill="none"><path d="M4 12l6 6L20 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Vollfunktioniert</span>
+      <span><svg viewBox="0 0 24 24" fill="none"><path d="M4 12l6 6L20 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Keine Kreditkarte</span>
+      <span><svg viewBox="0 0 24 24" fill="none"><path d="M4 12l6 6L20 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Profelle Einrichtung</span>
+    </div>
+    <a href="#" class="btn btn-white btn-lg">Jetzt registrieren</a>
+  </div>
+</section>
+
+<!-- ===================== FOOTER ===================== -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="#" class="logo">
+          <svg class="logo-mark" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+            <rect x="3" y="3" width="34" height="34" rx="9" fill="#7fd69a"/>
+            <rect x="10" y="11" width="9" height="18" rx="2" fill="#0d1f13"/>
+            <rect x="21" y="11" width="9" height="9" rx="2" fill="#eaf3ec"/>
+            <rect x="21" y="23" width="9" height="6" rx="2" fill="#eaf3ec"/>
+          </svg>
+          <span>desk<span style="color:#7fd69a">.box</span></span>
+        </a>
+        <p>Die smarte Bürosoftware für die Landwirtschaft. Digital, sicher und immer griffbereit.</p>
+        <div class="cert-badges">
+          <div class="cert-badge" title="GoBD zertifiziert">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.4 6.9L21 9l-5.6 4.3L17 20l-5-3.6L7 20l1.6-6.7L3 9l6.6-.1z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="cert-badge" title="Server in Deutschland">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 3c-4 0-8 3-8 8 0 6 8 10 8 10s8-4 8-10c0-5-4-8-8-8z" stroke="currentColor" stroke-width="1.6"/><path d="M4 11h16" stroke="currentColor" stroke-width="1.6"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-col">
+        <h4>Produkt</h4>
+        <a href="#">Funktionen</a>
+        <a href="#">Preise</a>
+        <a href="#">E-Rechnung</a>
+        <a href="#">Banking</a>
+        <a href="#">Jetzt testen</a>
+      </div>
+
+      <div class="footer-col">
+        <h4>Service</h4>
+        <a href="#">FAQ</a>
+        <a href="#">Kontakt</a>
+        <a href="#">Supportzeiten</a>
+        <a href="#">Ratgeber-Blog</a>
+        <a href="#">Datenschutz</a>
+      </div>
+
+      <div class="footer-col">
+        <h4>Kontakt</h4>
+        <div class="contact-item">
+          <svg class="c-ico" viewBox="0 0 24 24" fill="none"><path d="M4 5a2 2 0 012-2h2l2 5-2 1a14 14 0 006 6l1-2 5 2v2a2 2 0 01-2 2A17 17 0 014 5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+          <div><a href="tel:+4943153015418">+49(0)431 / 530 154 18</a></div>
+        </div>
+        <div class="contact-item">
+          <svg class="c-ico" viewBox="0 0 24 24" fill="none"><path d="M3 7l9 4 9-4M4 10v8h16V10" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+          <div><a href="mailto:support@deskbox-office.de">support(at)deskbox-office.de</a></div>
+        </div>
+        <div class="contact-item">
+          <svg class="c-ico" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <div>Supportzeiten:<br>Mo bis Fr: 08:00 - 16:00 Uhr</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <div class="socials">
+        <a href="#" title="LinkedIn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.94 5a2 2 0 10-.002 4.002A2 2 0 006.94 5zM7 8.5v9h4V8.5H7zM13.5 8.5c1.93 0 3.5.85 3.5 2.46v6.54h-4V12c0-1.6-1.27-2.26-2.5-2.26-1.26 0-2.08.85-2.43 1.67v-.02H7.5v5H9.07V12c0-1.1.72-1.82 1.72-1.82 1.06 0 1.7.72 1.7 1.83V17.5h3.98V10.96c0-3.1-2.12-4.46-4.6-4.46z"/></svg></a>
+        <a href="#" title="Instagram"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.7"/><circle cx="17.5" cy="6.5" r="1.1" fill="currentColor"/></svg></a>
+        <a href="#" title="YouTube"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M23 12s0-3.2-.4-4.7c-.2-.9-.9-1.5-1.7-1.7C19.2 5.2 12 5.2 12 5.2s-7.2 0-8.9.5c-.8.2-1.5.8-1.7 1.7C1 8.8 1 12 1 12s0 3.2.4 4.7c.2.9.9 1.5 1.7 1.7 1.7.5 8.9.5 8.9.5s7.2 0 8.9-.5c.8-.2 1.5-.8 1.7-1.7.4-1.5.4-4.7.4-4.7zM9.7 15.2V8.8l6 3.2-6 3.2z"/></svg></a>
+        <a href="#" title="Facebook"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 21v-8h3l.5-4h-3.5V7.5c0-1 .3-1.5 1.5-1.5H17V2.2C16.6 2.1 15.2 2 13.7 2 10.7 2 8.8 3.8 8.8 6.9V9H5.8v4h3v8h4.7z"/></svg></a>
+        <a href="#" title="WhatsApp"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 00-8.5 15.2L2 22l4.9-1.3A10 10 0 1012 2zm5.2 14c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.3-.7-2.5-1-4-3.6-4.1-3.7-.1-.2-1-1.3-1-2.5s.6-1.7.8-1.9c.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .5l-.4.5c-.2.2-.4.4-.2.7.2.4.9 1.4 1.9 2.2 1.3 1.1 2.3 1.4 2.6 1.6.3.2.5.2.7.1l.9-1c.2-.2.4-.2.6-.1l2 1c.2.1.4.2.5.3z"/></svg></a>
+      </div>
+      <div>© 2026 stadt.werk konzeption.text.gestaltung GmbH</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  var header = document.getElementById('siteHeader');
+  var navMenu = document.getElementById('navMenu');
+  var hamburger = document.getElementById('hamburger');
+  var dropdownItems = document.querySelectorAll('.nav-item.has-dropdown');
+  var desktop = window.matchMedia('(min-width: 720px)');
+
+  // scroll shadow on header
+  function onScroll(){
+    if(window.scrollY > 4){ header.classList.add('scrolled'); }
+    else { header.classList.remove('scrolled'); }
+  }
+  window.addEventListener('scroll', onScroll, {passive:true});
+  onScroll();
+
+  // hamburger toggle
+  function closeAllOpen(){
+    dropdownItems.forEach(function(el){ el.classList.remove('open'); el.querySelector('.nav-link').setAttribute('aria-expanded','false'); });
+  }
+
+  if(hamburger){
+    hamburger.addEventListener('click', function(){
+      var isOpen = navMenu.classList.toggle('open');
+      hamburger.classList.toggle('active', isOpen);
+      hamburger.setAttribute('aria-expanded', String(isOpen));
+      if(!isOpen){ closeAllOpen(); }
+    });
+  }
+
+  // dropdown behaviour: hover on desktop, click on touch/mobile
+  dropdownItems.forEach(function(item){
+    var link = item.querySelector('.nav-link');
+
+    function setOpen(open){
+      if(open){ item.classList.add('open'); link.setAttribute('aria-expanded','true'); }
+      else { item.classList.remove('open'); link.setAttribute('aria-expanded','false'); }
+    }
+
+    // desktop: hover
+    item.addEventListener('mouseenter', function(){
+      if(desktop.matches){ setOpen(true); }
+    });
+    item.addEventListener('mouseleave', function(){
+      if(desktop.matches){ setOpen(false); }
+    });
+
+    // click toggle (works on both, but only meaningful when not hovering on desktop)
+    link.addEventListener('click', function(e){
+      e.preventDefault();
+      if(desktop.matches){
+        // on desktop, only toggle via click if not using hover; keep simple toggle
+        setOpen(!item.classList.contains('open'));
+      } else {
+        // on mobile, toggle this one, close siblings
+        var willOpen = !item.classList.contains('open');
+        closeAllOpen();
+        setOpen(willOpen);
+      }
+    });
+  });
+
+  // close dropdowns when clicking outside
+  document.addEventListener('click', function(e){
+    if(!e.target.closest('.nav-item.has-dropdown')){
+      closeAllOpen();
+    }
+  });
+
+  // close mobile menu when a non-dropdown action link is clicked
+  navMenu.addEventListener('click', function(e){
+    if(e.target.closest('.nav-item.has-dropdown')){ return; }
+    if(navMenu.classList.contains('open') && desktop.matches === false){
+      navMenu.classList.remove('open');
+      hamburger.classList.remove('active');
+      hamburger.setAttribute('aria-expanded','false');
+    }
+  });
+
+  window.addEventListener('resize', function(){
+    if(desktop.matches){ closeAllOpen(); }
+  });
+})();
+</script>
+</body>
+</html>

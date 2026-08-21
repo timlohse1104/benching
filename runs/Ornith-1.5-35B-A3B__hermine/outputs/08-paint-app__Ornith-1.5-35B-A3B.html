@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paint Studio</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #eef1f5;
+    color: #2c3e50;
+    display: flex;
+    justify-content: center;
+  }
+  .app {
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.08);
+    padding: 20px;
+    max-width: 900px;
+  }
+  h1 {
+    font-size: 20px;
+    margin: 0 0 16px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: #f7f9fb;
+    border: 1px solid #e3e8ee;
+    border-radius: 10px;
+    margin-bottom: 16px;
+  }
+  .group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .divider {
+    width: 1px;
+    height: 32px;
+    background: #dde3ea;
+    margin: 0 4px;
+  }
+  button {
+    font: inherit;
+    font-size: 13px;
+    padding: 7px 12px;
+    border: 1px solid #d3dae3;
+    background: #ffffff;
+    color: #34495e;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+  }
+  button:hover { background: #f0f4f8; }
+  button:active { transform: translateY(1px); }
+  button.tool.active {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #ffffff;
+  }
+  button.icon-btn { font-size: 15px; padding: 7px 10px; }
+  .label {
+    font-size: 12px;
+    color: #6b7a8d;
+    font-weight: 500;
+  }
+  input[type="range"] { width: 130px; accent-color: #2563eb; }
+  .swatches {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+  }
+  .swatch {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid #ffffff;
+    box-shadow: 0 0 0 1px #c3ccd6;
+    cursor: pointer;
+    padding: 0;
+    transition: transform 0.1s;
+  }
+  .swatch:hover { transform: scale(1.12); }
+  .swatch.active { box-shadow: 0 0 0 2px #2563eb; }
+  input[type="color"] {
+    width: 34px;
+    height: 30px;
+    border: 1px solid #d3dae3;
+    border-radius: 7px;
+    background: #fff;
+    cursor: pointer;
+    padding: 2px;
+  }
+  .status {
+    font-size: 12px;
+    color: #6b7a8d;
+    font-variant-numeric: tabular-nums;
+    min-width: 130px;
+  }
+  .status b { color: #34495e; }
+  .stage {
+    border: 2px solid #d3dae3;
+    border-radius: 8px;
+    overflow: hidden;
+    line-height: 0;
+    background: #ffffff;
+    background-image:
+      linear-gradient(45deg, #f3f4f6 25%, transparent 25%),
+      linear-gradient(-45deg, #f3f4f6 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #f3f4f6 75%),
+      linear-gradient(-45deg, transparent 75%, #f3f4f6 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  }
+  canvas {
+    display: block;
+    cursor: crosshair;
+    touch-action: none;
+    background: #ffffff;
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <h1>🎨 Paint Studio</h1>
+
+    <div class="toolbar">
+      <div class="group">
+        <button id="tool-brush" class="tool active" data-tool="brush">Brush</button>
+        <button id="tool-eraser" class="tool" data-tool="eraser">Eraser</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="group">
+        <span class="label">Size</span>
+        <input type="range" id="size" min="1" max="80" value="8">
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="group">
+        <span class="label">Colors</span>
+        <div class="swatches" id="swatches"></div>
+        <input type="color" id="colorPicker" value="#2c3e50" title="Custom color">
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="group">
+        <button id="undo" class="icon-btn" title="Undo">↶</button>
+        <button id="redo" class="icon-btn" title="Redo">↷</button>
+        <button id="clear" class="icon-btn" title="Clear canvas">🗑</button>
+        <button id="save" class="icon-btn" title="Save as PNG">💾</button>
+      </div>
+
+      <div class="status" id="status"></div>
+    </div>
+
+    <div class="stage">
+      <canvas id="canvas" width="800" height="600"></canvas>
+    </div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  var canvas = document.getElementById("canvas");
+  var ctx = canvas.getContext("2d");
+
+  var BRUSH = "brush";
+  var ERASER = "eraser";
+
+  var presets = [
+    "#000000", "#ffffff", "#c0392b", "#e67e22", "#f1c40f",
+    "#27ae60", "#2980b9", "#8e44ad", "#8b5a2b", "#7f8c8d"
+  ];
+
+  var currentTool = BRUSH;
+  var currentColor = "#2c3e50";
+  var brushSize = 8;
+
+  var history = [];
+  var historyIndex = -1;
+
+  var drawing = false;
+  var lastX = 0;
+  var lastY = 0;
+
+  // --- Elements ---
+  var sizeInput = document.getElementById("size");
+  var colorPicker = document.getElementById("colorPicker");
+  var statusEl = document.getElementById("status");
+  var swatchesEl = document.getElementById("swatches");
+
+  // --- Init canvas background ---
+  function fillBackground() {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  fillBackground();
+
+  // --- Preset swatches ---
+  presets.forEach(function (color) {
+    var btn = document.createElement("button");
+    btn.className = "swatch";
+    btn.style.background = color;
+    btn.setAttribute("data-color", color);
+    btn.setAttribute("title", color);
+    btn.addEventListener("click", function () {
+      setColor(color);
+    });
+    swatchesEl.appendChild(btn);
+  });
+
+  function setColor(color) {
+    currentColor = color;
+    colorPicker.value = isPreset(color) ? color : color;
+    var swatches = swatchesEl.querySelectorAll(".swatch");
+    for (var i = 0; i < swatches.length; i++) {
+      swatches[i].classList.toggle("active", swatches[i].getAttribute("data-color") === color);
+    }
+    updateStatus();
+  }
+
+  function isPreset(color) {
+    return presets.some(function (p) {
+      return p.toLowerCase() === color.toLowerCase();
+    });
+  }
+
+  function updateStatus() {
+    var label = currentTool === ERASER ? "Eraser" : "Brush";
+    statusEl.innerHTML = "Tool: <b>" + label + "</b> &nbsp;•&nbsp; Size: <b>" + brushSize + "px</b> &nbsp;•&nbsp; Color: <b>" + currentColor.toUpperCase() + "</b>";
+  }
+
+  function setDrawingStyle() {
+    if (currentTool === ERASER) {
+      ctx.strokeStyle = "#ffffff";
+    } else {
+      ctx.strokeStyle = currentColor;
+    }
+    ctx.lineWidth = brushSize;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+  }
+
+  // --- Coordinate helper ---
+  function getPos(e) {
+    var rect = canvas.getBoundingClientRect();
+    var scaleX = canvas.width / rect.width;
+    var scaleY = canvas.height / rect.height;
+    var clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else if (e.changedTouches && e.changedTouches.length > 0) {
+      clientX = e.changedTouches[0].clientX;
+      clientY = e.changedTouches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
+    };
+  }
+
+  // --- Drawing ---
+  function startStroke(e) {
+    e.preventDefault();
+    drawing = true;
+    var pos = getPos(e);
+    lastX = pos.x;
+    lastY = pos.y;
+    setDrawingStyle();
+    // Draw a dot for single clicks / taps
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, brushSize / 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function moveStroke(e) {
+    if (!drawing) return;
+    e.preventDefault();
+    var pos = getPos(e);
+    var midX = (lastX + pos.x) / 2;
+    var midY = (lastY + pos.y) / 2;
+
+    setDrawingStyle();
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.quadraticCurveTo(lastX, lastY, midX, midY);
+    ctx.stroke();
+
+    lastX = pos.x;
+    lastY = pos.y;
+  }
+
+  function endStroke() {
+    if (!drawing) return;
+    drawing = false;
+    saveHistory();
+  }
+
+  // --- History ---
+  function saveHistory() {
+    if (historyIndex < history.length - 1) {
+      history = history.slice(0, historyIndex + 1);
+    }
+    history.push(canvas.toDataURL("image/png"));
+    historyIndex = history.length - 1;
+    updateButtons();
+  }
+
+  function loadSnapshot(dataUrl) {
+    var img = new Image();
+    img.onload = function () {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+      updateButtons();
+    };
+    img.src = dataUrl;
+  }
+
+  function undo() {
+    if (historyIndex > 0) {
+      historyIndex--;
+      loadSnapshot(history[historyIndex]);
+    }
+  }
+
+  function redo() {
+    if (historyIndex < history.length - 1) {
+      historyIndex++;
+      loadSnapshot(history[historyIndex]);
+    }
+  }
+
+  function clearCanvas() {
+    fillBackground();
+    saveHistory();
+  }
+
+  function updateButtons() {
+    document.getElementById("undo").disabled = historyIndex <= 0;
+    document.getElementById("redo").disabled = historyIndex >= history.length - 1;
+  }
+
+  // --- Save PNG ---
+  function savePNG() {
+    var link = document.createElement("a");
+    link.download = "painting.png";
+    link.href = canvas.toDataURL("image/png");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // --- Events ---
+  sizeInput.addEventListener("input", function () {
+    brushSize = parseInt(sizeInput.value, 10);
+    updateStatus();
+  });
+
+  colorPicker.addEventListener("input", function () {
+    setColor(colorPicker.value);
+  });
+
+  var toolButtons = document.querySelectorAll(".tool");
+  for (var i = 0; i < toolButtons.length; i++) {
+    toolButtons[i].addEventListener("click", function () {
+      currentTool = this.getAttribute("data-tool");
+      for (var j = 0; j < toolButtons.length; j++) {
+        toolButtons[j].classList.remove("active");
+      }
+      this.classList.add("active");
+      updateStatus();
+    });
+  }
+
+  document.getElementById("undo").addEventListener("click", undo);
+  document.getElementById("redo").addEventListener("click", redo);
+  document.getElementById("clear").addEventListener("click", clearCanvas);
+  document.getElementById("save").addEventListener("click", savePNG);
+
+  // Mouse
+  canvas.addEventListener("mousedown", startStroke);
+  canvas.addEventListener("mousemove", moveStroke);
+  window.addEventListener("mouseup", endStroke);
+
+  // Touch
+  canvas.addEventListener("touchstart", startStroke, { passive: false });
+  canvas.addEventListener("touchmove", moveStroke, { passive: false });
+  window.addEventListener("touchend", endStroke);
+
+  // Keyboard shortcuts
+  window.addEventListener("keydown", function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+      e.preventDefault();
+      undo();
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+      e.preventDefault();
+      redo();
+    }
+  });
+
+  // --- Boot ---
+  saveHistory();
+  updateButtons();
+  updateStatus();
+})();
+</script>
+</body>
+</html>

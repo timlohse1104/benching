@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Markdown Editor — Live Preview</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #f4f6f9;
+    color: #1f2933;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: #1f2933;
+    color: #f9fafb;
+    flex-wrap: wrap;
+    gap: 10px;
+    flex: 0 0 auto;
+  }
+  header .title { display: flex; align-items: baseline; gap: 10px; }
+  header h1 { font-size: 16px; font-weight: 600; margin: 0; }
+  header .subtitle { font-size: 12px; opacity: 0.7; }
+  .toolbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .counts { font-size: 12px; opacity: 0.85; font-variant-numeric: tabular-nums; }
+  .counts span { margin-left: 10px; }
+  button {
+    font-family: inherit;
+    background: #3b82f6;
+    color: #fff;
+    border: none;
+    padding: 7px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.15s ease;
+  }
+  button:hover { background: #2563eb; }
+  button:active { background: #1d4ed8; }
+  .main {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    padding: 12px;
+    gap: 12px;
+  }
+  .pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    overflow: hidden;
+  }
+  .pane-label {
+    padding: 8px 14px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #6b7280;
+    background: #f0f2f5;
+    border-bottom: 1px solid #e5e7eb;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  textarea {
+    flex: 1;
+    width: 100%;
+    border: none;
+    outline: none;
+    resize: none;
+    padding: 16px;
+    font-family: "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 14px;
+    line-height: 1.65;
+    color: #1f2933;
+    background: #fff;
+    tab-size: 2;
+  }
+  #preview {
+    flex: 1;
+    overflow: auto;
+    padding: 18px 26px;
+    line-height: 1.65;
+    font-size: 15px;
+    background: #fff;
+  }
+  #preview h1 { font-size: 27px; margin: 0 0 16px; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.3em; }
+  #preview h2 { font-size: 22px; margin: 24px 0 14px; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.25em; }
+  #preview h3 { font-size: 19px; margin: 22px 0 12px; }
+  #preview h4 { font-size: 16px; margin: 20px 0 10px; }
+  #preview h5 { font-size: 14px; margin: 18px 0 8px; }
+  #preview h6 { font-size: 13px; margin: 16px 0 8px; color: #6b7280; }
+  #preview p { margin: 0 0 14px; }
+  #preview ul, #preview ol { margin: 0 0 14px; padding-left: 1.7em; }
+  #preview li { margin: 4px 0; }
+  #preview li > ul, #preview li > ol { margin: 2px 0; }
+  #preview code {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    background: #f0f1f3;
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+    font-size: 88%;
+    color: #c0392b;
+  }
+  #preview pre {
+    background: #1f2933;
+    color: #e6edf3;
+    padding: 16px 18px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 0 0 16px;
+  }
+  #preview pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+    font-size: 13px;
+  }
+  #preview blockquote {
+    margin: 0 0 16px;
+    padding: 4px 16px;
+    color: #57606a;
+    border-left: 4px solid #d0d7de;
+    background: #f8f9fb;
+  }
+  #preview blockquote p { margin: 6px 0; }
+  #preview hr { border: none; border-top: 2px solid #e5e7eb; margin: 26px 0; }
+  #preview a { color: #2563eb; text-decoration: none; }
+  #preview a:hover { text-decoration: underline; }
+  #preview img { max-width: 100%; height: auto; border-radius: 6px; margin: 6px 0; }
+  #preview table { border-collapse: collapse; margin: 0 0 16px; display: block; overflow-x: auto; }
+  #preview th, #preview td { border: 1px solid #d0d7de; padding: 6px 12px; text-align: left; }
+  #preview th { background: #f0f2f5; }
+
+  @media (max-width: 768px) {
+    .main { flex-direction: column; overflow: auto; }
+    .pane { min-height: 42vh; }
+    textarea { min-height: 300px; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="title">
+      <h1>Markdown Editor</h1>
+      <span class="subtitle">Live preview &middot; client-side &middot; no external deps</span>
+    </div>
+    <div class="toolbar">
+      <div class="counts">
+        Words:<span id="word-count">0</span>
+        Characters:<span id="char-count">0</span>
+      </div>
+      <button id="copy-btn" type="button">Copy HTML</button>
+    </div>
+  </header>
+  <div class="main">
+    <div class="pane">
+      <div class="pane-label"><span>Markdown</span></div>
+      <textarea id="editor" spellcheck="false" placeholder="Type Markdown here..."></textarea>
+    </div>
+    <div class="pane">
+      <div class="pane-label"><span>Preview</span></div>
+      <div id="preview"></div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  var editor = document.getElementById("editor");
+  var preview = document.getElementById("preview");
+  var wordCountEl = document.getElementById("word-count");
+  var charCountEl = document.getElementById("char-count");
+  var copyBtn = document.getElementById("copy-btn");
+
+  // Escape characters that are dangerous in HTML text content.
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  // Escape characters that are dangerous inside a double-quoted attribute.
+  function escapeAttr(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  // Inline-level parsing: bold, italic, inline code, links, images.
+  function inline(text) {
+    text = escapeHtml(text);
+
+    var stash = [];
+    function stashCode(v) {
+      stash.push(v);
+      return "\u0000" + (stash.length - 1) + "\u0000";
+    }
+
+    // Inline code (protect from further formatting; backticks escaped for display)
+    text = text.replace(/(`+)([\s\S]+?)\1/g, function (m, ticks, code) {
+      return stashCode(escapeHtml(code.replace(/`/g, "&#96;")));
+    });
+
+    // Images: ![alt](src "title")
+    text = text.replace(/!\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+"([^"]*)")?\s*\)/g,
+      function (m, alt, src, title) {
+        if (/^javascript:/i.test(src.replace(/\s+/g, ""))) { src = "#"; }
+        var titleAttr = (title != null && title !== "") ? ' title="' + escapeAttr(title) + '"' : "";
+        return '<img src="' + escapeAttr(src) + '" alt="' + escapeAttr(alt) + '"' + titleAttr + '>';
+      });
+
+    // Links: [text](href "title")
+    text = text.replace(/\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+"([^"]*)")?\s*\)/g,
+      function (m, label, href, title) {
+        if (/^javascript:/i.test(href.replace(/\s+/g, ""))) { href = "#"; }
+        var titleAttr = (title != null && title !== "") ? ' title="' + escapeAttr(title) + '"' : "";
+        return '<a href="' + escapeAttr(href) + '"' + titleAttr + ">" + label + "</a>";
+      });
+
+    // Bold
+    text = text.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    text = text.replace(/__([^_]+)__/g, "<strong>$1</strong>");
+
+    // Italic
+    text = text.replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>");
+    text = text.replace(/(^|[^_\w])_([^_]+)_(?![^\s])/g, "$1<em>$2</em>");
+
+    // Restore stashed inline code
+    text = text.replace(/\u0000(\d+)\u0000/g, function (m, idx) {
+      return stash[parseInt(idx, 10)];
+    });
+
+    return text;
+  }
+
+  // Block-level parsing.
+  function parseMarkdown(src) {
+    var lines = String(src).replace(/\r\n/g, "\n").split("\n");
+    var blocks = [];
+    var i = 0;
+
+    while (i < lines.length) {
+      var line = lines[i];
+
+      // Fenced code block
+      var fence = line.match(/^(`{3,}|~{3,})\s*([^\s`]*)\s*$/);
+      if (fence) {
+        var marker = fence[1][0];
+        var lang = fence[2];
+        var codeLines = [];
+        i++;
+        while (i < lines.length && !lines[i].startsWith(marker)) {
+          codeLines.push(lines[i]);
+          i++;
+        }
+        i++; // consume closing fence if present
+        var cls = lang ? ' class="language-' + escapeAttr(lang) + '"' : "";
+        blocks.push("<pre><code" + cls + ">" + escapeHtml(codeLines.join("\n")) + "</code></pre>");
+        continue;
+      }
+
+      // Horizontal rule
+      if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
+        blocks.push("<hr>");
+        i++;
+        continue;
+      }
+
+      // Heading
+      var heading = line.match(/^(#{1,6})\s+(.*\S)\s*$/);
+      if (heading) {
+        var level = heading[1].length;
+        blocks.push("<h" + level + ">" + inline(heading[2]) + "</h" + level + ">");
+        i++;
+        continue;
+      }
+
+      // Blockquote
+      if (/^\s*>\s?/.test(line)) {
+        var quoted = [];
+        while (i < lines.length && /^\s*>\s?/.test(lines[i])) {
+          quoted.push(lines[i].replace(/^\s*>\s?/, ""));
+          i++;
+        }
+        blocks.push("<blockquote>" + parseMarkdown(quoted.join("\n")) + "</blockquote>");
+        continue;
+      }
+
+      // Unordered list
+      if (/^\s*[-*+]\s+/.test(line)) {
+        var items = [];
+        while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) {
+          items.push(inline(lines[i].replace(/^\s*[-*+]\s+/, "")));
+          i++;
+        }
+        blocks.push("<ul>" + items.map(function (it) { return "<li>" + it + "</li>"; }).join("") + "</ul>");
+        continue;
+      }
+
+      // Ordered list
+      if (/^\s*(\d+)\.\s+/.test(line)) {
+        var oitems = [];
+        while (i < lines.length && /^\s*(\d+)\.\s+/.test(lines[i])) {
+          var m = lines[i].match(/^\s*(\d+)\.\s+(.*\S)\s*$/);
+          oitems.push(inline(m ? m[2] : ""));
+          i++;
+        }
+        blocks.push("<ol>" + oitems.map(function (it) { return "<li>" + it + "</li>"; }).join("") + "</ol>");
+        continue;
+      }
+
+      // Blank line
+      if (/^\s*$/.test(line)) {
+        i++;
+        continue;
+      }
+
+      // Paragraph: gather consecutive non-special lines
+      var para = [];
+      while (i < lines.length &&
+        !/^\s*$/.test(lines[i]) &&
+        !/^(`{3,}|~{3,})\s/.test(lines[i]) &&
+        !/^(`{3,}|~{3,})$/.test(lines[i]) &&
+        !/^\s*([-*_])(\s*\1){2,}\s*$/.test(lines[i]) &&
+        !/^(#{1,6})\s+/.test(lines[i]) &&
+        !/^\s*>\s?/.test(lines[i]) &&
+        !/^\s*[-*+]\s+/.test(lines[i]) &&
+        !/^\s*(\d+)\.\s+/.test(lines[i])) {
+        para.push(lines[i]);
+        i++;
+      }
+      blocks.push("<p>" + inline(para.join("\n")) + "</p>");
+    }
+
+    return blocks.join("\n");
+  }
+
+  function render() {
+    var md = editor.value;
+    preview.innerHTML = parseMarkdown(md);
+
+    charCountEl.textContent = md.length;
+    var words = md.trim() === "" ? [] : md.trim().split(/\s+/);
+    wordCountEl.textContent = words.length;
+  }
+
+  editor.addEventListener("input", render);
+
+  copyBtn.addEventListener("click", function () {
+    var html = preview.innerHTML;
+    var done = false;
+    function finish() {
+      if (done) { return; }
+      done = true;
+      copyBtn.textContent = "Copied!";
+      setTimeout(function () { copyBtn.textContent = "Copy HTML"; }, 1400);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(html).then(finish).catch(function () {
+        fallback(html, finish);
+      });
+    } else {
+      fallback(html, finish);
+    }
+  });
+
+  function fallback(html, finish) {
+    try {
+      var ta = document.createElement("textarea");
+      ta.value = html;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "absolute";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, ta.value.length);
+      var ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      if (ok) { finish(); } else { finish(); }
+    } catch (e) {
+      finish();
+    }
+  }
+
+  var SAMPLE = [
+    "# Markdown Editor Demo",
+    "",
+    "This is a **live preview** editor. Type on the left and watch the preview update *instantly* on the right.",
+    "",
+    "## Formatting",
+    "",
+    "You can write **bold text**, *italic text*, and ***text that is both*** at once.",
+    "",
+    "Inline code looks like `const x = 42;` and is escaped for safety.",
+    "",
+    "## Code Block",
+    "",
+    "```javascript",
+    "function greet(name) {",
+    "  console.log(`Hello, ${name}!`);",
+    "}",
+    "greet('world');",
+    "```",
+    "",
+    "## Lists",
+    "",
+    "Unordered:",
+    "- Apples",
+    "- Bananas",
+    "- Cherries",
+    "",
+    "Ordered:",
+    "1. Wake up",
+    "2. Write code",
+    "3. Ship it",
+    "",
+    "## Blockquote",
+    "",
+    "> \"The best way to predict the future is to invent it.\"",
+    "> — Alan Kay",
+    "",
+    "## Links & Images",
+    "",
+    "Check out [MDN Web Docs](https://developer.mozilla.org \"The web's knowledge base\").",
+    "",
+    "![A scenic placeholder image](https://picsum.photos/640/180 \"Random photo\")",
+    "",
+    "## Horizontal Rule",
+    "",
+    "Anything before the rule...",
+    "",
+    "---",
+    "",
+    "...and anything after it.",
+    "",
+    "> ✅ Every feature above is supported, and raw HTML is escaped so injected scripts never run."
+  ].join("\n");
+
+  editor.value = SAMPLE;
+  render();
+})();
+</script>
+</body>
+</html>
