@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2D Physics Sandbox</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #1a1a2e;
+  overflow: hidden;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  color: #e0e0e0;
+}
+canvas { display: block; cursor: crosshair; }
+#panel {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  background: rgba(26, 26, 46, 0.92);
+  border: 1px solid #333;
+  border-radius: 10px;
+  padding: 16px 18px;
+  width: 220px;
+  backdrop-filter: blur(8px);
+  z-index: 10;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+#panel h2 {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #7c8c9d;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+.label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.label-row label {
+  font-size: 12px;
+  min-width: 70px;
+  color: #aaa;
+  text-align: right;
+}
+.label-row input[type="range"] {
+  flex: 1;
+  accent-color: #4a90d9;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 2px;
+  background: #333;
+  outline: none;
+}
+.label-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #4a90d9;
+  cursor: pointer;
+  border: 2px solid #fff;
+}
+.value {
+  font-size: 12px;
+  color: #4a90d9;
+  min-width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+#count {
+  font-size: 13px;
+  color: #8899aa;
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+.btn-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.btn {
+  flex: 1;
+  padding: 7px 0;
+  border: 1px solid #444;
+  border-radius: 6px;
+  background: #25253a;
+  color: #ccc;
+  font-size: 11px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  transition: all 0.15s;
+}
+.btn:hover { background: #333; color: #fff; }
+.btn.active { background: #4a90d9; color: #fff; border-color: #4a90d9; }
+.info {
+  font-size: 10px;
+  color: #556;
+  margin-top: 8px;
+  line-height: 1.5;
+}
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="panel">
+  <h2>Physics Controls</h2>
+  <div id="count">Balls: 0</div>
+  <div class="label-row">
+    <label>Gravity</label>
+    <input type="range" id="grav" min="0" max="20" step="0.1" value="9.8">
+    <span class="value" id="gravVal">9.8</span>
+  </div>
+  <div class="label-row">
+    <label>Restitution</label>
+    <input type="range" id="rest" min="0" max="1" step="0.01" value="0.7">
+    <span class="value" id="restVal">0.70</span>
+  </div>
+  <div class="label-row">
+    <label>Friction</label>
+    <input type="range" id="fric" min="0" max="1" step="0.01" value="0.02">
+    <span class="value" id="fricVal">0.02</span>
+  </div>
+  <div class="btn-row">
+    <button class="btn" id="btnReset">Reset</button>
+    <button class="btn" id="btnCollide">Collide: ON</button>
+  </div>
+  <div class="info">Click to spawn &amp; drag to fling balls</div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const balls = [];
+let collisionsOn = true;
+
+// Colors
+const COLORS = [
+  '#ff4d6a','#ff7b4a','#ffcc33','#66ff6a','#33ccff','#66aaff','#c066ff',
+  '#ff66a0','#ff9944','#33ff99','#44aaff','#a066ff','#ff3366',
+  '#cc33aa','#66ffcc','#33ffcc','#ffccaa','#ff66cc','#9966ff',
+  '#ffaa00','#33ff88','#ff55cc','#aa44ff','#ff88cc'
+];
+
+function randomColor() {
+  return COLORS[Math.floor(Math.random() * COLORS.length)];
+}
+
+function randomRadius() {
+  return 8 + Math.random() * 24;
+}
+
+function spawnBall(x, y, vx, vy) {
+  const r = randomRadius();
+  balls.push({
+    x: x !== undefined ? x : Math.random() * (W - 2 * r),
+    y: y !== undefined ? y : r,
+    vx: vx !== undefined ? vx : (Math.random() - 0.5) * 100,
+    vy: vy !== undefined ? vy : (Math.random() - 0.5) * 50,
+    r: r,
+    color: randomColor(),
+    mass: r * r
+  });
+}
+
+// Drag state
+let dragging = false;
+let dragStartX, dragStartY, dragStartTime;
+let dragBalls = [];
+
+canvas.addEventListener('mousedown', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  dragging = true;
+  dragStartX = mx;
+  dragStartY = my;
+  dragStartTime = performance.now();
+  dragBalls = [];
+
+  // Try to click on an existing ball to start dragging it
+  for (let i = balls.length - 1; i >= 0; i--) {
+    const b = balls[i];
+    const dx = mx - b.x;
+    const dy = my - b.y;
+    if (dx * dx + dy * dy <= b.r * b.r) {
+      dragBalls.push(i);
+      break;
+    }
+  }
+  // If no ball clicked, spawn a new one
+  if (dragBalls.length === 0) {
+    const b = spawnBall(mx, my);
+    dragBalls.push(balls.length - 1);
+  }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (!dragging) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const elapsed = (performance.now() - dragStartTime) / 1000;
+
+  for (const idx of dragBalls) {
+    const b = balls[idx];
+    const dx = mx - dragStartX;
+    const dy = my - dragStartY;
+    const speed = Math.sqrt(dx * dx + dy * dy) / Math.max(elapsed, 0.01);
+    const angle = Math.atan2(dy, dx);
+    b.vx = Math.cos(angle) * speed * 1.5;
+    b.vy = Math.sin(angle) * speed * 1.5;
+    b.x = mx;
+    b.y = my;
+  }
+});
+
+canvas.addEventListener('mouseup', () => {
+  dragging = false;
+  dragBalls = [];
+});
+
+canvas.addEventListener('mouseleave', () => {
+  dragging = false;
+  dragBalls = [];
+});
+
+// Touch support
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const t = e.touches[0];
+  const mx = t.clientX - rect.left;
+  const my = t.clientY - rect.top;
+
+  dragging = true;
+  dragStartX = mx;
+  dragStartY = my;
+  dragStartTime = performance.now();
+  dragBalls = [];
+
+  for (let i = balls.length - 1; i >= 0; i--) {
+    const b = balls[i];
+    const dx = mx - b.x;
+    const dy = my - b.y;
+    if (dx * dx + dy * dy <= b.r * b.r) {
+      dragBalls.push(i);
+      break;
+    }
+  }
+  if (dragBalls.length === 0) {
+    const b = spawnBall(mx, my);
+    dragBalls.push(balls.length - 1);
+  }
+});
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  if (!dragging) return;
+  const rect = canvas.getBoundingClientRect();
+  const t = e.touches[0];
+  const mx = t.clientX - rect.left;
+  const my = t.clientY - rect.top;
+  const elapsed = (performance.now() - dragStartTime) / 1000;
+
+  for (const idx of dragBalls) {
+    const b = balls[idx];
+    const dx = mx - dragStartX;
+    const dy = my - dragStartY;
+    const speed = Math.sqrt(dx * dx + dy * dy) / Math.max(elapsed, 0.01);
+    const angle = Math.atan2(dy, dx);
+    b.vx = Math.cos(angle) * speed * 1.5;
+    b.vy = Math.sin(angle) * speed * 1.5;
+    b.x = mx;
+    b.y = my;
+  }
+});
+
+canvas.addEventListener('touchend', () => {
+  dragging = false;
+  dragBalls = [];
+});
+
+// Physics parameters
+let gravity = 9.8;
+let restitution = 0.7;
+let friction = 0.02;
+
+function update(dt) {
+  // Clamp dt to prevent huge jumps
+  dt = Math.min(dt, 0.05);
+
+  for (const b of balls) {
+    // Gravity
+    b.vy += gravity * dt;
+
+    // Friction (horizontal damping)
+    b.vx *= (1 - friction * dt * 60);
+
+    // Floor collision
+    if (b.y + b.r > H) {
+      b.y = H - b.r;
+      b.vy *= -restitution;
+      if (Math.abs(b.vy) < 0.5) b.vy = 0;
+    }
+
+    // Ceiling collision
+    if (b.y - b.r < 0) {
+      b.y = b.r;
+      b.vy *= -restitution;
+      if (Math.abs(b.vy) < 0.5) b.vy = 0;
+    }
+
+    // Wall collisions
+    if (b.x - b.r < 0) {
+      b.x = b.r;
+      b.vx *= -restitution;
+      if (Math.abs(b.vx) < 0.5) b.vx = 0;
+    }
+    if (b.x + b.r > W) {
+      b.x = W - b.r;
+      b.vx *= -restitution;
+      if (Math.abs(b.vx) < 0.5) b.vx = 0;
+    }
+
+    // Drag override
+    if (dragging && dragBalls.includes(balls.indexOf(b))) {
+      // Let drag handle position
+    }
+  }
+
+  // Circle-circle collisions
+  if (collisionsOn) {
+    for (let i = 0; i < balls.length; i++) {
+      for (let j = i + 1; j < balls.length; j++) {
+        const a = balls[i];
+        const b = balls[j];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const distSq = dx * dx + dy * dy;
+        const minDist = a.r + b.r;
+
+        if (distSq < minDist * minDist && distSq > 0) {
+          const dist = Math.sqrt(distSq);
+          const overlap = minDist - dist;
+          const nx = dx / dist;
+          const ny = dy / dist;
+
+          // Separate balls
+          const totalMass = a.mass + b.mass;
+          const sepA = overlap * (b.mass / totalMass);
+          const sepB = overlap * (a.mass / totalMass);
+
+          a.x -= nx * sepA;
+          a.y -= ny * sepA;
+          b.x += nx * sepB;
+          b.y += ny * sepB;
+
+          // Relative velocity along normal
+          const dvx = a.vx - b.vx;
+          const dvy = a.vy - b.vy;
+          const dvn = dvx * nx + dvy * ny;
+
+          if (dvn > 0) continue; // Moving apart
+
+          // Impulse
+          const impulse = -(1 + restitution) * dvn / totalMass;
+          a.vx += impulse * b.mass * nx;
+          a.vy += impulse * b.mass * ny;
+          b.vx -= impulse * a.mass * nx;
+          b.vy -= impulse * a.mass * ny;
+        }
+      }
+    }
+  }
+}
+
+function draw() {
+  // Clear with dark theme
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle grid
+  ctx.strokeStyle = 'rgba(50, 50, 70, 0.3)';
+  ctx.lineWidth = 1;
+  const gridSize = 50;
+  for (let x = gridSize; x < W; x += gridSize) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, H);
+    ctx.stroke();
+  }
+  for (let y = gridSize; y < H; y += gridSize) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+  }
+
+  // Draw balls
+  for (const b of balls) {
+    // Shadow
+    ctx.beginPath();
+    ctx.arc(b.x + 2, b.y + 2, b.r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fill();
+
+    // Main ball
+    const grad = ctx.createRadialGradient(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.1, b.x, b.y, b.r);
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(0.3, b.color);
+    grad.addColorStop(1, shadeColor(b.color, -40));
+
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Highlight
+    ctx.beginPath();
+    ctx.arc(b.x - b.r * 0.25, b.y - b.r * 0.25, b.r * 0.3, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fill();
+
+    // Outline
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // Drag indicator
+  if (dragging && dragBalls.length > 0) {
+    const idx = dragBalls[0];
+    const b = balls[idx];
+    const rect = canvas.getBoundingClientRect();
+    const mx = (dragStartX === undefined ? 0 : dragStartX);
+    const my = (dragStartY === undefined ? 0 : dragStartY);
+
+    // Draw trail line
+    ctx.beginPath();
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = 'rgba(74, 144, 217, 0.5)';
+    ctx.lineWidth = 2;
+    ctx.moveTo(b.x, b.y);
+    ctx.lineTo(mx, my);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+function shadeColor(color, percent) {
+  let R = parseInt(color.substring(1, 3), 16);
+  let G = parseInt(color.substring(3, 5), 16);
+  let B = parseInt(color.substring(5, 7), 16);
+  R = Math.min(255, Math.max(0, R + Math.round(R * percent / 100)));
+  G = Math.min(255, Math.max(0, G + Math.round(G * percent / 100)));
+  B = Math.min(255, Math.max(0, B + Math.round(B * percent / 100)));
+  return '#'+[R,G,B].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+
+// UI controls
+const gravSlider = document.getElementById('grav');
+const restSlider = document.getElementById('rest');
+const fricSlider = document.getElementById('fric');
+const gravVal = document.getElementById('gravVal');
+const restVal = document.getElementById('restVal');
+const fricVal = document.getElementById('fricVal');
+const countDisplay = document.getElementById('count');
+const btnReset = document.getElementById('btnReset');
+const btnCollide = document.getElementById('btnCollide');
+
+gravSlider.addEventListener('input', () => {
+  gravity = parseFloat(gravSlider.value);
+  gravVal.textContent = gravity.toFixed(1);
+});
+restSlider.addEventListener('input', () => {
+  restitution = parseFloat(restSlider.value);
+  restVal.textContent = restitution.toFixed(2);
+});
+fricSlider.addEventListener('input', () => {
+  friction = parseFloat(fricSlider.value);
+  fricVal.textContent = friction.toFixed(2);
+});
+
+btnReset.addEventListener('click', () => {
+  balls.length = 0;
+  countDisplay.textContent = 'Balls: 0';
+});
+
+btnCollide.addEventListener('click', () => {
+  collisionsOn = !collisionsOn;
+  btnCollide.textContent = 'Collide: ' + (collisionsOn ? 'ON' : 'OFF');
+  btnCollide.classList.toggle('active', collisionsOn);
+});
+
+// Update count
+function updateCount() {
+  countDisplay.textContent = 'Balls: ' + balls.length;
+}
+
+// Initial spawn of a few balls
+for (let i = 0; i < 10; i++) {
+  spawnBall();
+}
+
+let lastTime = 0;
+function loop(timestamp) {
+  const dt = (timestamp - lastTime) / 1000;
+  lastTime = timestamp;
+
+  update(dt);
+  draw();
+  updateCount();
+
+  requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

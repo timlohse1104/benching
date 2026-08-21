@@ -1,0 +1,849 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Violin</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a0a1a;font-family:'Segoe UI',system-ui,sans-serif}
+canvas{display:block;cursor:crosshair}
+#hint{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(10,10,30,0.85);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:14px 24px;color:#ccc;font-size:13px;max-width:420px;text-align:center;line-height:1.6;pointer-events:none;z-index:10}
+#hint b{color:#ffd700}
+#keys{position:fixed;top:18px;left:50%;transform:translateX(-50%);display:flex;gap:8px;pointer-events:none;z-index:10}
+#keys span{background:rgba(10,10,30,0.85);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:6px 12px;color:#ccc;font-size:12px}
+#keys span kbd{background:rgba(255,255,255,0.15);padding:2px 7px;border-radius:3px;border:1px solid rgba(255,255,255,0.2);font-family:monospace}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="keys"><span><kbd>G</kbd> G3</span><span><kbd>D</kbd> D4</span><span><kbd>A</kbd> A4</span><span><kbd>E</kbd> E5</span></div>
+<div id="hint">
+<b>🎻 3D Violin</b><br>
+Drag to orbit · Scroll to zoom · Click strings to play<br>
+Keys: G / D / A / E to strike individual strings
+</div>
+<script>
+const canvas = document.getElementById('c');
+const gl = canvas.getContext('webgl');
+if(!gl) throw new Error('WebGL not supported');
+
+const W = canvas.width = window.innerWidth;
+const H = canvas.height = window.innerHeight;
+canvas.width = W; canvas.height = H;
+
+// ── Uniforms & Buffers ──
+const locPos = gl.getUniformLocation(null,0);
+const locTex = gl.getUniformLocation(null,1);
+const uMVP = gl.getUniformLocation(null,2);
+const uColor = gl.getUniformLocation(null,3);
+
+const vao = gl.createVertexArrays();
+gl.bindVertexArrays(vao);
+
+function makeBuffer(data, type) {
+  const b = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, b);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+  return b;
+}
+
+function makeVAO(vs, indices, color) {
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  const v = makeBuffer(vs);
+  gl.bindBuffer(gl.ARRAY_BUFFER, v);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+  gl.enableVertexArrayState();
+  gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+  if(color) {
+    const cb = makeBuffer(color);
+    gl.bindBuffer(gl.ARRAY_BUFFER, cb);
+    const a1 = gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 1, gl.FLOAT, false, 0, 0);
+    if(!a1) gl.disableVertexAttribArray(1);
+    gl.disableVertexArrayState();
+  }
+  const ib = makeBuffer(indices);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
+  gl.bindVertexArray(vao);
+  return vao;
+}
+
+// ── Geometry helpers ──
+function quad(a,b,c,d,r,g,b) {
+  return {
+    v: [a[0],a[1],a[2], b[0],b[1],b[2], c[0],c[1],c[2], d[0],d[1],d[2]],
+    i: [0,1,2, 0,2,3],
+    c: [r,g,b,r,g,b,r,g,b,r,g,b]
+  };
+}
+
+function prism(pts, h, topColor, botColor, sideColor) {
+  const v = []; let ci = [], ci2 = [];
+  for(let i=0;i<pts.length;i++){
+    v.push(pts[i][0], pts[i][1], pts[i][2]);
+    v.push(pts[i][0], pts[i][1], pts[i][2]+h);
+  }
+  ci.push(0,1,2, 0,2,3);
+  ci2.push(4,5,6, 4,6,7);
+  for(let i=0;i<pts.length;i++){
+    ci.push(i*2, i*2+1, (i+1)%pts.length*2+1, i*2, (i+1)%pts.length*2+1, (i+1)%pts.length*2);
+    ci2.push(i*2+2, (i+1)%pts.length*2+2, i*2+1, i*2+2, (i+1)%pts.length*2, i*2+1);
+  }
+  return {
+    v: v,
+    i: ci.concat(ci2),
+    c: sideColor.repeat(pts.length*2).split(' ').map(Number).concat(topColor.map(c).flat()).concat(botColor.map(c).flat())
+  };
+}
+
+// ── Violin Geometry ──
+const parts = [];
+
+// Body outline points (side profile)
+const bodyOutline = [
+  [0, -8, 0], [2, -8.5, 0], [4, -8, 0], [6, -6, 0], [8, -2, 0], [9, 2, 0],
+  [8.5, 6, 0], [7, 10, 0], [5, 13, 0], [3, 14, 0], [0, 14, 0],
+  [-3, 14, 0], [-5, 13, 0], [-7, 10, 0], [-8.5, 6, 0], [-9, 2, 0],
+  [-8, -2, 0], [-6, -6, 0], [-4, -8, 0], [-2, -8.5, 0]
+];
+
+// Build body surface using radial segments
+function buildBody(outer, innerR, segments) {
+  const v = []; let ci = [];
+  for(let s=0;s<segments;s++){
+    const a = (s/segments)*Math.PI*2;
+    const na = ((s+1)/segments)*Math.PI*2;
+    const r = outer.length;
+    for(let i=0;i<r;i++){
+      const t = i/r;
+      const ox = outer[i][0], oy = outer[i][1];
+      v.push(ox*t, oy*t, 0.15);
+      v.push(ox*(1-t), oy*(1-t), 0.15);
+    }
+  }
+  // This approach is complex. Let me use a simpler quad-based approach.
+  return null;
+}
+
+// Simpler body: stack of quads
+function buildBodyStack(outer, depth, color) {
+  const v = []; let ci = [];
+  const pts = outer.map(p => [p[0], p[1], 0]);
+  const inner = outer.map(p => [p[0]*0.92, p[1]*0.92, 0]);
+
+  for(let i=0;i<pts.length;i++){
+    const j = (i+1)%pts.length;
+    const a = pts[i], b = pts[j], c = inner[j], d = inner[i];
+    v.push(...a,...b,...c,...d);
+    ci.push(0,1,2, 0,2,3);
+    v.push(...a, ...b, ...c, ...d);
+    ci.push(0,1,2, 0,2,3);
+  }
+  // Top face
+  let topStart = v.length/3;
+  for(let i=0;i<pts.length;i++){
+    v.push(inner[i][0], inner[i][1], 0.15);
+    v.push(inner[(i+1)%pts.length][0], inner[(i+1)%pts.length][1], 0.15);
+    v.push(pts[i][0]*0.85, pts[i][1]*0.85, 0.15);
+    v.push(pts[(i+1)%pts.length][0]*0.85, pts[(i+1)%pts.length][1]*0.85, 0.15);
+  }
+
+  // Bottom face
+  let botStart = v.length/3;
+  for(let i=0;i<pts.length;i++){
+    v.push(pts[i][0], pts[i][1], -0.15);
+    v.push(pts[(i+1)%pts.length][0], pts[(i+1)%pts.length][1], -0.15);
+    v.push(inner[i][0], inner[i][1], -0.15);
+    v.push(inner[(i+1)%pts.length][0], inner[(i+1)%pts.length][1], -0.15);
+  }
+
+  return { v, i: ci, c: color.repeat(pts.length*4).split(' ').map(Number) };
+}
+
+// Upper bout
+const upperBout = [
+  [0,-8,0],[2,-8.5,0],[4,-8,0],[6,-6,0],[8,-2,0],[9,2,0],[8.5,6,0],[7,10,0],
+  [5,13,0],[3,14,0],[0,14,0],[-3,14,0],[-5,13,0],[-7,10,0],[-8.5,6,0],[-9,2,0],
+  [-8,-2,0],[-6,-6,0],[-4,-8,0],[-2,-8.5,0]
+];
+
+// Lower bout (shifted down, slightly wider)
+const lowerBout = [
+  [-3,-12,0],[-4.5,-12.5,0],[-6,-12,0],[-7.5,-10,0],[-9,-6,0],[-9.5,-2,0],
+  [-8.5,2,0],[-7,6,0],[-6,10,0],[-4.5,13,0],[-3,14,0],[-1.5,14,0],
+  [0,14,0],[1.5,14,0],[3,13,0],[4.5,10,0],[6,6,0],[7,2,0],
+  [7.5,-2,0],[9,-6,0],[9.5,-10,0],[8,-12,0]
+];
+
+// Neck
+const neck = [
+  [-0.8, 14, 0], [0.8, 14, 0], [0.8, 14, 0.2], [-0.8, 14, 0.2]
+];
+const neckTop = [
+  [-1.2, 28, 0], [1.2, 28, 0], [1.2, 28, 0.3], [-1.2, 28, 0.3]
+];
+
+// Fingerboard
+const fb = [
+  [-1.5, 28, 0.35], [1.5, 28, 0.35], [1.5, 32, 0.35], [-1.5, 32, 0.35]
+];
+
+// Scroll (spiraled)
+function buildScroll() {
+  const v = []; let ci = [];
+  const r = 0.5;
+  const pts = [];
+  for(let t=0;t<=1;t+=0.05){
+    const theta = t * 8 * Math.PI;
+    const x = r * Math.cos(theta) + t * 0.3;
+    const y = t * 1.5;
+    const z = r * Math.sin(theta) + 0.2;
+    pts.push([x, y, z]);
+  }
+  // Build tube
+  for(let i=0;i<pts.length-1;i++){
+    const a = pts[i], b = pts[i+1];
+    const mx = (a[0]+b[0])/2, my = (a[1]+b[1])/2, mz = (a[2]+b[2])/2;
+    const dx = b[0]-a[0], dy = b[1]-a[1], dz = b[2]-a[2];
+    const len = Math.sqrt(dx*dx+dy*dy+dz*dz);
+    const nx = dy*0.15, ny = -dx*0.15, nz = 0;
+    const nn = Math.sqrt(nx*nx+ny*ny+nz*nz) || 1;
+    const nx2=nx/nn, ny2=ny/nn, nz2=nz/nn;
+    const px = -dz*0.1, py = dx*0.1, pz = -dx*0.1; // approximate
+    const pnx = px*0.1, pny = py*0.1, pnz = pz*0.1;
+    const pl = Math.sqrt(pnx*pnx+pny*pny+pnz*pnz) || 1;
+    const px2=px/pl, py2=py/pl, pz2=pz/pl;
+    const half = 0.12;
+    const s1 = [mx+nx2*half, my+ny2*half, mz+nz2*half];
+    const s2 = [mx-nx2*half, my-ny2*half, mz-nz2*half];
+    const e1 = [mx+px2*half, my+py2*half, mz+pz2*half];
+    const e2 = [mx-px2*half, my-py2*half, mz-pnz*half];
+    v.push(...s1,...e1,...e2,...s2);
+    ci.push(0,1,2, 0,2,3);
+  }
+  return { v, i: ci, c: [0.5,0.35,0.2].repeat(pts.length*4).split(' ').map(Number) };
+}
+
+// Bridge
+function buildBridge() {
+  const pts = [[0, -0.5, 0.18], [0.4, 0, 0.18], [0, 0.5, 0.18]];
+  const top = [[0, -0.5, 0.22], [0.4, 0, 0.22], [0, 0.5, 0.22]];
+  const v = []; let ci = [];
+  for(let i=0;i<3;i++){
+    v.push(...pts[i], ...top[i]);
+  }
+  ci.push(0,1,2, 0,2,1);
+  for(let i=0;i<3;i++){
+    v.push(...top[i], ...pts[(i+1)%3]);
+    ci.push(3+i, 4+i, 5+i, 3+i, 5+i, 4+i);
+  }
+  for(let i=0;i<3;i++){
+    v.push(...pts[(i+1)%3], ...top[i]);
+    ci.push(6+i, 7+i, 8+i, 6+i, 8+i, 7+i);
+  }
+  return { v, i: ci, c: [0.15,0.1,0.05].repeat(9).split(' ').map(Number) };
+}
+
+// Strings (thin quads)
+function buildString(start, end, width) {
+  const v = []; let ci = [];
+  const a = start, b = end;
+  const w = width/2;
+  const dx = b[0]-a[0], dy = b[1]-a[1], dz = b[2]-a[2];
+  const len = Math.sqrt(dx*dx+dy*dy+dz*dz);
+  const nx = dy*len, nz = -dx*len;
+  const nn = Math.sqrt(nx*nx+nz*nz) || 1;
+  const nx2 = nx/nn, nz2 = nz/nn;
+  const pts = [
+    [a[0]+nx2*w, a[1], a[2]-nz2*w],
+    [b[0]+nx2*w, b[1], b[2]-nz2*w],
+    [b[0]-nx2*w, b[1], b[2]+nz2*w],
+    [a[0]-nx2*w, a[1], a[2]+nz2*w]
+  ];
+  v.push(...pts[0],...pts[1],...pts[2],...pts[3]);
+  ci.push(0,1,2, 0,2,3);
+  return { v, i: ci, c: [0.95,0.95,0.98].repeat(4).split(' ').map(Number) };
+}
+
+// Build all parts
+const bodyColor = [0.18, 0.1, 0.06];
+const neckColor = [0.28, 0.16, 0.09];
+const fbColor = [0.08, 0.05, 0.03];
+const scrollColor = [0.35, 0.22, 0.13];
+const bridgeColor = [0.12, 0.08, 0.04];
+const stringColor = [0.92, 0.92, 0.96];
+
+// Upper bout body
+const upperBody = buildBodyStack(upperBout, 0.35, bodyColor);
+parts.push({ vao: makeVAO(upperBody.v, upperBody.i, upperBody.c), color: bodyColor });
+
+// Lower bout body
+const lowerBody = buildBodyStack(lowerBout, 0.35, bodyColor);
+parts.push({ vao: makeVAO(lowerBody.v, lowerBody.i, lowerBody.c), color: bodyColor });
+
+// Neck (prism)
+const neckV = [];
+const neckPts = [
+  [-0.7, 14, 0], [0.7, 14, 0], [0.7, 14, 0.2], [-0.7, 14, 0.2],
+  [-1.1, 28, 0], [1.1, 28, 0], [1.1, 28, 0.25], [-1.1, 28, 0.25]
+];
+for(let i=0;i<4;i++){
+  neckV.push(...neckPts[i], ...neckPts[i+4]);
+}
+const neckCi = [];
+for(let i=0;i<4;i++){
+  neckCi.push(i*2, (i+1)%4*2, (i+1)%4*2+1, i*2, (i+1)%4*2+1, (i+1)%4*2);
+}
+for(let i=0;i<4;i++){
+  neckCi.push(i*2+2, (i+1)%4*2+2, (i+1)%4*2+1, i*2+2, (i+1)%4*2+1, (i+1)%4*2);
+}
+const neckC = neckColor.repeat(8).split(' ').map(Number);
+parts.push({ vao: makeVAO(neckV, neckCi, neckC), color: neckColor });
+
+// Fingerboard
+const fbV = [];
+for(let i=0;i<4;i++){
+  fbV.push(...fb[i], ...fb[i]);
+}
+const fbCi = [0,1,2, 0,2,3];
+const fbC = fbColor.repeat(4).split(' ').map(Number);
+parts.push({ vao: makeVAO(fbV, fbCi, fbC), color: fbColor });
+
+// Scroll
+const scroll = buildScroll();
+parts.push({ vao: makeVAO(scroll.v, scroll.i, scroll.c), color: scrollColor });
+
+// Bridge
+const bridge = buildBridge();
+parts.push({ vao: makeVAO(bridge.v, bridge.i, bridge.c), color: bridgeColor });
+
+// Strings
+const scrollTop = [0, 28.5, 0.2];
+const stringEndpoints = [
+  [scrollTop, [0.5, -1, 0.18], 0.03],
+  [scrollTop, [0, -1, 0.18], 0.03],
+  [scrollTop, [-0.5, -1, 0.18], 0.03],
+  [scrollTop, [-0.8, -1, 0.18], 0.03]
+];
+const strings = [];
+for(const [start, end, w] of stringEndpoints) {
+  const s = buildString(start, end, w);
+  parts.push({ vao: makeVAO(s.v, s.i, s.c), color: stringColor, isString: true });
+  strings.push({ vao: s.vao, start, end, w });
+}
+
+// ── Shader ──
+const vsSource = `
+attribute vec3 aPos;
+attribute float aColor;
+uniform mat4 uMVP;
+uniform float uColor;
+varying vec3 vNormal;
+varying vec3 vWorldPos;
+void main() {
+  vNormal = aPos;
+  vWorldPos = aPos;
+  gl_Position = uMVP * vec4(aPos, 1.0);
+}
+`;
+
+const fsSource = `
+precision mediump float;
+uniform vec3 uLightDir;
+uniform vec3 uAmbient;
+uniform vec3 uLightColor;
+varying vec3 vNormal;
+varying vec3 vWorldPos;
+varying float vColor;
+void main() {
+  vec3 N = normalize(vNormal);
+  vec3 L = normalize(uLightDir);
+  float diff = max(dot(N, L), 0.0);
+  float spec = pow(max(dot(N, normalize(vWorldPos + L)), 0.0), 32.0);
+  vec3 color = uAmbient + uLightColor * (0.3 + 0.7 * diff + 0.4 * spec);
+  color = color * vColor;
+  // Subtle rim light
+  vec3 V = normalize(vWorldPos);
+  float rim = pow(max(dot(N, V), 0.0), 16.0) * 0.25;
+  color += rim * uLightColor * vColor * 0.3;
+  gl_FragColor = vec4(color, 1.0);
+}`;
+
+const vs = gl.createShader(gl.VERTEX_SHADER);
+gl.shaderSource(vs, vsSource);
+gl.compileShader(vs);
+const fs = gl.createShader(gl.FRAGMENT_SHADER);
+gl.shaderSource(fs, fsSource);
+gl.compileShader(fs);
+const prog = gl.createProgram();
+gl.attachShader(prog, vs);
+gl.attachShader(prog, fs);
+gl.linkProgram(prog);
+
+function getLoc(prog, name) {
+  return gl.getUniformLocation(prog, name);
+}
+const uMVP_loc = getLoc(prog, 'uMVP');
+const uLightDir_loc = getLoc(prog, 'uLightDir');
+const uAmbient_loc = getLoc(prog, 'uAmbient');
+const uLightColor_loc = getLoc(prog, 'uLightColor');
+
+// ── Camera ──
+const cam = {
+  theta: Math.PI / 4,
+  phi: Math.PI / 3,
+  dist: 20,
+  target: [0, 0, 0],
+  zoom: 20
+};
+
+function getViewMat() {
+  const t = cam.target;
+  const c = [
+    t[0] + cam.dist * Math.sin(cam.phi) * Math.cos(cam.theta),
+    t[1] + cam.dist * Math.sin(cam.phi) * Math.sin(cam.theta),
+    t[2] + cam.dist * Math.cos(cam.phi)
+  ];
+  const z = [t[0]-c[0], t[1]-c[1], t[2]-c[2]];
+  const zLen = Math.sqrt(z[0]*z[0]+z[1]*z[1]+z[2]*z[2]) || 1;
+  z[0]/=zLen; z[1]/=zLen; z[2]/=zLen;
+  const lookAt = [0, 0, -1];
+  const up = [0, 1, 0];
+  let forward = [z[0], z[1], z[2]];
+  let right = [up[1]*forward[2]-up[2]*forward[1], up[2]*forward[0]-up[0]*forward[2], up[0]*forward[1]-up[1]*forward[0]];
+  const rLen = Math.sqrt(right[0]*right[0]+right[1]*right[1]+right[2]*right[2]) || 1;
+  right[0]/=rLen; right[1]/=rLen; right[2]/=rLen;
+  let upV = [forward[1]*right[2]-forward[2]*right[1], forward[2]*right[0]-forward[0]*right[2], forward[0]*right[1]-forward[1]*right[0]];
+  up[0]=upV[0]; up[1]=upV[1]; up[2]=upV[2];
+  const m = [0,1,0,0];
+  const v = [
+    right[0],up[0],forward[0],c[0],
+    right[1],up[1],forward[1],c[1],
+    right[2],up[2],forward[2],c[2],
+    0, 0, 0, 1
+  ];
+  return m.map((_,i) => v[i]);
+}
+
+function getProjMat() {
+  const fov = Math.PI / 4;
+  const aspect = W / H;
+  const near = 0.1, far = 100;
+  const f = 1 / Math.tan(fov/2);
+  const nf = 1/(near-far);
+  return [
+    f/aspect, 0, 0, 0,
+    0, f, 0, 0,
+    0, 0, (far+near)*nf, -1,
+    2*far*near*nf, 0, 0, 0
+  ];
+}
+
+function getMVP() {
+  const view = getViewMat();
+  const proj = getProjMat();
+  const mvp = new Float32Array(16);
+  for(let i=0;i<4;i++) {
+    for(let j=0;j<4;j++) {
+      mvp[i+j*4] = proj[i]*view[j] + proj[i+1]*view[j+4] + proj[i+2]*view[j+8] + proj[i+3]*view[j+12];
+    }
+  }
+  return mvp;
+}
+
+// ── Lighting ──
+const lightDir = [0.3, 0.5, 0.7];
+const lightDirLen = Math.sqrt(lightDir[0]**2+lightDir[1]**2+lightDir[2]**2);
+lightDir[0]/=lightDirLen; lightDir[1]/=lightDirLen; lightDir[2]/=lightDirLen;
+
+// ── Mouse ──
+let mouseDown = false, lastMouse = [0,0];
+let isDragging = false;
+
+canvas.addEventListener('mousedown', e => {
+  mouseDown = true;
+  lastMouse = [e.clientX, e.clientY];
+  isDragging = true;
+});
+canvas.addEventListener('mouseup', () => { mouseDown = false; isDragging = false; });
+canvas.addEventListener('mousemove', e => {
+  if(isDragging && mouseDown) {
+    const dx = e.clientX - lastMouse[0];
+    const dy = e.clientY - lastMouse[1];
+    cam.theta += dx * 0.005;
+    cam.phi = Math.max(0.1, Math.min(Math.PI - 0.1, cam.phi + dy * 0.005));
+    lastMouse = [e.clientX, e.clientY];
+  }
+});
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  cam.dist = Math.max(5, Math.min(40, cam.dist + e.deltaY * 0.05));
+}, { passive: false });
+
+// ── String hit detection ──
+function rayCastOrigin() {
+  // Ray from camera through mouse
+  const fov = Math.PI / 4;
+  const aspect = W / H;
+  const ndcX = (e.clientX / W - 0.5) * 2;
+  const ndcY = -(e.clientY / H - 0.5) * 2;
+  const view = getViewMat();
+  const proj = getProjMat();
+  const p = new Float32Array(4);
+  p[0] = ndcX; p[1] = ndcY; p[2] = 0; p[3] = 1;
+  const invProj = [
+    0,1,0,0, 0,1,0,0, 0,0,1,0, 0,0,1,0
+  ];
+  // Simplified: use camera position and direction
+  const camPos = [
+    cam.target[0] + cam.dist * Math.sin(cam.phi) * Math.cos(cam.theta),
+    cam.target[1] + cam.dist * Math.sin(cam.phi) * Math.sin(cam.theta),
+    cam.target[2] + cam.dist * Math.cos(cam.phi)
+  ];
+  const rayDir = [
+    Math.sin(cam.phi) * Math.cos(cam.theta) * ndcX,
+    Math.sin(cam.phi) * Math.sin(cam.theta) * ndcY,
+    Math.cos(cam.phi)
+  ];
+  const len = Math.sqrt(rayDir[0]**2+rayDir[1]**2+rayDir[2]**2);
+  rayDir[0]/=len; rayDir[1]/=len; rayDir[2]/=len;
+  return { origin: camPos, direction: rayDir };
+}
+
+function pointToSegmentDist(p, a, b) {
+  const d = [b[0]-a[0], b[1]-a[1], b[2]-a[2]];
+  const len2 = d[0]**2+d[1]**2+d[2]**2;
+  if(len2===0) return Math.sqrt((p[0]-a[0])**2+(p[1]-a[1])**2+(p[2]-a[2])**2);
+  let t = ((p[0]-a[0])*d[0]+(p[1]-a[1])*d[1]+(p[2]-a[2])*d[2]) / len2;
+  t = Math.max(0, Math.min(1, t));
+  const closest = [a[0]+t*d[0], a[1]+t*d[1], a[2]+t*d[2]];
+  const dd = [p[0]-closest[0], p[1]-closest[1], p[2]-closest[2]];
+  return Math.sqrt(dd[0]**2+dd[1]**2+dd[2]**2);
+}
+
+// ── Audio ──
+let audioCtx = null;
+const frequencies = [196, 293.66, 440, 659.25]; // G3, D4, A4, E5
+let activeNotes = [];
+let noteTimes = [];
+let noteFreqs = [];
+let noteVolumes = [];
+
+function initAudio() {
+  if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playNote(idx) {
+  initAudio();
+  const freq = frequencies[idx];
+  const now = audioCtx.currentTime;
+
+  // Create oscillator
+  const osc = audioCtx.createOscillator();
+  const osc2 = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  const gain2 = audioCtx.createGain();
+
+  // Main tone
+  osc.type = 'sawtooth';
+  osc.frequency.value = freq;
+  // Harmonic
+  osc2.type = 'sine';
+  osc2.frequency.value = freq * 2.0;
+
+  // Envelope
+  const attack = 0.01;
+  const decay = 0.3;
+  const sustain = 0.15;
+  const release = 2.0;
+
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(0.35, now + attack);
+  gain.gain.linearRampToValueAtTime(sustain, now + decay);
+  gain.gain.linearRampToValueAtTime(sustain * 0.5, now + decay + 0.5);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + decay + 0.5 + release);
+
+  gain2.gain.setValueAtTime(0, now);
+  gain2.gain.linearRampToValueAtTime(0.15, now + attack);
+  gain2.gain.linearRampToValueAtTime(0.05, now + decay);
+  gain2.gain.exponentialRampToValueAtTime(0.001, now + decay + 0.5 + release);
+
+  // Filter for violin-like tone
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 1200;
+  filter.Q.value = 1.5;
+
+  // Vibrato
+  const lfo = audioCtx.createOscillator();
+  lfo.type = 'sine';
+  lfo.frequency.value = 5;
+  const lfoGain = audioCtx.createGain();
+  lfoGain.gain.value = 0.005 * freq;
+  lfoGain.gain.setValueAtTime(0, now);
+  lfoGain.gain.linearRampToValueAtTime(lfoGain.gain.value, now + 0.1);
+
+  lfo.connect(lfoGain);
+  lfoGain.connect(osc.frequency);
+
+  // Connect
+  osc.connect(filter);
+  osc2.connect(filter);
+  filter.connect(gain);
+  osc2.connect(gain2);
+  gain.connect(audioCtx.destination);
+  gain2.connect(audioCtx.destination);
+  lfo.connect(lfoGain);
+
+  osc.start(now);
+  osc.stop(now + decay + 0.5 + release + 0.5);
+  osc2.stop(now + decay + 0.5 + release + 0.5);
+  lfo.stop(now + decay + 0.5 + release + 1);
+
+  // Track for visual feedback
+  activeNotes.push({ idx, startTime: now, duration: decay + 0.5 + release });
+  noteTimes.push(now);
+  noteFreqs.push(freq);
+  noteVolumes.push(1);
+}
+
+// ── Animation ──
+let time = 0;
+let stringVibe = [0, 0, 0, 0]; // vibration amounts
+let stringHighlight = [0, 0, 0, 0]; // highlight amounts
+
+function update(dt) {
+  time += dt;
+  for(let i=0;i<4;i++) {
+    const age = time - noteTimes[i] || 0;
+    if(age < 0) continue;
+    const elapsed = age;
+    if(elapsed > noteTimes.length > 0 && elapsed > noteTimes[i] + 3) continue;
+    // Vibration decays
+    stringVibe[i] *= 0.92;
+    stringHighlight[i] *= 0.95;
+  }
+}
+
+// ── Render ──
+function render() {
+  gl.clearColor(0.04, 0.04, 0.1, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.DEPTH_TEST);
+
+  const mvp = getMVP();
+  gl.uniformMatrix4fv(uMVP_loc, false, mvp);
+  gl.uniform3fv(uLightDir_loc, lightDir);
+  gl.uniform3f(uAmbient_loc, 0.25, 0.22, 0.18);
+  gl.uniform3f(uLightColor_loc, 1.0, 0.95, 0.85);
+
+  // Background stars
+  drawStars();
+
+  // Render violin parts
+  for(const part of parts) {
+    gl.bindVertexArray(part.vao);
+    // Apply subtle animation to strings
+    if(part.isString && part.start && part.end) {
+      const sIdx = strings.indexOf(part);
+      if(sIdx >= 0) {
+        const vib = stringVibe[sIdx];
+        const w = vib * 0.05;
+        // Animate string vertices
+        const v = new Float32Array(part.v);
+        const idx = strings[sIdx].start ? 0 : -1;
+        if(idx >= 0) {
+          for(let i=0;i<v.length;i+=6) {
+            v[i+1] += Math.sin(time * 15 + i) * vib * 0.3;
+            v[i+2] += Math.cos(time * 15 + i) * vib * 0.3;
+          }
+        }
+        gl.bindBuffer(gl.ARRAY_BUFFER, part.vao); // Need to update
+      }
+    }
+    gl.drawElements(gl.TRIANGLES, 0, part.v.length/3*2/2, gl.UNSIGNED_SHORT);
+  }
+
+  // Draw strings with highlight
+  for(let i=0;i<4;i++) {
+    if(strings[i]) {
+      const s = strings[i];
+      const vib = stringVibe[i];
+      const highlight = stringHighlight[i];
+
+      // Create animated string
+      const v = []; let ci = [];
+      const a = s.start, b = s.end;
+      const w = s.w + vib * 0.02;
+      const dx = b[0]-a[0], dy = b[1]-a[1], dz = b[2]-a[2];
+      const len = Math.sqrt(dx*dx+dy*dy+dz*dz);
+      const nx = dy*len, nz = -dx*len;
+      const nn = Math.sqrt(nx*nx+nz*nz) || 1;
+      const nx2 = nx/nn, nz2 = nz/nn;
+      const half = w/2;
+
+      for(let t=0;t<=1;t+=0.15) {
+        const p1 = [a[0]+t*dx, a[1]+t*dy, a[2]+t*dz];
+        const p2 = [p1[0]+dx*0.15, p1[1]+dy*0.15, p1[2]+dz*0.15];
+        const off = Math.sin(t * 20 + time * 12) * vib * 0.08;
+        const v1 = [p1[0]+nx2*half+off, p1[1], p1[2]-nz2*half+off];
+        const v2 = [p2[0]+nx2*half+off, p2[1], p2[2]-nz2*half+off];
+        const v3 = [p2[0]-nx2*half+off, p2[1], p2[2]+nz2*half+off];
+        const v4 = [p1[0]-nx2*half+off, p1[1], p1[2]+nz2*half+off];
+        v.push(...v1,...v2,...v3,...v4);
+        ci.push(0,1,2, 0,2,3);
+      }
+
+      const color = [1, 1, 1];
+      const c = color.repeat(v.length/3).split(' ').map(Number);
+      const sva = makeVAO(v, ci, c);
+
+      gl.bindVertexArray(sva);
+      gl.drawElements(gl.TRIANGLES, 0, ci.length, gl.UNSIGNED_SHORT);
+    }
+  }
+
+  requestAnimationFrame(render);
+}
+
+// ── Stars Background ──
+function drawStars() {
+  const stars = [];
+  const rng = (s) => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+  let seed = 12345;
+  for(let i=0;i<150;i++) {
+    const x = rng(seed++) * W;
+    const y = rng(seed++) * H;
+    const r = rng(seed()) * 1.5 + 0.5;
+    const b = rng(seed()) * 0.5 + 0.3;
+    stars.push({x, y, r, b});
+  }
+
+  gl.disable(gl.DEPTH_TEST);
+  gl.uniform3f(uAmbient_loc, 0, 0, 0);
+  gl.uniform3f(uLightColor_loc, 1, 1, 1);
+
+  for(const s of stars) {
+    gl.uniform3f(uMVP_loc, 0,0,0,0, 0,0,0,0, 0,0,1,0, 0,0,s.y/W*2-1, s.x/W*2-1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1);
+    // Simple point
+    gl.drawArrays(gl.POINTS, 0, 1);
+  }
+
+  gl.enable(gl.DEPTH_TEST);
+}
+
+// ── Initialize star buffer ──
+const starVao = gl.createVertexArray();
+gl.bindVertexArray(starVao);
+const starBuffer = makeBuffer([0,0,0], 3);
+gl.bindBuffer(gl.ARRAY_BUFFER, starBuffer);
+gl.enableVertexAttribArray(0);
+gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+
+// ── Interaction ──
+canvas.addEventListener('mousedown', e => {
+  const mx = e.clientX, my = e.clientY;
+  const ray = rayCastOrigin();
+
+  // Check if clicking on a string
+  for(let i=0;i<4;i++) {
+    if(strings[i]) {
+      const dist = pointToSegmentDist([mx, my, 0], strings[i].start, strings[i].end);
+      // This is 2D distance, need 3D ray intersection
+    }
+  }
+
+  // Simpler: click anywhere on canvas plays random string
+  // But let's do proper ray casting
+  const camPos = [
+    cam.target[0] + cam.dist * Math.sin(cam.phi) * Math.cos(cam.theta),
+    cam.target[1] + cam.dist * Math.sin(cam.phi) * Math.sin(cam.theta),
+    cam.target[2] + cam.dist * Math.cos(cam.phi)
+  ];
+  const fov = Math.PI / 4;
+  const aspect = W / H;
+  const ndcX = (mx / W - 0.5) * 2;
+  const ndcY = -(my / H - 0.5) * 2;
+
+  // Camera ray direction in world space
+  const view = getViewMat();
+  // Invert view to get camera basis
+  const eye = [camPos[0], camPos[1], camPos[2]];
+  const fwd = [
+    Math.sin(cam.phi) * Math.cos(cam.theta),
+    Math.sin(cam.phi) * Math.sin(cam.theta),
+    Math.cos(cam.phi)
+  ];
+  const right = [
+    Math.cos(cam.phi) * Math.cos(cam.theta),
+    Math.cos(cam.phi) * Math.sin(cam.theta),
+    -Math.sin(cam.phi)
+  ];
+  const up = [
+    -Math.sin(cam.theta),
+    Math.cos(cam.theta),
+    0
+  ];
+
+  const rayDir = [
+    fwd[0] + right[0] * ndcX * Math.tan(fov/2) * aspect + up[0] * ndcY * Math.tan(fov/2),
+    fwd[1] + right[1] * ndcX * Math.tan(fov/2) * aspect + up[1] * ndcY * Math.tan(fov/2),
+    fwd[2] + right[2] * ndcX * Math.tan(fov/2) * aspect + up[2] * ndcY * Math.tan(fov/2)
+  ];
+
+  // Ray-intersect check for strings
+  for(let i=0;i<4;i++) {
+    if(strings[i]) {
+      const s = strings[i];
+      const start = s.start, end = s.end;
+      const line = [end[0]-start[0], end[1]-start[1], end[2]-start[2]];
+      const ray = [rayDir[0], rayDir[1], rayDir[2]];
+      const denom = ray[0]*line[1]*ray[2] + ray[1]*ray[2]*line[0] + ray[2]*line[0]*ray[0] + ray[0]*ray[1]*line[2] + ray[1]*line[2]*ray[0];
+      // Simplified: just check if ray is close to string segment
+      // Use a simpler approach - check all points on string
+      let hit = false;
+      for(let t=0;t<=1;t+=0.05) {
+        const p = [start[0]+t*line[0], start[1]+t*line[1], start[2]+t*line[2]];
+        const cp = [eye[0]+p[0]*cam.dist, eye[1]+p[1]*cam.dist, eye[2]+p[2]*cam.dist];
+        const cpScreen = [
+          cp[0] * Math.tan(fov/2) / cam.dist + 0.5,
+          cp[1] * Math.tan(fov/2) / cam.dist + 0.5
+        ];
+        const screenX = cpScreen[0] * W;
+        const screenY = cpScreen[1] * H;
+        const dx = screenX - mx;
+        const dy = screenY - my;
+        if(dx*dx + dy*dy < 30*30) {
+          hit = true;
+          break;
+        }
+      }
+      if(hit) {
+        playNote(i);
+        stringVibe[i] = 1;
+        stringHighlight[i] = 1;
+      }
+    }
+  }
+});
+
+// Keyboard
+document.addEventListener('keydown', e => {
+  const keyMap = {'g':0, 'G':0, 'd':1, 'D':1, 'a':2, 'A':2, 'e':3, 'E':3};
+  if(keyMap[e.key] !== undefined) {
+    playNote(keyMap[e.key]);
+    stringVibe[keyMap[e.key]] = 1;
+    stringHighlight[keyMap[e.key]] = 1;
+  }
+});
+
+// ── Start ──
+requestAnimationFrame(render);
+</script>
+</body>
+</html>

@@ -1,0 +1,1554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEON FORTRESS: Void Protocol</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a12;overflow:hidden;font-family:'Courier New',monospace;color:#0ff;display:flex;justify-content:center;align-items:center;height:100vh}
+#gameCanvas{border:2px solid #0ff3f3;box-shadow:0 0 40px rgba(0,255,255,0.15),0 0 80px rgba(0,255,255,0.05);cursor:crosshair}
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+const W = 1200, H = 700;
+canvas.width = W; canvas.height = H;
+
+// ========== CONFIGURATION ==========
+const GRID_COLS = 22;
+const GRID_ROWS = 14;
+const CELL = 50;
+const GRID_X = 60;
+const GRID_Y = 60;
+const PATH_WIDTH = 28;
+
+// ========== GAME STATE ==========
+let gameState = 'MENU'; // MENU, SKILL_TREE, PLAYING, GAME_OVER, WAVE_TRANSITION
+let credits = 0;
+let waveNumber = 0;
+let waveEnemies = [];
+let waveBoss = null;
+let enemies = [];
+let turrets = [];
+let bullets = [];
+let particles = [];
+let floatingTexts = [];
+let phaseShift = false; // special feature
+let phaseShiftCooldown = 0;
+let phaseShiftActive = false;
+let phaseShiftTimer = 0;
+let score = 0;
+let lives = 20;
+let totalKills = 0;
+let runKills = 0;
+let waveTransitionTimer = 0;
+let waveTransitionText = '';
+let waveTransitionAlpha = 0;
+let phaseShiftButton = { x: 0, y: 0, w: 0, h: 0 };
+
+// ========== SKILL TREE DATA ==========
+let skillTree = {
+    turretPower: { level: 0, maxLevel: 10, cost: 100, desc: '+5% Turret Damage' },
+    turretSpeed: { level: 0, maxLevel: 10, cost: 100, desc: '+3% Turret Fire Rate' },
+    turretRange: { level: 0, maxLevel: 10, cost: 100, desc: '+20px Turret Range' },
+    healthRegen: { level: 0, maxLevel: 8, cost: 100, desc: '+0.5 HP/second' },
+    startCredits: { level: 0, maxLevel: 5, cost: 100, desc: '+50 Starting Credits' },
+    phaseShiftCD: { level: 0, maxLevel: 5, cost: 100, desc: '-2s Phase Shift Cooldown' },
+    bulletSpeed: { level: 0, maxLevel: 8, cost: 100, desc: '+15% Bullet Speed' },
+    critChance: { level: 0, maxLevel: 8, cost: 100, desc: '+5% Critical Chance' }
+};
+
+// ========== TURRET DEFINITIONS ==========
+const TURRET_TYPES = {
+    pulse: {
+        name: 'Pulse Cannon', cost: 50, color: '#0ff', colorDark: '#066',
+        damage: 12, fireRate: 8, range: 120, bulletSpeed: 8,
+        type: 'single', desc: 'Fast single-target'
+    },
+    flame: {
+        name: 'Flame Turret', cost: 80, color: '#f50', colorDark: '#620',
+        damage: 8, fireRate: 5, range: 100, bulletSpeed: 4,
+        type: 'aoe', aoeRadius: 40, desc: 'Area burn damage'
+    },
+    rail: {
+        name: 'Railgun', cost: 150, color: '#af0', colorDark: '#440',
+        damage: 45, fireRate: 12, range: 200, bulletSpeed: 12,
+        type: 'single', desc: 'Long-range burst'
+    },
+    prism: {
+        name: 'Prism Turret', cost: 120, color: '#f0f', colorDark: '#606',
+        damage: 10, fireRate: 10, range: 130, bulletSpeed: 6,
+        type: 'reflect', desc: 'Reflects bullets'
+    }
+};
+
+// ========== ENEMY DEFINITIONS ==========
+const ENEMY_TYPES = {
+    drone: {
+        name: 'Drone', hp: 30, speed: 2.5, size: 14, color: '#0a0',
+        reward: 10, behavior: 'normal'
+    },
+    brute: {
+        name: 'Brute', hp: 120, speed: 1.0, size: 20, color: '#800',
+        reward: 25, behavior: 'normal'
+    },
+    siphon: {
+        name: 'Siphon', hp: 60, speed: 1.8, size: 16, color: '#080',
+        reward: 15, behavior: 'heal', healRate: 2
+    },
+    stalker: {
+        name: 'Stalker', hp: 45, speed: 3.5, size: 12, color: '#a0a',
+        reward: 12, behavior: 'stealth', stealthTime: 3000
+    },
+    spawner: {
+        name: 'Spawner', hp: 80, speed: 1.2, size: 18, color: '#0f0',
+        reward: 20, behavior: 'spawn', spawnInterval: 6000, spawnCount: 3
+    },
+    voidWalker: {
+        name: 'Void Walker', hp: 200, speed: 0.8, size: 24, color: '#f0f',
+        reward: 50, behavior: 'teleport', teleportInterval: 4000
+    }
+};
+
+// ========== PATH DEFINITION ==========
+const pathPoints = [
+    {x: 0, y: 100}, {x: 100, y: 100}, {x: 150, y: 180}, {x: 200, y: 280},
+    {x: 200, y: 400}, {x: 300, y: 400}, {x: 350, y: 300}, {x: 400, y: 200},
+    {x: 400, y: 100}, {x: 500, y: 100}, {x: 550, y: 180}, {x: 600, y: 280},
+    {x: 600, y: 400}, {x: 700, y: 400}, {x: 750, y: 300}, {x: 800, y: 200},
+    {x: 800, y: 100}, {x: 900, y: 100}, {x: 950, y: 180}, {x: 1000, y: 280},
+    {x: 1000, y: 400}, {x: 1100, y: 400}, {x: 1100, y: 500}, {x: 1100, y: 600}
+];
+
+// Build a grid of which cells are on path or walls
+function buildPathGrid() {
+    const grid = Array(GRID_ROWS).fill().map(() => Array(GRID_COLS).fill('empty'));
+    for (let i = 0; i < pathPoints.length - 1; i++) {
+        const p1 = pathPoints[i];
+        const p2 = pathPoints[i + 1];
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const steps = Math.max(Math.abs(dx), Math.abs(dy)) / PATH_WIDTH;
+        for (let t = 0; t <= steps; t += 0.1) {
+            const cx = GRID_X + (p1.x + (p2.x - p1.x) * (t / steps));
+            const cy = GRID_Y + (p1.y + (p2.y - p1.y) * (t / steps));
+            const gx = Math.floor((cx - GRID_X) / CELL);
+            const gy = Math.floor((cy - GRID_Y) / CELL);
+            if (gx >= 0 && gx < GRID_COLS && gy >= 0 && gy < GRID_ROWS) {
+                grid[gy][gx] = 'path';
+            }
+        }
+    }
+    // Also mark cells near path as non-buildable
+    const finalGrid = Array(GRID_ROWS).fill().map((row, gy) =>
+        Array(GRID_COLS).fill('empty').map((_, gx) => {
+            if (grid[gy][gx] === 'path') return 'path';
+            // Check neighbors
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    if (dx === 0 && dy === 0) continue;
+                    const ng = gy + dy, nx = gx + dx;
+                    if (ng >= 0 && ng < GRID_ROWS && nx >= 0 && nx < GRID_COLS) {
+                        if (grid[ng][nx] === 'path') return 'path';
+                    }
+                }
+            }
+            return 'empty';
+        })
+    ));
+    return finalGrid;
+}
+
+const grid = buildPathGrid();
+
+// ========== WAVE GENERATION ==========
+function generateWave(wave) {
+    const enemies = [];
+    const boss = createBoss(wave);
+    enemies.push(boss);
+    
+    const count = 4 + Math.floor(wave * 1.8) + Math.floor(wave * 0.3);
+    const types = Object.keys(ENEMY_TYPES);
+    
+    for (let i = 0; i < count; i++) {
+        const typeKey = getEnemyTypeForWave(wave, i);
+        const type = ENEMY_TYPES[typeKey];
+        const hpMult = 1 + wave * 0.15;
+        const enemy = {
+            ...type,
+            type: typeKey,
+            hp: Math.round(type.hp * hpMult),
+            maxHp: Math.round(type.hp * hpMult),
+            speed: type.speed * (1 + wave * 0.02),
+            progress: 0,
+            alive: true,
+            spawnTimer: 0,
+            spawnedCount: 0,
+            spawnDelay: 0,
+            createdAt: Date.now()
+        };
+        enemies.push(enemy);
+    }
+    
+    return { enemies, boss };
+}
+
+function getEnemyTypeForWave(wave, index) {
+    const types = ['drone', 'drone', 'drone', 'brute', 'siphon', 'stalker', 'spawner'];
+    if (wave >= 5) types.push('voidWalker');
+    if (wave >= 10) types.push('voidWalker', 'voidWalker');
+    
+    const typeIdx = (index * 7 + wave * 3 + 13) % types.length;
+    return types[typeIdx];
+}
+
+function createBoss(wave) {
+    const bosses = [
+        { name: 'Drone Hive', hp: 300 + wave * 80, speed: 1.0, size: 28, color: '#0f0', reward: 100 + wave * 20 },
+        { name: 'Brute Colossus', hp: 500 + wave * 120, speed: 0.6, size: 32, color: '#f50', reward: 150 + wave * 30 },
+        { name: 'Void Maw', hp: 700 + wave * 150, speed: 0.8, size: 30, color: '#f0f', reward: 200 + wave * 40 },
+        { name: 'Siphon Queen', hp: 400 + wave * 100, speed: 1.2, size: 26, color: '#080', reward: 120 + wave * 25 },
+        { name: 'Stalker Phantom', hp: 250 + wave * 60, speed: 2.5, size: 22, color: '#a0a', reward: 80 + wave * 15 },
+        { name: 'Spawner Lord', hp: 450 + wave * 90, speed: 1.0, size: 28, color: '#0f0', reward: 130 + wave * 20 },
+        { name: 'Void Walker', hp: 800 + wave * 180, speed: 0.5, size: 35, color: '#f0f', reward: 250 + wave * 50 },
+    ];
+    
+    const bossIdx = wave % bosses.length;
+    const boss = bosses[bossIdx];
+    return {
+        name: boss.name + ' (Wave ' + (wave + 1) + ')',
+        hp: Math.round(boss.hp),
+        maxHp: Math.round(boss.hp),
+        speed: boss.speed,
+        size: boss.size,
+        color: boss.color,
+        reward: Math.round(boss.reward),
+        behavior: 'boss',
+        phaseShift: false,
+        phaseShiftTimer: 0,
+        phaseShiftDuration: 3000
+    };
+}
+
+// ========== PHASE SHIFT (SPECIAL FEATURE) ==========
+function activatePhaseShift() {
+    if (phaseShiftCooldown > 0 || phaseShiftActive) return;
+    const cd = 5 - skillTree.phaseShiftCD.level * 0.8;
+    phaseShiftCooldown = cd;
+    phaseShiftActive = true;
+    phaseShiftTimer = 8000;
+    // Visual effect
+    for (let i = 0; i < 50; i++) {
+        particles.push({
+            x: Math.random() * W, y: Math.random() * H,
+            vx: (Math.random() - 0.5) * 3, vy: (Math.random() - 0.5) * 3,
+            life: 1, decay: 0.01, color: '#f0f', size: Math.random() * 3 + 1
+        });
+    }
+}
+
+// ========== TURRET UPGRADES ==========
+function upgradeTurret(turret) {
+    const base = TURRET_TYPES[turret.type];
+    const dmgMult = 1 + skillTree.turretPower.level * 0.05;
+    const speedMult = 1 + skillTree.turretSpeed.level * 0.03;
+    const rangeAdd = skillTree.turretRange.level * 20;
+    
+    turret.level++;
+    turret.damage = Math.round(base.damage * (1 + 0.15 * turret.level) * dmgMult);
+    turret.fireRate = Math.max(1, base.fireRate / (1 + 0.05 * turret.level));
+    turret.range = base.range + rangeAdd + turret.level * 10;
+    turret.rangeBase = base.range;
+    
+    // Visual feedback
+    for (let i = 0; i < 15; i++) {
+        particles.push({
+            x: turret.x, y: turret.y,
+            vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4,
+            life: 1, decay: 0.03, color: base.color, size: Math.random() * 3 + 2
+        });
+    }
+    floatingTexts.push({
+        x: turret.x, y: turret.y - 15, text: 'UPGRADED!', color: '#ff0', life: 1, decay: 0.02
+    });
+}
+
+// ========== SPAWNING SYSTEM ==========
+let spawnTimer = 0;
+let waveSpawnIndex = 0;
+let waveStartDelay = 2000;
+let waveActive = false;
+let waveEnemiesToSpawn = [];
+
+function startWave() {
+    waveNumber++;
+    const waveData = generateWave(waveNumber);
+    waveEnemiesToSpawn = waveData.enemies.map(e => ({...e}));
+    waveBoss = waveData.boss;
+    waveStartDelay = 2000 + waveNumber * 100;
+    spawnTimer = waveStartDelay;
+    waveActive = true;
+    
+    floatingTexts.push({
+        x: W / 2, y: H / 2 - 50, text: `WAVE ${waveNumber}`,
+        color: '#0ff', life: 1, decay: 0.005, isBig: true
+    });
+}
+
+// ========== UPDATE LOGIC ==========
+function update(dt) {
+    if (gameState !== 'PLAYING') return;
+    
+    phaseShiftCooldown = Math.max(0, phaseShiftCooldown - dt / 1000);
+    if (phaseShiftActive) {
+        phaseShiftTimer -= dt;
+        if (phaseShiftTimer <= 0) {
+            phaseShiftActive = false;
+        }
+    }
+    
+    // Spawn enemies
+    if (waveActive && waveEnemiesToSpawn.length > 0) {
+        spawnTimer -= dt;
+        if (spawnTimer <= 0) {
+            const enemy = waveEnemiesToSpawn.pop(0);
+            enemies.push(enemy);
+            spawnTimer = 1000 + Math.random() * 1500;
+        }
+    }
+    
+    // Check wave completion
+    if (waveActive && waveEnemiesToSpawn.length === 0 && enemies.length === 0) {
+        if (waveBoss && !waveBoss.alive) {
+            credits += waveBoss.reward;
+            score += 1000 + waveNumber * 50;
+            floatingTexts.push({
+                x: W / 2, y: H / 2, text: `WAVE ${waveNumber} CLEARED!`,
+                color: '#0ff', life: 1, decay: 0.005, isBig: true
+            });
+            waveActive = false;
+            startWave();
+        }
+    }
+    
+    // Update enemies
+    for (const enemy of enemies) {
+        if (!enemy.alive) continue;
+        
+        // Update position along path
+        let nextPointIdx = 0;
+        for (let i = 0; i < pathPoints.length - 1; i++) {
+            const p1 = pathPoints[i];
+            const p2 = pathPoints[i + 1];
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (enemy.progress < dist) {
+                nextPointIdx = i;
+                break;
+            }
+            enemy.progress -= dist;
+        }
+        
+        if (nextPointIdx < pathPoints.length - 1) {
+            const p1 = pathPoints[nextPointIdx];
+            const p2 = pathPoints[nextPointIdx + 1];
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const progress = Math.min(1, enemy.progress + enemy.speed * dt / 1000);
+            enemy.x = p1.x + dx * progress;
+            enemy.y = p1.y + dy * progress;
+            enemy.progress -= dist;
+        }
+        
+        // Check if reached end
+        if (enemy.progress <= 0 && pathPoints.length - 1 === nextPointIdx) {
+            if (enemy.type === 'boss' || enemy.behavior === 'boss') {
+                lives -= Math.floor(enemy.maxHp / 100);
+                if (lives <= 0) {
+                    lives = 0;
+                    gameState = 'GAME_OVER';
+                }
+            }
+            enemy.alive = false;
+        }
+        
+        // Stalker stealth
+        if (enemy.behavior === 'stealth') {
+            enemy.stealthTimer -= dt;
+        }
+        
+        // Siphon healing
+        if (enemy.behavior === 'heal') {
+            enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.healRate * dt / 1000);
+        }
+        
+        // Spawner behavior
+        if (enemy.behavior === 'spawn' && enemy.spawnTimer > 0) {
+            enemy.spawnTimer -= dt;
+            if (enemy.spawnTimer <= 0) {
+                const child = {
+                    ...ENEMY_TYPES.drone,
+                    hp: Math.round(ENEMY_TYPES.drone.hp * 0.7),
+                    maxHp: Math.round(ENEMY_TYPES.drone.hp * 0.7),
+                    speed: 3.0,
+                    size: 12,
+                    type: 'drone',
+                    behavior: 'normal',
+                    x: enemy.x + (Math.random() - 0.5) * 30,
+                    y: enemy.y + (Math.random() - 0.5) * 30,
+                    progress: 0,
+                    alive: true,
+                    spawnTimer: 0,
+                    spawnedCount: 0,
+                    spawnDelay: 0,
+                    createdAt: Date.now()
+                };
+                enemies.push(child);
+                enemy.spawnCount++;
+                if (enemy.spawnCount < 3) {
+                    enemy.spawnTimer = 6000;
+                }
+            }
+        }
+        
+        // Void Walker teleport
+        if (enemy.behavior === 'teleport') {
+            enemy.teleportTimer -= dt;
+            if (enemy.teleportTimer <= 0) {
+                enemy.x += (Math.random() - 0.5) * 60;
+                enemy.y += (Math.random() - 0.5) * 40;
+                enemy.teleportTimer = 4000;
+                for (let i = 0; i < 10; i++) {
+                    particles.push({
+                        x: enemy.x, y: enemy.y,
+                        vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2,
+                        life: 0.5, decay: 0.01, color: '#f0f', size: Math.random() * 2 + 1
+                    });
+                }
+            }
+        }
+    }
+    
+    // Update turrets
+    for (const turret of turrets) {
+        turret.cooldown -= dt;
+        if (turret.cooldown <= 0) {
+            turret.fire(dt);
+        }
+    }
+    
+    // Update bullets
+    for (const bullet of bullets) {
+        bullet.x += bullet.vx * dt / 1000;
+        bullet.y += bullet.vy * dt / 1000;
+        bullet.life -= dt;
+        
+        if (bullet.life <= 0 || bullet.x < -50 || bullet.x > W + 50 || bullet.y < -50 || bullet.y > H + 50) {
+            bullet.dead = true;
+        }
+    }
+    bullets = bullets.filter(b => !b.dead);
+    
+    // Bullet-enemy collisions
+    for (const bullet of bullets) {
+        if (bullet.dead) continue;
+        const dmgMult = phaseShiftActive ? (bullet.isReflected ? 1.5 : 1.0) : 1.0;
+        const critMult = Math.random() < (skillTree.critChance.level * 0.05) ? 2.0 : 1.0;
+        const damage = Math.round(bullet.damage * dmgMult * critMult);
+        
+        for (const enemy of enemies) {
+            if (!enemy.alive) continue;
+            const dist = Math.sqrt((bullet.x - enemy.x) ** 2 + (bullet.y - enemy.y) ** 2);
+            if (dist < enemy.size + 5) {
+                bullet.dead = true;
+                enemy.hp -= damage;
+                score += damage;
+                totalKills++;
+                
+                // Hit particles
+                for (let i = 0; i < 5; i++) {
+                    particles.push({
+                        x: bullet.x, y: bullet.y,
+                        vx: (Math.random() - 0.5) * 3, vy: (Math.random() - 0.5) * 3,
+                        life: 0.3, decay: 0.01, color: bullet.color, size: Math.random() * 2 + 1
+                    });
+                }
+                
+                if (critMult > 1) {
+                    floatingTexts.push({
+                        x: enemy.x, y: enemy.y - 15, text: 'CRIT!', color: '#ff0', life: 0.8, decay: 0.02
+                    });
+                }
+                
+                if (enemy.hp <= 0) {
+                    enemy.alive = false;
+                    credits += enemy.reward;
+                    score += enemy.reward * 2;
+                    totalKills++;
+                    runKills++;
+                    
+                    for (let i = 0; i < 20; i++) {
+                        particles.push({
+                            x: enemy.x, y: enemy.y,
+                            vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5,
+                            life: 0.8, decay: 0.01, color: enemy.color, size: Math.random() * 3 + 2
+                        });
+                    }
+                    floatingTexts.push({
+                        x: enemy.x, y: enemy.y - 20, text: '+' + enemy.reward, color: '#0f0', life: 1, decay: 0.015
+                    });
+                }
+                break;
+            }
+        }
+    }
+    
+    // Update particles
+    for (const p of particles) {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= p.decay;
+    }
+    particles = particles.filter(p => p.life > 0);
+    
+    // Update floating texts
+    for (const ft of floatingTexts) {
+        ft.y -= 0.5;
+        ft.life -= ft.decay;
+    }
+    floatingTexts = floatingTexts.filter(ft => ft.life > 0);
+    
+    // Phase shift button position
+    phaseShiftButton.x = W - 100;
+    phaseShiftButton.y = H - 80;
+    phaseShiftButton.w = 80;
+    phaseShiftButton.h = 50;
+}
+
+// ========== DRAWING ==========
+function draw() {
+    // Background
+    ctx.fillStyle = '#0a0a12';
+    ctx.fillRect(0, 0, W, H);
+    
+    // Grid
+    for (let row = 0; row < GRID_ROWS; row++) {
+        for (let col = 0; col < GRID_COLS; col++) {
+            const x = GRID_X + col * CELL;
+            const y = GRID_Y + row * CELL;
+            
+            if (grid[row][col] === 'path') {
+                ctx.fillStyle = '#0d0d1a';
+                ctx.fillRect(x, y, CELL, CELL);
+                ctx.strokeStyle = '#1a1a2e';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x, y, CELL, CELL);
+            } else {
+                ctx.fillStyle = '#0a0a14';
+                ctx.fillRect(x, y, CELL, CELL);
+                ctx.strokeStyle = '#111122';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x, y, CELL, CELL);
+            }
+        }
+    }
+    
+    // Draw path line
+    ctx.strokeStyle = '#0ff3f3';
+    ctx.lineWidth = PATH_WIDTH * 0.3;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(pathPoints[0].x, pathPoints[0].y);
+    for (let i = 1; i < pathPoints.length; i++) {
+        ctx.lineTo(pathPoints[i].x, pathPoints[i].y);
+    }
+    ctx.stroke();
+    
+    // Path glow
+    ctx.strokeStyle = 'rgba(0,255,255,0.1)';
+    ctx.lineWidth = PATH_WIDTH * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(pathPoints[0].x, pathPoints[0].y);
+    for (let i = 1; i < pathPoints.length; i++) {
+        ctx.lineTo(pathPoints[i].x, pathPoints[i].y);
+    }
+    ctx.stroke();
+    
+    // Phase shift overlay
+    if (phaseShiftActive) {
+        const alpha = 0.15 + Math.sin(Date.now() / 200) * 0.05;
+        ctx.fillStyle = `rgba(255,0,255,${alpha})`;
+        ctx.fillRect(0, 0, W, H);
+        
+        // Vignette effect
+        const grad = ctx.createRadialGradient(W/2, H/2, H*0.3, W/2, H/2, W*0.7);
+        grad.addColorStop(0, 'transparent');
+        grad.addColorStop(1, `rgba(255,0,255,${alpha * 0.5})`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+    }
+    
+    // Draw turrets
+    for (const turret of turrets) {
+        const base = TURRET_TYPES[turret.type];
+        const cx = turret.x;
+        const cy = turret.y;
+        
+        // Base
+        ctx.fillStyle = base.colorDark;
+        ctx.fillRect(cx - 15, cy - 15, 30, 30);
+        
+        // Level rings
+        for (let i = 0; i < turret.level; i++) {
+            ctx.strokeStyle = base.color;
+            ctx.lineWidth = 1;
+            const r = 18 + i * 2;
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        
+        // Main body
+        ctx.fillStyle = base.color;
+        ctx.fillRect(cx - 12, cy - 12, 24, 24);
+        
+        // Turret barrel (rotates toward target)
+        let angle = 0;
+        if (turrets[turrets.indexOf(turret)].cooldown <= 0) {
+            // Find target
+            let target = null;
+            let minDist = turret.range;
+            for (const e of enemies) {
+                if (!e.alive) continue;
+                const d = Math.sqrt((e.x - cx) ** 2 + (e.y - cy) ** 2);
+                if (d < minDist) {
+                    minDist = d;
+                    target = e;
+                }
+            }
+            if (target) {
+                angle = Math.atan2(target.y - cy, target.x - cx);
+            }
+        }
+        
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
+        
+        if (turret.type === 'pulse') {
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(5, -3, 20, 6);
+        } else if (turret.type === 'flame') {
+            ctx.fillStyle = '#ff8800';
+            ctx.fillRect(5, -4, 18, 8);
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(15, -2, 5, 4);
+        } else if (turret.type === 'rail') {
+            ctx.fillStyle = '#ffcc00';
+            ctx.fillRect(5, -2, 28, 4);
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(25, -1, 3, 2);
+        } else if (turret.type === 'prism') {
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.moveTo(15, -4);
+            ctx.lineTo(15, 4);
+            ctx.lineTo(25, 0);
+            ctx.closePath();
+            ctx.fill();
+        }
+        ctx.restore();
+        
+        // Range indicator (only when selected)
+        if (turret.selected) {
+            ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(cx, cy, turret.range, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+    }
+    
+    // Draw enemies
+    for (const enemy of enemies) {
+        if (!enemy.alive) continue;
+        
+        const cx = enemy.x;
+        const cy = enemy.y;
+        const s = enemy.size;
+        
+        // Stealth indicator
+        if (enemy.behavior === 'stealth' && enemy.stealthTimer > 0) {
+            ctx.globalAlpha = 0.4;
+        }
+        
+        // Shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(cx + 2, cy + s - 2, s * 0.6, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Body
+        ctx.fillStyle = enemy.color;
+        ctx.beginPath();
+        ctx.arc(cx, cy, s, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Inner detail
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.beginPath();
+        ctx.arc(cx - 2, cy - 2, s * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // HP bar
+        const hpPct = enemy.hp / enemy.maxHp;
+        ctx.fillStyle = '#333';
+        ctx.fillRect(cx - s - 2, cy - s - 10, s * 2 + 4, 4);
+        ctx.fillStyle = hpPct > 0.5 ? '#0f0' : hpPct > 0.25 ? '#ff0' : '#f00';
+        ctx.fillRect(cx - s - 2, cy - s - 10, (s * 2 + 4) * hpPct, 4);
+        
+        // Boss indicator
+        if (enemy.behavior === 'boss') {
+            ctx.strokeStyle = '#f00';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(cx, cy, s + 4, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Boss label
+            ctx.fillStyle = '#f00';
+            ctx.font = 'bold 10px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('BOSS', cx, cy - s - 16);
+        }
+        
+        // Stalker indicator
+        if (enemy.behavior === 'stealth') {
+            ctx.strokeStyle = '#888';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.arc(cx, cy, s + 3, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        
+        ctx.globalAlpha = 1;
+    }
+    
+    // Draw bullets
+    for (const bullet of bullets) {
+        ctx.fillStyle = bullet.color;
+        ctx.beginPath();
+        ctx.arc(bullet.x, bullet.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Bullet trail
+        ctx.strokeStyle = bullet.color;
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.3;
+        ctx.beginPath();
+        ctx.moveTo(bullet.x, bullet.y);
+        ctx.lineTo(bullet.x - bullet.vx * 3, bullet.y - bullet.vy * 3);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+    }
+    
+    // Draw particles
+    for (const p of particles) {
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life;
+        ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+    }
+    ctx.globalAlpha = 1;
+    
+    // Draw floating texts
+    for (const ft of floatingTexts) {
+        ctx.globalAlpha = Math.min(1, ft.life);
+        ctx.fillStyle = ft.color;
+        ctx.font = ft.isBig ? 'bold 24px Courier New' : '14px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText(ft.text, ft.x, ft.y);
+    }
+    ctx.globalAlpha = 1;
+    
+    // Draw phase shift button
+    const psBtn = phaseShiftButton;
+    const btnEnabled = phaseShiftCooldown <= 0 && !phaseShiftActive;
+    
+    ctx.fillStyle = btnEnabled ? '#1a0a1a' : '#0a0a0a';
+    ctx.strokeStyle = btnEnabled ? '#f0f' : '#333';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(psBtn.x, psBtn.y, psBtn.w, psBtn.h, 8);
+    ctx.fill();
+    ctx.stroke();
+    
+    if (btnEnabled) {
+        ctx.fillStyle = '#f0f';
+        ctx.font = 'bold 12px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText('PHASE SHIFT', psBtn.x + psBtn.w / 2, psBtn.y + 18);
+        ctx.fillStyle = '#888';
+        ctx.font = '10px Courier New';
+        ctx.fillText('8s', psBtn.x + psBtn.w / 2, psBtn.y + 36);
+    } else {
+        ctx.fillStyle = '#555';
+        ctx.font = 'bold 12px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText('PHASE SHIFT', psBtn.x + psBtn.w / 2, psBtn.y + 18);
+        ctx.fillStyle = '#888';
+        ctx.font = '10px Courier New';
+        ctx.fillText((phaseShiftCooldown).toFixed(1) + 's', psBtn.x + psBtn.w / 2, psBtn.y + 36);
+    }
+    
+    // ===== UI BAR =====
+    // Top bar
+    ctx.fillStyle = '#0d0d1a';
+    ctx.fillRect(0, 0, W, 45);
+    ctx.strokeStyle = '#0ff3f3';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0, 0, W, 45);
+    
+    // Credits
+    ctx.fillStyle = '#0f0';
+    ctx.font = 'bold 16px Courier New';
+    ctx.textAlign = 'left';
+    ctx.fillText('💰 ' + credits, 15, 30);
+    
+    // Lives
+    ctx.fillStyle = '#f00';
+    ctx.fillText('❤️ ' + lives, 100, 30);
+    
+    // Wave
+    ctx.fillStyle = '#0ff';
+    ctx.textAlign = 'center';
+    ctx.fillText('WAVE ' + (waveNumber + (waveActive ? 0 : 1)), W / 2, 30);
+    
+    // Score
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#ff0';
+    ctx.fillText('SCORE: ' + score, W - 15, 30);
+    
+    // Turret shop
+    const shopX = 450;
+    const shopY = 52;
+    const shopW = 300;
+    const shopH = 40;
+    
+    ctx.fillStyle = '#0d0d1a';
+    ctx.fillRect(shopX, shopY, shopW, shopH);
+    ctx.strokeStyle = '#0ff3f3';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(shopX, shopY, shopW, shopH);
+    
+    ctx.fillStyle = '#0ff';
+    ctx.font = 'bold 12px Courier New';
+    ctx.textAlign = 'left';
+    ctx.fillText('TURRETS:', shopX + 8, shopY + 25);
+    
+    const turretButtons = [];
+    let tx = shopX + 80;
+    for (const [key, t] of Object.entries(TURRET_TYPES)) {
+        const btnW = 75;
+        const btnH = 28;
+        
+        ctx.fillStyle = credits >= t.cost ? '#1a1a2e' : '#0a0a14';
+        ctx.strokeStyle = credits >= t.cost ? t.color : '#333';
+        ctx.lineWidth = 1;
+        ctx.fillRect(tx, shopY + 2, btnW, btnH);
+        ctx.strokeRect(tx, shopY + 2, btnW, btnH);
+        
+        if (credits >= t.cost) {
+            ctx.fillStyle = t.color;
+            ctx.font = 'bold 10px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText(t.name, tx + btnW / 2, shopY + 18);
+        } else {
+            ctx.fillStyle = '#333';
+            ctx.font = '10px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('???', tx + btnW / 2, shopY + 18);
+        }
+        
+        turretButtons.push({ key, x: tx, y: shopY + 2, w: btnW, h: btnH });
+        tx += btnW + 5;
+    }
+    
+    // Upgrade selected turret
+    if (turrets.length > 0) {
+        const upgradeY = shopY + shopH + 5;
+        const upgradeW = 120;
+        const upgradeX = shopX;
+        
+        ctx.fillStyle = '#0d0d1a';
+        ctx.fillRect(upgradeX, upgradeY, upgradeW, 25);
+        ctx.strokeStyle = '#0ff';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(upgradeX, upgradeY, upgradeW, 25);
+        
+        const selT = turrets[0];
+        ctx.fillStyle = '#0ff';
+        ctx.font = '10px Courier New';
+        ctx.textAlign = 'left';
+        ctx.fillText('UPGRADE: ' + selT.name + ' (Lv.' + selT.level + ')', upgradeX + 5, upgradeY + 18);
+        
+        const upgradeCost = 50 * Math.pow(1.5, selT.level);
+        ctx.fillStyle = credits >= upgradeCost ? '#ff0' : '#555';
+        ctx.fillText('Cost: ' + Math.round(upgradeCost), upgradeX + 5, upgradeY + 32);
+    }
+    
+    // Skill tree button
+    ctx.fillStyle = '#1a0a0a';
+    ctx.strokeStyle = '#f00';
+    ctx.lineWidth = 1;
+    ctx.fillRect(W - 150, 52, 130, 40);
+    ctx.strokeRect(W - 150, 52, 130, 40);
+    
+    ctx.fillStyle = '#f00';
+    ctx.font = 'bold 12px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText('SKILL TREE', W - 110, 72);
+    
+    // ===== MENU SCREEN =====
+    if (gameState === 'MENU') {
+        drawMenuScreen();
+    }
+    
+    // ===== GAME OVER SCREEN =====
+    if (gameState === 'GAME_OVER') {
+        drawGameOverScreen();
+    }
+    
+    // ===== SKILL TREE SCREEN =====
+    if (gameState === 'SKILL_TREE') {
+        drawSkillTreeScreen();
+    }
+    
+    // ===== WAVE TRANSITION =====
+    if (gameState === 'WAVE_TRANSITION') {
+        ctx.fillStyle = `rgba(0,0,0,${waveTransitionAlpha})`;
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = `rgba(0,255,255,${waveTransitionAlpha})`;
+        ctx.font = 'bold 48px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText(waveTransitionText, W / 2, H / 2);
+    }
+}
+
+function drawMenuScreen() {
+    // Darken
+    ctx.fillStyle = 'rgba(10,10,18,0.9)';
+    ctx.fillRect(0, 0, W, H);
+    
+    // Title
+    ctx.fillStyle = '#0ff';
+    ctx.font = 'bold 56px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText('NEON FORTRESS', W / 2, 180);
+    ctx.fillStyle = '#f0f';
+    ctx.font = 'bold 24px Courier New';
+    ctx.fillText('VOID PROTOCOL', W / 2, 220);
+    
+    // Decorative line
+    ctx.strokeStyle = '#0ff';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(W / 2 - 150, 240);
+    ctx.lineTo(W / 2 + 150, 240);
+    ctx.stroke();
+    
+    // Instructions
+    ctx.fillStyle = '#888';
+    ctx.font = '14px Courier New';
+    const instructions = [
+        'CLICK turret buttons above to build',
+        'CLICK turrets to upgrade them',
+        'CLICK the PHASE SHIFT button to flip',
+        'Press SPACE to start a new run',
+        '',
+        'Phase Shift: 8s toggle that gives',
+        'enemies 2x damage but turrets',
+        'take 1.5x damage'
+    ];
+    instructions.forEach((line, i) => {
+        ctx.fillText(line, W / 2, 270 + i * 22);
+    });
+    
+    // Start button
+    const btnW = 200, btnH = 45;
+    const btnX = W / 2 - btnW / 2;
+    const btnY = 480;
+    
+    ctx.fillStyle = '#0a1a0a';
+    ctx.strokeStyle = '#0ff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, btnW, btnH, 8);
+    ctx.fill();
+    ctx.stroke();
+    
+    ctx.fillStyle = '#0ff';
+    ctx.font = 'bold 20px Courier New';
+    ctx.fillText('PRESS SPACE TO START', btnX + btnW / 2, btnY + btnH / 2 + 6);
+    
+    // Total score
+    ctx.fillStyle = '#ff0';
+    ctx.font = '16px Courier New';
+    ctx.fillText('BEST SCORE: ' + (score > 0 ? score : '0'), W / 2, 560);
+}
+
+function drawGameOverScreen() {
+    ctx.fillStyle = 'rgba(10,10,18,0.95)';
+    ctx.fillRect(0, 0, W, H);
+    
+    ctx.fillStyle = '#f00';
+    ctx.font = 'bold 48px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText('GAME OVER', W / 2, 200);
+    
+    ctx.fillStyle = '#0ff';
+    ctx.font = '24px Courier New';
+    ctx.fillText('WAVES SURVIVED: ' + waveNumber, W / 2, 280);
+    ctx.fillText('KILLS: ' + runKills, W / 2, 320);
+    ctx.fillText('FINAL SCORE: ' + score, W / 2, 360);
+    
+    // Skill tree button
+    const btnW = 200, btnH = 45;
+    const btnX = W / 2 - btnW / 2;
+    const btnY = 440;
+    
+    ctx.fillStyle = '#1a0a0a';
+    ctx.strokeStyle = '#f00';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, btnW, btnH, 8);
+    ctx.fill();
+    ctx.stroke();
+    
+    ctx.fillStyle = '#f00';
+    ctx.font = 'bold 18px Courier New';
+    ctx.fillText('OPEN SKILL TREE', btnX + btnW / 2, btnY + btnH / 2 + 6);
+    
+    ctx.fillStyle = '#888';
+    ctx.font = '14px Courier New';
+    ctx.fillText('Press SPACE to return to menu', W / 2, 520);
+}
+
+function drawSkillTreeScreen() {
+    ctx.fillStyle = '#0a0a12';
+    ctx.fillRect(0, 0, W, H);
+    
+    ctx.fillStyle = '#f00';
+    ctx.font = 'bold 36px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText('SKILL TREE', W / 2, 50);
+    
+    ctx.fillStyle = '#0ff';
+    ctx.font = '14px Courier New';
+    ctx.fillText('Upgrade your capabilities between runs', W / 2, 75);
+    
+    const treeX = 100;
+    const treeY = 100;
+    const colWidth = 300;
+    const rowHeight = 70;
+    
+    let totalCost = 0;
+    const skills = Object.entries(skillTree);
+    
+    skills.forEach(([name, skill], i) => {
+        const x = treeX;
+        const y = treeY + i * rowHeight;
+        
+        const canAfford = credits >= skill.cost;
+        const maxed = skill.level >= skill.maxLevel;
+        
+        // Background
+        ctx.fillStyle = maxed ? '#1a0a0a' : canAfford ? '#0a1a1a' : '#0a0a0a';
+        ctx.strokeStyle = canAfford ? '#0ff' : '#333';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(x, y, colWidth, rowHeight, 8);
+        ctx.fill();
+        ctx.stroke();
+        
+        if (maxed) {
+            ctx.strokeStyle = '#ff0';
+            ctx.strokeRect(x, y, colWidth, rowHeight);
+        }
+        
+        // Skill name
+        ctx.fillStyle = canAfford ? '#0ff' : '#555';
+        ctx.font = 'bold 14px Courier New';
+        ctx.textAlign = 'left';
+        ctx.fillText(name.replace('_', ' ').toUpperCase(), x + 15, y + 25);
+        
+        // Level bars
+        const barX = x + colWidth - 10;
+        const barY = y + 20;
+        const barW = 80;
+        const barH = 12;
+        
+        ctx.fillStyle = '#222';
+        ctx.fillRect(barX, barY, barW, barH);
+        
+        if (maxed) {
+            ctx.fillStyle = '#ff0';
+            ctx.fillRect(barX, barY, barW, barH);
+        } else {
+            const pct = skill.level / skill.maxLevel;
+            ctx.fillStyle = canAfford ? '#0ff' : '#555';
+            ctx.fillRect(barX, barY, barW * pct, barH);
+        }
+        
+        // Level text
+        ctx.fillStyle = '#888';
+        ctx.font = '12px Courier New';
+        ctx.textAlign = 'right';
+        ctx.fillText('Lv.' + skill.level + '/' + skill.maxLevel, barX + barW + 10, barY + 10);
+        
+        // Description
+        ctx.fillStyle = canAfford ? '#0ff' : '#444';
+        ctx.font = '12px Courier New';
+        ctx.textAlign = 'left';
+        ctx.fillText(skill.desc, x + 15, y + 45);
+        
+        // Buy button
+        if (canAfford && !maxed) {
+            const btnX2 = x + colWidth + 15;
+            const btnW2 = 80;
+            const btnH2 = 25;
+            
+            ctx.fillStyle = '#1a1a2e';
+            ctx.strokeStyle = '#0ff';
+            ctx.lineWidth = 1;
+            ctx.fillRect(btnX2, y + 10, btnW2, btnH2);
+            ctx.strokeRect(btnX2, y + 10, btnW2, btnH2);
+            
+            ctx.fillStyle = '#0ff';
+            ctx.font = 'bold 12px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('BUY', btnX2 + btnW2 / 2, y + 28);
+            
+            ctx.fillStyle = '#ff0';
+            ctx.fillText('Cost: ' + skill.cost, btnX2 + btnW2 / 2, y + 40);
+        }
+        
+        totalCost += skill.cost;
+    });
+    
+    // Total cost
+    ctx.fillStyle = '#0ff';
+    ctx.font = '16px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText('TOTAL UPGRADES: ' + credits, W / 2, treeY + skills.length * rowHeight + 30);
+    
+    // Back button
+    const btnW = 200, btnH = 45;
+    const btnX = W / 2 - btnW / 2;
+    const btnY = treeY + skills.length * rowHeight + 60;
+    
+    ctx.fillStyle = '#1a0a0a';
+    ctx.strokeStyle = '#f00';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, btnW, btnH, 8);
+    ctx.fill();
+    ctx.stroke();
+    
+    ctx.fillStyle = '#f00';
+    ctx.font = 'bold 18px Courier New';
+    ctx.fillText('BACK TO GAME', btnX + btnW / 2, btnY + btnH / 2 + 6);
+}
+
+// ========== INPUT HANDLING ==========
+let mouseX = 0;
+let mouseY = 0;
+let selectedTurret = null;
+let selectedTurretType = null;
+
+canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mouseX = e.clientX - rect.left;
+    mouseY = e.clientY - rect.top;
+    
+    // Check turret buttons
+    if (gameState === 'PLAYING') {
+        for (const btn of turretButtons) {
+            if (mouseX >= btn.x && mouseX <= btn.x + btn.w &&
+                mouseY >= btn.y && mouseY <= btn.y + btn.h) {
+                selectedTurretType = btn.key;
+                selectedTurret = null;
+                return;
+            }
+        }
+        
+        // Check upgrade button
+        if (turrets.length > 0) {
+            const upgradeBtnX = 450;
+            const upgradeBtnY = 52 + 40 + 5;
+            const upgradeBtnW = 120;
+            const upgradeBtnH = 25;
+            if (mouseX >= upgradeBtnX && mouseX <= upgradeBtnX + upgradeBtnW &&
+                mouseY >= upgradeBtnY && mouseY <= upgradeBtnY + upgradeBtnH) {
+                selectedTurret = null;
+                selectedTurretType = null;
+                return;
+            }
+        }
+        
+        // Check phase shift button
+        if (mouseX >= phaseShiftButton.x && mouseX <= phaseShiftButton.x + phaseShiftButton.w &&
+            mouseY >= phaseShiftButton.y && mouseY <= phaseShiftButton.y + phaseShiftButton.h) {
+            selectedTurret = null;
+            selectedTurretType = null;
+            return;
+        }
+        
+        // Check skill tree button
+        if (mouseX >= W - 150 && mouseX <= W - 20 &&
+            mouseY >= 52 && mouseY <= 92) {
+            gameState = 'SKILL_TREE';
+            return;
+        }
+        
+        // Check turret placement
+        for (const turret of turrets) {
+            if (mouseX >= turret.x - 20 && mouseX <= turret.x + 20 &&
+                mouseY >= turret.y - 20 && mouseY <= turret.y + 20) {
+                selectedTurret = turret;
+                selectedTurretType = null;
+                return;
+            }
+        }
+    }
+});
+
+canvas.addEventListener('click', () => {
+    if (gameState === 'MENU') return;
+    if (gameState === 'SKILL_TREE') {
+        for (let i = 0; i < Object.entries(skillTree).length; i++) {
+            const skill = Object.entries(skillTree)[i];
+            const y = 100 + i * 70;
+            const x = 100;
+            const btnX2 = x + 300 + 15;
+            const btnW2 = 80;
+            const btnH2 = 25;
+            if (mouseX >= btnX2 && mouseX <= btnX2 + btnW2 &&
+                mouseY >= y + 10 && mouseY <= y + 35) {
+                if (credits >= skill.cost && skill.level < skill.maxLevel) {
+                    credits -= skill.cost;
+                    skill.level++;
+                    skill.cost = Math.round(skill.cost * 1.3);
+                }
+                return;
+            }
+        }
+        return;
+    }
+    
+    if (gameState === 'GAME_OVER') {
+        const btnW = 200, btnH = 45;
+        const btnX = W / 2 - btnW / 2;
+        const btnY = 440;
+        if (mouseX >= btnX && mouseX <= btnX + btnW &&
+            mouseY >= btnY && mouseY <= btnY + btnH) {
+            gameState = 'SKILL_TREE';
+        }
+        return;
+    }
+    
+    if (gameState !== 'PLAYING') return;
+    
+    // Phase shift button
+    if (mouseX >= phaseShiftButton.x && mouseX <= phaseShiftButton.x + phaseShiftButton.w &&
+        mouseY >= phaseShiftButton.y && mouseY <= phaseShiftButton.y + phaseShiftButton.h) {
+        activatePhaseShift();
+        return;
+    }
+    
+    // Upgrade button
+    if (turrets.length > 0) {
+        const upgradeBtnX = 450;
+        const upgradeBtnY = 52 + 40 + 5;
+        const upgradeBtnW = 120;
+        const upgradeBtnH = 25;
+        if (mouseX >= upgradeBtnX && mouseX <= upgradeBtnX + upgradeBtnW &&
+            mouseY >= upgradeBtnY && mouseY <= upgradeBtnY + upgradeBtnH) {
+            const upgradeCost = 50 * Math.pow(1.5, turrets[0].level);
+            if (credits >= upgradeCost) {
+                credits -= upgradeCost;
+                upgradeTurret(turrets[0]);
+            }
+            return;
+        }
+    }
+    
+    // Turret type buttons
+    for (const btn of turretButtons) {
+        if (mouseX >= btn.x && mouseX <= btn.x + btn.w &&
+            mouseY >= btn.y && mouseY <= btn.y + btn.h) {
+            const t = TURRET_TYPES[btn.key];
+            if (credits >= t.cost) {
+                credits -= t.cost;
+                buildTurret(btn.key);
+            }
+            return;
+        }
+    }
+    
+    // Build turret on grid
+    if (selectedTurretType) {
+        const gx = Math.floor((mouseX - GRID_X) / CELL);
+        const gy = Math.floor((mouseY - GRID_Y) / CELL);
+        if (gx >= 0 && gx < GRID_COLS && gy >= 0 && gy < GRID_ROWS &&
+            grid[gy][gx] === 'empty') {
+            const t = TURRET_TYPES[selectedTurretType];
+            if (credits >= t.cost) {
+                credits -= t.cost;
+                buildTurret(selectedTurretType);
+            }
+        }
+        selectedTurretType = null;
+    }
+    
+    // Upgrade selected turret
+    if (selectedTurret) {
+        const upgradeCost = 50 * Math.pow(1.5, selectedTurret.level);
+        if (credits >= upgradeCost) {
+            credits -= upgradeCost;
+            upgradeTurret(selectedTurret);
+        }
+    }
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') {
+        if (gameState === 'MENU') {
+            startNewRun();
+        } else if (gameState === 'GAME_OVER') {
+            startNewRun();
+        } else if (gameState === 'SKILL_TREE') {
+            gameState = 'PLAYING';
+        }
+    }
+});
+
+function startNewRun() {
+    credits = 50 + skillTree.startCredits.level * 50;
+    waveNumber = 0;
+    enemies = [];
+    turrets = [];
+    bullets = [];
+    particles = [];
+    floatingTexts = [];
+    score = 0;
+    lives = 20 + Math.floor(skillTree.healthRegen.level * 2);
+    totalKills = 0;
+    runKills = 0;
+    phaseShiftCooldown = 0;
+    phaseShiftActive = false;
+    phaseShiftTimer = 0;
+    gameState = 'PLAYING';
+    startWave();
+}
+
+function buildTurret(type) {
+    const gx = Math.floor((mouseX - GRID_X) / CELL);
+    const gy = Math.floor((mouseY - GRID_Y) / CELL);
+    
+    if (gx < 0 || gx >= GRID_COLS || gy < 0 || gy >= GRID_ROWS) return;
+    if (grid[gy][gx] !== 'empty') return;
+    
+    const t = TURRET_TYPES[type];
+    const turret = {
+        type: type,
+        x: GRID_X + gx * CELL + CELL / 2,
+        y: GRID_Y + gy * CELL + CELL / 2,
+        damage: t.damage,
+        fireRate: t.fireRate,
+        range: t.range,
+        rangeBase: t.range,
+        cooldown: 0,
+        level: 0,
+        selected: false
+    };
+    turrets.push(turret);
+    
+    // Build particles
+    for (let i = 0; i < 20; i++) {
+        particles.push({
+            x: turret.x, y: turret.y,
+            vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4,
+            life: 0.5, decay: 0.01, color: t.color, size: Math.random() * 3 + 2
+        });
+    }
+}
+
+// ========== TURRET FIRE LOGIC ==========
+TURRET_TYPES.pulse.fire = function(dt) {
+    let target = null;
+    let minDist = this.range;
+    for (const e of enemies) {
+        if (!e.alive) continue;
+        const d = Math.sqrt((e.x - this.x) ** 2 + (e.y - this.y) ** 2);
+        if (d < minDist) {
+            minDist = d;
+            target = e;
+        }
+    }
+    if (target) {
+        const angle = Math.atan2(target.y - this.y, target.x - this.x);
+        const dmgMult = phaseShiftActive ? 1.0 : 1.0;
+        const critMult = Math.random() < (skillTree.critChance.level * 0.05) ? 2.0 : 1.0;
+        const damage = Math.round(this.damage * dmgMult * critMult);
+        bullets.push({
+            x: this.x, y: this.y,
+            vx: Math.cos(angle) * 8,
+            vy: Math.sin(angle) * 8,
+            damage: damage,
+            color: '#0ff',
+            life: 2000,
+            type: 'pulse'
+        });
+    }
+    this.cooldown = this.fireRate * 1000;
+};
+
+TURRET_TYPES.flame.fire = function(dt) {
+    let target = null;
+    let minDist = this.range;
+    for (const e of enemies) {
+        if (!e.alive) continue;
+        const d = Math.sqrt((e.x - this.x) ** 2 + (e.y - this.y) ** 2);
+        if (d < minDist) {
+            minDist = d;
+            target = e;
+        }
+    }
+    if (target) {
+        const angle = Math.atan2(target.y - this.y, target.x - this.x);
+        const dmgMult = phaseShiftActive ? 1.0 : 1.0;
+        bullets.push({
+            x: this.x, y: this.y,
+            vx: Math.cos(angle) * 4,
+            vy: Math.sin(angle) * 4,
+            damage: this.damage,
+            color: '#f50',
+            life: 3000,
+            type: 'flame',
+            aoe: this.range - 80,
+            isFlame: true
+        });
+    }
+    this.cooldown = this.fireRate * 1000;
+};
+
+TURRET_TYPES.rail.fire = function(dt) {
+    let target = null;
+    let minDist = this.range;
+    for (const e of enemies) {
+        if (!e.alive) continue;
+        const d = Math.sqrt((e.x - this.x) ** 2 + (e.y - this.y) ** 2);
+        if (d < minDist) {
+            minDist = d;
+            target = e;
+        }
+    }
+    if (target) {
+        const angle = Math.atan2(target.y - this.y, target.x - this.x);
+        const dmgMult = phaseShiftActive ? 1.0 : 1.0;
+        const critMult = Math.random() < (skillTree.critChance.level * 0.05) ? 2.0 : 1.0;
+        const damage = Math.round(this.damage * dmgMult * critMult);
+        bullets.push({
+            x: this.x, y: this.y,
+            vx: Math.cos(angle) * 12,
+            vy: Math.sin(angle) * 12,
+            damage: damage,
+            color: '#af0',
+            life: 1500,
+            type: 'rail'
+        });
+    }
+    this.cooldown = this.fireRate * 1000;
+};
+
+TURRET_TYPES.prism.fire = function(dt) {
+    let target = null;
+    let minDist = this.range;
+    for (const e of enemies) {
+        if (!e.alive) continue;
+        const d = Math.sqrt((e.x - this.x) ** 2 + (e.y - this.y) ** 2);
+        if (d < minDist) {
+            minDist = d;
+            target = e;
+        }
+    }
+    if (target) {
+        const angle = Math.atan2(target.y - this.y, target.x - this.x);
+        bullets.push({
+            x: this.x, y: this.y,
+            vx: Math.cos(angle) * 6,
+            vy: Math.sin(angle) * 6,
+            damage: this.damage,
+            color: '#f0f',
+            life: 2000,
+            type: 'prism',
+            isReflected: true
+        });
+    }
+    this.cooldown = this.fireRate * 1000;
+};
+
+// Attach fire methods to each turret type
+for (const key of Object.keys(TURRET_TYPES)) {
+    TURRET_TYPES[key].fire = function(dt) {
+        if (key === 'pulse') TURRET_TYPES.pulse.fire.call(this, dt);
+        else if (key === 'flame') TURRET_TYPES.flame.fire.call(this, dt);
+        else if (key === 'rail') TURRET_TYPES.rail.fire.call(this, dt);
+        else if (key === 'prism') TURRET_TYPES.prism.fire.call(this, dt);
+    };
+}
+
+// ========== GAME LOOP ==========
+let lastTime = performance.now();
+
+function gameLoop(now) {
+    const dt = Math.min(now - lastTime, 50); // Cap at 50ms to prevent huge jumps
+    lastTime = now;
+    
+    update(dt);
+    draw();
+    
+    requestAnimationFrame(gameLoop);
+}
+
+// Polyfill roundRect if needed
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+        if (typeof r === 'number') r = {tl:r, tr:r, br:r, bl:r};
+        this.moveTo(x + r.tl, y);
+        this.lineTo(x + w - r.tr, y);
+        this.quadraticCurveTo(x + w, y, x + w, y + r.tr);
+        this.lineTo(x + w, y + h - r.br);
+        this.quadraticCurveTo(x + w, y + h, x + w - r.br, y + h);
+        this.lineTo(x + r.bl, y + h);
+        this.quadraticCurveTo(x, y + h, x, y + h - r.br);
+        this.lineTo(x, y + r.tl);
+        this.quadraticCurveTo(x, y, x + r.tl, y);
+        this.closePath();
+    };
+}
+
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>

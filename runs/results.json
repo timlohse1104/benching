@@ -1,6 +1,6 @@
 {
   "aggregate": true,
-  "timestamp": "2026-08-21T11-09-54Z",
+  "timestamp": "2026-08-21T12-39-48Z",
   "dry_run": false,
   "prompts": [
     {
@@ -164,9 +164,419 @@
       "uid": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine::Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
       "run_dir": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine",
       "run_timestamp": "2026-08-21T11-09-54Z"
+    },
+    {
+      "id": "Ternary-Bonsai-27B",
+      "label": "Ternary-Bonsai-27B",
+      "provider": "openai/llamacpp",
+      "is_local": true,
+      "kind": "hermine",
+      "api_base": "http://172.30.48.1:8081/v1",
+      "model_name": "Ternary-Bonsai-27B",
+      "uid": "Ternary-Bonsai-27B__hermine::Ternary-Bonsai-27B",
+      "run_dir": "Ternary-Bonsai-27B__hermine",
+      "run_timestamp": "2026-08-21T12-39-48Z"
     }
   ],
   "cells": [
+    {
+      "prompt_id": "01-svg-clock",
+      "model_id": "Ternary-Bonsai-27B",
+      "model_label": "Ternary-Bonsai-27B",
+      "provider": "openai/llamacpp",
+      "is_local": true,
+      "is_dry_run": false,
+      "kind": "hermine",
+      "status": "ok",
+      "html_file": "Ternary-Bonsai-27B__hermine/outputs/01-svg-clock__Ternary-Bonsai-27B.html",
+      "raw_file": null,
+      "thumbnail": "Ternary-Bonsai-27B__hermine/thumbnails/01-svg-clock__Ternary-Bonsai-27B.png",
+      "latency_ms": 27101,
+      "prompt_tokens": 230,
+      "completion_tokens": 1999,
+      "total_tokens": 2229,
+      "cost_usd": null,
+      "looks_like_html": true,
+      "validation": {
+        "status": "ok",
+        "has_doctype": true,
+        "has_html": true,
+        "has_head": true,
+        "has_body": true,
+        "parse_issues": [],
+        "runtime_issues": [],
+        "thumbnail": "thumbnails/01-svg-clock__Ternary-Bonsai-27B.png"
+      },
+      "error": null,
+      "run_dir": "Ternary-Bonsai-27B__hermine",
+      "model_uid": "Ternary-Bonsai-27B__hermine::Ternary-Bonsai-27B"
+    },
+    {
+      "prompt_id": "02-fractal-tree",
+      "model_id": "Ternary-Bonsai-27B",
+      "model_label": "Ternary-Bonsai-27B",
+      "provider": "openai/llamacpp",
+      "is_local": true,
+      "is_dry_run": false,
+      "kind": "hermine",
+      "status": "broken",
+      "html_file": "Ternary-Bonsai-27B__hermine/outputs/02-fractal-tree__Ternary-Bonsai-27B.html",
+      "raw_file": null,
+      "thumbnail": "Ternary-Bonsai-27B__hermine/thumbnails/02-fractal-tree__Ternary-Bonsai-27B.png",
+      "latency_ms": 90006,
+      "prompt_tokens": 304,
+      "completion_tokens": 6676,
+      "total_tokens": 6980,
+      "cost_usd": null,
+      "looks_like_html": true,
+      "validation": {
+        "status": "broken",
+        "has_doctype": true,
+        "has_html": true,
+        "has_head": true,
+        "has_body": true,
+        "parse_issues": [],
+        "runtime_issues": [
+          {
+            "kind": "page_error",
+            "message": "Cannot read properties of undefined (reading 'x')",
+            "line": null,
+            "col": null
+          }
+        ],
+        "thumbnail": "thumbnails/02-fractal-tree__Ternary-Bonsai-27B.png"
+      },
+      "error": null,
+      "run_dir": "Ternary-Bonsai-27B__hermine",
+      "model_uid": "Ternary-Bonsai-27B__hermine::Ternary-Bonsai-27B"
+    },
+    {
+      "prompt_id": "03-tower-defense",
+      "model_id": "Ternary-Bonsai-27B",
+      "model_label": "Ternary-Bonsai-27B",
+      "provider": "openai/llamacpp",
+      "is_local": true,
+      "is_dry_run": false,
+      "kind": "hermine",
+      "status": "broken",
+      "html_file": "Ternary-Bonsai-27B__hermine/outputs/03-tower-defense__Ternary-Bonsai-27B.html",
+      "raw_file": null,
+      "thumbnail": "Ternary-Bonsai-27B__hermine/thumbnails/03-tower-defense__Ternary-Bonsai-27B.png",
+      "latency_ms": 228349,
+      "prompt_tokens": 203,
+      "completion_tokens": 16967,
+      "total_tokens": 17170,
+      "cost_usd": null,
+      "looks_like_html": true,
+      "validation": {
+        "status": "broken",
+        "has_doctype": true,
+        "has_html": true,
+        "has_head": true,
+        "has_body": true,
+        "parse_issues": [],
+        "runtime_issues": [
+          {
+            "kind": "page_error",
+            "message": "Unexpected token ')'",
+            "line": null,
+            "col": null
+          }
+        ],
+        "thumbnail": "thumbnails/03-tower-defense__Ternary-Bonsai-27B.png"
+      },
+      "error": null,
+      "run_dir": "Ternary-Bonsai-27B__hermine",
+      "model_uid": "Ternary-Bonsai-27B__hermine::Ternary-Bonsai-27B"
+    },
+    {
+      "prompt_id": "04-particle-simulation",
+      "model_id": "Ternary-Bonsai-27B",
+      "model_label": "Ternary-Bonsai-27B",
+      "provider": "openai/llamacpp",
+      "is_local": true,
+      "is_dry_run": false,
+      "kind": "hermine",
+      "status": "ok",
+      "html_file": "Ternary-Bonsai-27B__hermine/outputs/04-particle-simulation__Ternary-Bonsai-27B.html",
+      "raw_file": null,
+      "thumbnail": "Ternary-Bonsai-27B__hermine/thumbnails/04-particle-simulation__Ternary-Bonsai-27B.png",
+      "latency_ms": 44494,
+      "prompt_tokens": 257,
+      "completion_tokens": 2964,
+      "total_tokens": 3221,
+      "cost_usd": null,
+      "looks_like_html": true,
+      "validation": {
+        "status": "ok",
+        "has_doctype": true,
+        "has_html": true,
+        "has_head": true,
+        "has_body": true,
+        "parse_issues": [],
+        "runtime_issues": [],
+        "thumbnail": "thumbnails/04-particle-simulation__Ternary-Bonsai-27B.png"
+      },
+      "error": null,
+      "run_dir": "Ternary-Bonsai-27B__hermine",
+      "model_uid": "Ternary-Bonsai-27B__hermine::Ternary-Bonsai-27B"
+    },
+    {
+      "prompt_id": "05-game-of-life",
+      "model_id": "Ternary-Bonsai-27B",
+      "model_label": "Ternary-Bonsai-27B",
+      "provider": "openai/llamacpp",
+      "is_local": true,
+      "is_dry_run": false,
+      "kind": "hermine",
+      "status": "ok",
+      "html_file": "Ternary-Bonsai-27B__hermine/outputs/05-game-of-life__Ternary-Bonsai-27B.html",
+      "raw_file": null,
+      "thumbnail": "Ternary-Bonsai-27B__hermine/thumbnails/05-game-of-life__Ternary-Bonsai-27B.png",
+      "latency_ms": 77788,
+      "prompt_tokens": 288,
+      "completion_tokens": 5793,
+      "total_tokens": 6081,
+      "cost_usd": null,
+      "looks_like_html": true,
+      "validation": {
+        "status": "ok",
+        "has_doctype": true,
+        "has_html": true,
+        "has_head": true,
+        "has_body": true,
+        "parse_issues": [],
+        "runtime_issues": [],
+        "thumbnail": "thumbnails/05-game-of-life__Ternary-Bonsai-27B.png"
+      },
+      "error": null,
+      "run_dir": "Ternary-Bonsai-27B__hermine",
+      "model_uid": "Ternary-Bonsai-27B__hermine::Ternary-Bonsai-27B"
+    },
+    {
+      "prompt_id": "06-physics-sandbox",
+      "model_id": "Ternary-Bonsai-27B",
+      "model_label": "Ternary-Bonsai-27B",
+      "provider": "openai/llamacpp",
+      "is_local": true,
+      "is_dry_run": false,
+      "kind": "hermine",
+      "status": "ok",
+      "html_file": "Ternary-Bonsai-27B__hermine/outputs/06-physics-sandbox__Ternary-Bonsai-27B.html",
+      "raw_file": null,
+      "thumbnail": "Ternary-Bonsai-27B__hermine/thumbnails/06-physics-sandbox__Ternary-Bonsai-27B.png",
+      "latency_ms": 64948,
+      "prompt_tokens": 303,
+      "completion_tokens": 5023,
+      "total_tokens": 5326,
+      "cost_usd": null,
+      "looks_like_html": true,
+      "validation": {
+        "status": "ok",
+        "has_doctype": true,
+        "has_html": true,
+        "has_head": true,
+        "has_body": true,
+        "parse_issues": [],
+        "runtime_issues": [],
+        "thumbnail": "thumbnails/06-physics-sandbox__Ternary-Bonsai-27B.png"
+      },
+      "error": null,
+      "run_dir": "Ternary-Bonsai-27B__hermine",
+      "model_uid": "Ternary-Bonsai-27B__hermine::Ternary-Bonsai-27B"
+    },
+    {
+      "prompt_id": "07-deskbox-clone",
+      "model_id": "Ternary-Bonsai-27B",
+      "model_label": "Ternary-Bonsai-27B",
+      "provider": "openai/llamacpp",
+      "is_local": true,
+      "is_dry_run": false,
+      "kind": "hermine",
+      "status": "ok",
+      "html_file": "Ternary-Bonsai-27B__hermine/outputs/07-deskbox-clone__Ternary-Bonsai-27B.html",
+      "raw_file": null,
+      "thumbnail": "Ternary-Bonsai-27B__hermine/thumbnails/07-deskbox-clone__Ternary-Bonsai-27B.png",
+      "latency_ms": 248166,
+      "prompt_tokens": 786,
+      "completion_tokens": 19186,
+      "total_tokens": 19972,
+      "cost_usd": null,
+      "looks_like_html": true,
+      "validation": {
+        "status": "ok",
+        "has_doctype": true,
+        "has_html": true,
+        "has_head": true,
+        "has_body": true,
+        "parse_issues": [],
+        "runtime_issues": [],
+        "thumbnail": "thumbnails/07-deskbox-clone__Ternary-Bonsai-27B.png"
+      },
+      "error": null,
+      "run_dir": "Ternary-Bonsai-27B__hermine",
+      "model_uid": "Ternary-Bonsai-27B__hermine::Ternary-Bonsai-27B"
+    },
+    {
+      "prompt_id": "08-paint-app",
+      "model_id": "Ternary-Bonsai-27B",
+      "model_label": "Ternary-Bonsai-27B",
+      "provider": "openai/llamacpp",
+      "is_local": true,
+      "is_dry_run": false,
+      "kind": "hermine",
+      "status": "ok",
+      "html_file": "Ternary-Bonsai-27B__hermine/outputs/08-paint-app__Ternary-Bonsai-27B.html",
+      "raw_file": null,
+      "thumbnail": "Ternary-Bonsai-27B__hermine/thumbnails/08-paint-app__Ternary-Bonsai-27B.png",
+      "latency_ms": 57536,
+      "prompt_tokens": 304,
+      "completion_tokens": 4322,
+      "total_tokens": 4626,
+      "cost_usd": null,
+      "looks_like_html": true,
+      "validation": {
+        "status": "ok",
+        "has_doctype": true,
+        "has_html": true,
+        "has_head": true,
+        "has_body": true,
+        "parse_issues": [],
+        "runtime_issues": [],
+        "thumbnail": "thumbnails/08-paint-app__Ternary-Bonsai-27B.png"
+      },
+      "error": null,
+      "run_dir": "Ternary-Bonsai-27B__hermine",
+      "model_uid": "Ternary-Bonsai-27B__hermine::Ternary-Bonsai-27B"
+    },
+    {
+      "prompt_id": "09-violin-3d",
+      "model_id": "Ternary-Bonsai-27B",
+      "model_label": "Ternary-Bonsai-27B",
+      "provider": "openai/llamacpp",
+      "is_local": true,
+      "is_dry_run": false,
+      "kind": "hermine",
+      "status": "broken",
+      "html_file": "Ternary-Bonsai-27B__hermine/outputs/09-violin-3d__Ternary-Bonsai-27B.html",
+      "raw_file": null,
+      "thumbnail": "Ternary-Bonsai-27B__hermine/thumbnails/09-violin-3d__Ternary-Bonsai-27B.png",
+      "latency_ms": 178946,
+      "prompt_tokens": 321,
+      "completion_tokens": 13020,
+      "total_tokens": 13341,
+      "cost_usd": null,
+      "looks_like_html": true,
+      "validation": {
+        "status": "broken",
+        "has_doctype": true,
+        "has_html": true,
+        "has_head": true,
+        "has_body": true,
+        "parse_issues": [
+          {
+            "kind": "parse_error",
+            "message": "expected-doctype-but-got-chars",
+            "line": 2,
+            "col": 0
+          },
+          {
+            "kind": "parse_error",
+            "message": "unexpected-doctype",
+            "line": 2,
+            "col": 15
+          },
+          {
+            "kind": "parse_error",
+            "message": "non-html-root",
+            "line": 3,
+            "col": 16
+          },
+          {
+            "kind": "parse_error",
+            "message": "unexpected-start-tag-ignored",
+            "line": 4,
+            "col": 6
+          },
+          {
+            "kind": "parse_error",
+            "message": "unexpected-end-tag",
+            "line": 18,
+            "col": 7
+          },
+          {
+            "kind": "parse_error",
+            "message": "unexpected-start-tag",
+            "line": 19,
+            "col": 6
+          }
+        ],
+        "runtime_issues": [
+          {
+            "kind": "page_error",
+            "message": "Failed to execute 'getUniformLocation' on 'WebGLRenderingContext': parameter 1 is not of type 'WebGLProgram'.",
+            "line": null,
+            "col": null
+          }
+        ],
+        "thumbnail": "thumbnails/09-violin-3d__Ternary-Bonsai-27B.png"
+      },
+      "error": null,
+      "run_dir": "Ternary-Bonsai-27B__hermine",
+      "model_uid": "Ternary-Bonsai-27B__hermine::Ternary-Bonsai-27B"
+    },
+    {
+      "prompt_id": "10-markdown-editor",
+      "model_id": "Ternary-Bonsai-27B",
+      "model_label": "Ternary-Bonsai-27B",
+      "provider": "openai/llamacpp",
+      "is_local": true,
+      "is_dry_run": false,
+      "kind": "hermine",
+      "status": "broken",
+      "html_file": "Ternary-Bonsai-27B__hermine/outputs/10-markdown-editor__Ternary-Bonsai-27B.html",
+      "raw_file": null,
+      "thumbnail": "Ternary-Bonsai-27B__hermine/thumbnails/10-markdown-editor__Ternary-Bonsai-27B.png",
+      "latency_ms": 94711,
+      "prompt_tokens": 343,
+      "completion_tokens": 6966,
+      "total_tokens": 7309,
+      "cost_usd": null,
+      "looks_like_html": true,
+      "validation": {
+        "status": "broken",
+        "has_doctype": true,
+        "has_html": true,
+        "has_head": true,
+        "has_body": true,
+        "parse_issues": [
+          {
+            "kind": "parse_error",
+            "message": "unexpected-end-tag",
+            "line": 505,
+            "col": 9
+          }
+        ],
+        "runtime_issues": [
+          {
+            "kind": "page_error",
+            "message": "Unexpected identifier 'inline'",
+            "line": null,
+            "col": null
+          },
+          {
+            "kind": "page_error",
+            "message": "Invalid regular expression: /\\n((?:\\s*(?:[1-9]+\\.\\s|\\d+\\)\\s|\\s*[-*+]\\s)[^\\n\\r]*(?:\\r?\\n(?:\\s*(?:[1-9]+\\.\\s|\\d+\\)\\s|\\s*(?:[1-2]\\s|\\s*[1-9]+\\s)|\\s*(?:[-*+]\\s)))[^\\n\\r]*)*)/g: Unterminated group",
+            "line": null,
+            "col": null
+          }
+        ],
+        "thumbnail": "thumbnails/10-markdown-editor__Ternary-Bonsai-27B.png"
+      },
+      "error": null,
+      "run_dir": "Ternary-Bonsai-27B__hermine",
+      "model_uid": "Ternary-Bonsai-27B__hermine::Ternary-Bonsai-27B"
+    },
     {
       "prompt_id": "01-svg-clock",
       "model_id": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
@@ -3782,14 +4192,14 @@
     }
   ],
   "summary": {
-    "total": 100,
+    "total": 110,
     "total_cost_usd": 0.0,
     "status_counts": {
-      "ok": 72,
-      "warnings": 12,
-      "broken": 16
+      "ok": 78,
+      "broken": 20,
+      "warnings": 12
     },
-    "model_count": 10,
-    "run_count": 10
+    "model_count": 11,
+    "run_count": 11
   }
 }

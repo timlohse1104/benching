@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paint Canvas</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f0f2f5;
+    color: #333;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  #toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 24px;
+    background: #ffffff;
+    border-bottom: 2px solid #e1e5eb;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    z-index: 10;
+  }
+  #toolbar button, #toolbar select {
+    padding: 6px 14px;
+    border: 1.5px solid #d1d5db;
+    border-radius: 6px;
+    background: #fafafa;
+    color: #333;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+    outline: none;
+  }
+  #toolbar button:hover, #toolbar select:hover {
+    background: #eef2ff;
+    border-color: #a5b4fc;
+  }
+  #toolbar button.active {
+    background: #dbeafe;
+    border-color: #3b82f6;
+    color: #1d4ed8;
+    font-weight: 600;
+  }
+  .separator {
+    width: 1px;
+    height: 28px;
+    background: #e5e7eb;
+    margin: 0 4px;
+  }
+  .label {
+    font-size: 12px;
+    color: #6b7280;
+    font-weight: 500;
+    margin-right: 2px;
+    white-space: nowrap;
+  }
+  .color-preview {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid #d1d5db;
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 4px;
+  }
+  #palette {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .palette-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .palette-swatch:hover {
+    transform: scale(1.15);
+    border-color: #333;
+  }
+  .palette-swatch.selected {
+    border-color: #333;
+    box-shadow: 0 0 0 2px rgba(0,0,0,0.2);
+  }
+  #canvas-stage {
+    border: 2px solid #d1d5eb;
+    border-radius: 4px;
+    margin: 20px auto;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    overflow: hidden;
+    cursor: crosshair;
+    touch-action: none;
+  }
+  #canvas-stage canvas {
+    display: block;
+    background: #ffffff;
+  }
+  #status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 8px 24px;
+    background: #ffffff;
+    border-top: 2px solid #e1e5eb;
+    font-size: 12px;
+    color: #6b7280;
+    box-shadow: 0 -1px 3px rgba(0,0,0,0.06);
+  }
+  #status-bar span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  #status-bar .value {
+    font-weight: 600;
+    color: #333;
+  }
+  .btn-group {
+    display: flex;
+    gap: 4px;
+  }
+  .btn-group button {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+  button.clear-btn {
+    border-color: #fca5a5;
+    color: #dc2626;
+  }
+  button.clear-btn:hover {
+    background: #fef2f2;
+    border-color: #ef4444;
+  }
+  button.save-btn {
+    border-color: #bbf7d0;
+    color: #16a34a;
+  }
+  button.save-btn:hover {
+    background: #f0fdf4;
+    border-color: #22c55e;
+  }
+  button.undo-btn, button.redo-btn {
+    border-color: #c7d2fe;
+    color: #3b82f6;
+  }
+  button.undo-btn:hover, button.redo-btn:hover {
+    background: #eff6ff;
+    border-color: #60a5fa;
+  }
+  button.undo-btn:disabled, button.redo-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    border-color: #d1d5db;
+    color: #9ca3af;
+  }
+  #size-display, #color-display {
+    font-size: 13px;
+    font-weight: 500;
+    color: #333;
+  }
+  input[type="range"] {
+    width: 100px;
+    accent-color: #3b82f6;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <button class="active" id="btnBrush" onclick="setTool('brush')" title="Brush">
+    🖌️ Brush
+  </button>
+  <button id="btnEraser" onclick="setTool('eraser')" title="Eraser">
+    🧹 Eraser
+  </button>
+  <div class="separator"></div>
+  <span class="label">Size:</span>
+  <input type="range" id="brushSize" min="1" max="100" value="5" oninput="updateSize()">
+  <span id="size-display">5px</span>
+  <div class="separator"></div>
+  <span class="label">Color:</span>
+  <input type="color" id="colorPicker" value="#000000" oninput="updateColor()">
+  <span class="color-preview" id="colorPreview" style="background:#000000;"></span>
+  <div class="separator"></div>
+  <div id="palette" onclick="handlePaletteClick(event, this)"></div>
+  <div class="separator"></div>
+  <div class="btn-group">
+    <button class="undo-btn" id="btnUndo" onclick="undo()" title="Undo">↩ Undo</button>
+    <button class="redo-btn" id="btnRedo" onclick="redo()" title="Redo">↪ Redo</button>
+    <button class="clear-btn" onclick="clearCanvas()" title="Clear">🗑 Clear</button>
+    <button class="save-btn" onclick="savePNG()" title="Save as PNG">💾 Save PNG</button>
+  </div>
+</div>
+
+<div id="canvas-stage">
+  <canvas id="canvas" width="800" height="600"></canvas>
+</div>
+
+<div id="status-bar">
+  <span>Brush: <span class="value" id="statusTool">Brush</span></span>
+  <span>Size: <span class="value" id="statusSize">5px</span></span>
+  <span>Color: <span class="value" id="statusColor">#000000</span></span>
+  <span>History: <span class="value" id="statusHistory">0</span></span>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const W = canvas.width;
+const H = canvas.height;
+
+let tool = 'brush';
+let brushSize = 5;
+let brushColor = '#000000';
+let isDrawing = false;
+let lastX = -1;
+let lastY = -1;
+let currentPath = [];
+
+// History
+const history = [];
+const redoStack = [];
+const maxHistory = 50;
+
+// Preset palette
+const paletteColors = [
+  '#ff0000','#ff6b0b','#ffeb3b','#ffea00','#00e676','#00c853',
+  '#00bcd4','#0000ff','#9c27b0','#ff00ff','#8d6e63','#e0e0e0',
+  '#616161','#424242','#ffffff','#3f51b5','#e91e63','#607d8b'
+];
+
+function initPalette() {
+  const el = document.getElementById('palette');
+  paletteColors.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'palette-swatch';
+    div.style.background = c;
+    div.title = c;
+    div.onclick = function() { selectColor(c, this); };
+    el.appendChild(div);
+  });
+}
+
+function selectColor(c, el) {
+  brushColor = c;
+  document.getElementById('colorPicker').value = c;
+  updateColor();
+  if (el) {
+    document.querySelectorAll('.palette-swatch').forEach(s => s.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+}
+
+function setTool(t) {
+  tool = t;
+  document.getElementById('btnBrush').classList.toggle('active', t === 'brush');
+  document.getElementById('btnEraser').classList.toggle('active', t === 'eraser');
+  document.getElementById('statusTool').textContent = t === 'brush' ? 'Brush' : 'Eraser';
+}
+
+function updateSize() {
+  brushSize = parseInt(document.getElementById('brushSize').value);
+  document.getElementById('size-display').textContent = brushSize + 'px';
+  document.getElementById('statusSize').textContent = brushSize + 'px';
+}
+
+function updateColor() {
+  brushColor = document.getElementById('colorPicker').value;
+  document.getElementById('colorPreview').style.background = brushColor;
+  document.getElementById('statusColor').textContent = brushColor;
+}
+
+function updateHistory() {
+  const state = canvas.toDataURL();
+  history.push(state);
+  if (history.length > maxHistory) history.shift();
+  redoStack.length = 0;
+  updateHistoryUI();
+}
+
+function undo() {
+  if (history.length < 2) {
+    // We saved the initial blank state, so we need at least 1 step back
+    // Actually, initial state is index 0, so we need length >= 2 to undo
+    // But let's handle it: if length is 1, that's just the blank state
+    return;
+  }
+  if (currentPath.length > 0) {
+    saveCurrentPath();
+  }
+  const prev = history[history.length - 2];
+  history.pop();
+  history.push(prev);
+  canvas.src = new Image(prev);
+  canvas.src = prev;
+  // Force reload
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = W;
+  tempCanvas.height = H;
+  const tempCtx = tempCanvas.getContext('2d');
+  tempCtx.drawImage(tempCanvas, 0, 0, W, H);
+  // Better approach:
+  const img = new Image();
+  img.onload = function() {
+    ctx.drawImage(img, 0, 0, W, H);
+  };
+  img.src = prev;
+  currentPath = [];
+  updateHistoryUI();
+}
+
+function redo() {
+  if (redoStack.length === 0) return;
+  const state = redoStack.pop();
+  const img = new Image();
+  img.onload = function() {
+    ctx.drawImage(img, 0, 0, W, H);
+  };
+  img.src = state;
+  currentPath = [];
+  updateHistoryUI();
+}
+
+function saveCurrentPath() {
+  if (currentPath.length > 1) {
+    // Save the current drawn state
+    const state = canvas.toDataURL();
+    history.push(state);
+    if (history.length > maxHistory) history.shift();
+    currentPath = [];
+    updateHistoryUI();
+  }
+}
+
+function updateHistoryUI() {
+  document.getElementById('btnUndo').disabled = history.length <= 1;
+  document.getElementById('btnRedo').disabled = redoStack.length === 0;
+  document.getElementById('statusHistory').textContent = history.length - 1;
+}
+
+function clearCanvas() {
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+  currentPath = [];
+  updateHistory();
+}
+
+function savePNG() {
+  const link = document.createElement('a');
+  link.download = 'drawing.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = W / rect.width;
+  const scaleY = H / rect.height;
+  if (e.touches) {
+    const t = e.touches[0];
+    return { x: (t.clientX - rect.left) * scaleX, y: (t.clientY - rect.top) * scaleY };
+  }
+  return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+}
+
+function drawLine(x1, y1, x2, y2) {
+  ctx.beginPath();
+  ctx.lineWidth = brushSize;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if (tool === 'eraser') {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.strokeStyle = '#000000';
+  } else {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = brushColor;
+  }
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+function startDraw(e) {
+  isDrawing = true;
+  const pos = getPos(e);
+  lastX = pos.x;
+  lastY = pos.y;
+  currentPath = [{ x: pos.x, y: pos.y }];
+}
+
+function moveDraw(e) {
+  if (!isDrawing) return;
+  e.preventDefault();
+  const pos = getPos(e);
+  drawLine(lastX, lastY, pos.x, pos.y);
+  currentPath.push({ x: pos.x, y: pos.y });
+  lastX = pos.x;
+  lastY = pos.y;
+}
+
+function endDraw(e) {
+  if (!isDrawing) return;
+  isDrawing = false;
+  updateHistory();
+  currentPath = [];
+}
+
+canvas.addEventListener('mousedown', startDraw);
+canvas.addEventListener('mousemove', moveDraw);
+canvas.addEventListener('mouseup', endDraw);
+canvas.addEventListener('mouseleave', endDraw);
+
+canvas.addEventListener('touchstart', startDraw, { passive: false });
+canvas.addEventListener('touchmove', moveDraw, { passive: false });
+canvas.addEventListener('touchend', endDraw);
+
+// Initialize
+initPalette();
+updateSize();
+updateColor();
+updateHistoryUI();
+updateHistory();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>desk.box – Die smarte Bürosoftware für die Landwirtschaft</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --primary: #0b5ebd;
+    --primary-dark: #07469a;
+    --primary-light: #1a8fcf;
+    --accent: #f59e0b;
+    --accent-dark: #d97706;
+    --text: #1e293b;
+    --text-light: #64748b;
+    --text-lighter: #94a3b8;
+    --bg: #ffffff;
+    --bg-alt: #f8fafc;
+    --bg-dark: #0f172a;
+    --border: #e2e8f0;
+    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+    --shadow-md: 0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
+    --shadow-lg: 0 10px 30px rgba(0,0,0,.12), 0 4px 8px rgba(0,0,0,.06);
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', Arial, sans-serif;
+    color: var(--text);
+    line-height: 1.6;
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+  img { max-width: 100%; display: block; }
+  a { text-decoration: none; color: inherit; }
+  button { cursor: pointer; font-family: inherit; border: none; background: none; }
+  ul { list-style: none; }
+
+  /* ===== HEADER ===== */
+  .header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.97);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+  }
+  .header__inner {
+    max-width: 1280px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 64px;
+  }
+  .header__logo {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 1.35rem; font-weight: 700; color: var(--primary);
+    letter-spacing: -0.5px;
+    flex-shrink: 0;
+  }
+  .header__logo svg { width: 28px; height: 28px; }
+  .header__nav { display: flex; align-items: center; gap: 0; }
+  .header__nav-item {
+    position: relative;
+    padding: 0 14px; height: 64px;
+    display: flex; align-items: center;
+    color: var(--text-light); font-size: 0.9rem; font-weight: 500;
+    transition: color .2s;
+  }
+  .header__nav-item:hover, .header__nav-item.active { color: var(--primary); }
+  .header__nav-item::after {
+    content: ''; display: block; width: 5px; height: 5px;
+    position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+    border-radius: 50%; border: 2px solid currentColor;
+    opacity: 0; transition: opacity .2s;
+  }
+  .header__nav-item:hover::after { opacity: 1; }
+  .header__nav-item.has-caret::before {
+    content: ''; display: inline-block;
+    width: 0; height: 0; border-left: 4px solid transparent;
+    border-right: 4px solid transparent; border-top: 4px solid currentColor;
+    margin-left: 6px; vertical-align: middle;
+    font-size: 0; line-height: 0;
+  }
+  .header__nav-dropdown {
+    position: absolute; top: calc(100% + 8px); left: 0;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 8px 0;
+    min-width: 220px; box-shadow: var(--shadow-lg);
+    opacity: 0; visibility: hidden; transform: translateY(-8px);
+    transition: all .2s ease; z-index: 200;
+  }
+  .header__nav-item:hover .header__nav-dropdown,
+  .header__nav-item:focus-within .header__nav-dropdown,
+  .header__nav-item.open .header__nav-dropdown {
+    opacity: 1; visibility: visible; transform: translateY(0);
+  }
+  .header__nav-dropdown a {
+    display: block; padding: 10px 18px;
+    color: var(--text); font-size: 0.9rem;
+    transition: background .15s, color .15s;
+  }
+  .header__nav-dropdown a:hover { background: var(--bg-alt); color: var(--primary); }
+  .header__right { display: flex; align-items: center; gap: 1rem; flex-shrink: 0; }
+  .header__login {
+    color: var(--text); font-size: 0.9rem; font-weight: 500;
+    padding: 6px 12px; border-radius: var(--radius);
+    transition: background .15s;
+  }
+  .header__login:hover { background: var(--bg-alt); }
+  .header__cta {
+    background: var(--primary); color: #fff;
+    padding: 10px 24px; border-radius: 50px;
+    font-size: 0.9rem; font-weight: 600;
+    transition: background .2s, transform .1s;
+  }
+  .header__cta:hover { background: var(--primary-dark); transform: translateY(-1px); }
+  .hamburger {
+    display: none; flex-direction: column; gap: 5px;
+    width: 28px; height: 28px; cursor: pointer;
+  }
+  .hamburger span {
+    display: block; width: 100%; height: 2px;
+    background: var(--text); border-radius: 2px;
+    transition: all .3s ease;
+  }
+  .hamburger.open span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
+  .hamburger.open span:nth-child(2) { opacity: 0; }
+  .hamburger.open span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
+
+  /* ===== HERO ===== */
+  .hero {
+    max-width: 1280px; margin: 0 auto;
+    padding: 6rem 2rem 4rem;
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 4rem; align-items: center;
+  }
+  .hero__badges {
+    display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 1.5rem;
+  }
+  .hero__badge {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg-alt); border: 1px solid var(--border);
+    padding: 6px 14px; border-radius: 50px;
+    font-size: 0.82rem; color: var(--text-light);
+    font-weight: 500;
+  }
+  .hero__badge svg { width: 16px; height: 16px; }
+  .hero__headline {
+    font-size: clamp(2rem, 4vw, 2.8rem);
+    font-weight: 800; line-height: 1.15;
+    color: var(--text); letter-spacing: -1px;
+    margin-bottom: 1.2rem;
+  }
+  .hero__headline span { color: var(--primary); }
+  .hero__body {
+    font-size: 1.05rem; color: var(--text-light);
+    margin-bottom: 2rem; max-width: 520px;
+  }
+  .hero__buttons { display: flex; gap: 1rem; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 14px 28px; border-radius: 50px;
+    font-size: 1rem; font-weight: 600;
+    transition: all .2s;
+  }
+  .btn-primary {
+    background: var(--primary); color: #fff;
+    box-shadow: 0 4px 14px rgba(11,94,189,.3);
+  }
+  .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+  .btn-secondary {
+    background: var(--bg); color: var(--text);
+    border: 2px solid var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--primary); color: var(--primary); }
+  .btn-accent {
+    background: var(--accent); color: var(--bg-dark);
+    box-shadow: 0 4px 14px rgba(245,158,11,.3);
+  }
+  .btn-accent:hover { background: var(--accent-dark); transform: translateY(-2px); }
+  .hero__visual {
+    display: flex; gap: 1.5rem; align-items: stretch;
+  }
+  .hero__person {
+    flex: 1; border-radius: var(--radius-lg);
+    overflow: hidden; position: relative;
+    aspect-ratio: 3/4;
+    background: linear-gradient(135deg, #e0f2fe, #dbeafe);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: var(--shadow-md);
+  }
+  .hero__person svg { width: 100%; height: 100%; }
+  .hero__product {
+    flex: 1.3; border-radius: var(--radius-lg);
+    overflow: hidden; position: relative;
+    background: linear-gradient(135deg, #1e3a5f, #0f172a);
+    aspect-ratio: 4/3;
+    box-shadow: var(--shadow-lg);
+  }
+  .hero__product svg { width: 100%; height: 100%; }
+  .hero__play-btn {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 56px; height: 56px;
+    background: rgba(255,255,255,.2);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: background .2s, transform .2s;
+  }
+  .hero__play-btn:hover { background: rgba(255,255,255,.3); transform: translate(-50%, -50%) scale(1.1); }
+  .hero__play-btn svg { width: 24px; height: 24px; fill: #fff; margin-left: 4px; }
+
+  /* ===== FEATURES BULLETS ===== */
+  .features-row {
+    max-width: 1280px; margin: 0 auto;
+    padding: 5rem 2rem;
+    background: var(--bg-alt);
+  }
+  .features-row__title {
+    text-align: center;
+    font-size: 1.6rem; font-weight: 700;
+    color: var(--text); margin-bottom: 3rem;
+    letter-spacing: -0.5px;
+  }
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+  .feature-item {
+    display: flex; gap: 16px;
+    padding: 1.5rem;
+    background: var(--bg);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    transition: box-shadow .2s, transform .2s;
+  }
+  .feature-item:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+  }
+  .feature-item__icon {
+    width: 42px; height: 42px;
+    background: linear-gradient(135deg, var(--primary-light), var(--primary));
+    border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .feature-item__icon svg { width: 22px; height: 22px; fill: #fff; }
+  .feature-item__text h4 {
+    font-size: 1rem; font-weight: 600;
+    color: var(--text); margin-bottom: 4px;
+  }
+  .feature-item__text p {
+    font-size: 0.85rem; color: var(--text-light);
+    line-height: 1.5;
+  }
+
+  /* ===== SECTION: Das bietet dir desk.box ===== */
+  .section-cards {
+    max-width: 1280px; margin: 0 auto;
+    padding: 5rem 2rem;
+  }
+  .section-title {
+    text-align: center; margin-bottom: 3rem;
+  }
+  .section-title h2 {
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
+    font-weight: 800; color: var(--text);
+    letter-spacing: -0.5px; margin-bottom: 0.75rem;
+  }
+  .section-title p {
+    font-size: 1.05rem; color: var(--text-light);
+    max-width: 600px; margin: 0 auto;
+  }
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1.5rem;
+  }
+  .card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 2rem 1.5rem 1.5rem;
+    text-align: center;
+    transition: box-shadow .2s, transform .2s;
+  }
+  .card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-4px);
+  }
+  .card__icon {
+    width: 64px; height: 64px;
+    margin: 0 auto 1.2rem;
+    background: var(--bg-alt);
+    border-radius: var(--radius-lg);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .card__icon svg { width: 32px; height: 32px; color: var(--primary); }
+  .card__title {
+    font-size: 1.15rem; font-weight: 700;
+    color: var(--text); margin-bottom: 0.5rem;
+  }
+  .card__desc {
+    font-size: 0.9rem; color: var(--text-light);
+    margin-bottom: 1rem; line-height: 1.5;
+  }
+  .card__link {
+    color: var(--primary); font-size: 0.9rem;
+    font-weight: 600;
+    display: inline-flex; align-items: center; gap: 4px;
+    transition: gap .2s;
+  }
+  .card__link:hover { gap: 8px; }
+  .card__link svg { width: 14px; height: 14px; transition: transform .2s; }
+  .card__link:hover svg { transform: translateX(4px); }
+
+  /* ===== TESTIMONIALS ===== */
+  .testimonials {
+    max-width: 1280px; margin: 0 auto;
+    padding: 5rem 2rem;
+    background: var(--bg-alt);
+  }
+  .testimonials-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+  .testimonial {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    position: relative;
+  }
+  .testimonial::before {
+    content: '"';
+    font-size: 4rem;
+    font-weight: 800;
+    color: var(--primary);
+    opacity: 0.15;
+    position: absolute;
+    top: -10px; left: 20px;
+    line-height: 1;
+  }
+  .testimonial__quote {
+    font-size: 1rem;
+    color: var(--text);
+    line-height: 1.7;
+    margin-bottom: 1.2rem;
+    font-style: italic;
+  }
+  .testimonial__author {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .testimonial__avatar {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary-light), var(--primary));
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; color: #fff;
+    font-size: 1rem; flex-shrink: 0;
+  }
+  .testimonial__name {
+    font-weight: 700; font-size: 0.95rem; color: var(--text);
+  }
+  .testimonial__role {
+    font-size: 0.82rem; color: var(--text-light);
+  }
+
+  /* ===== BLOG ===== */
+  .blog-section {
+    max-width: 1280px; margin: 0 auto;
+    padding: 5rem 2rem;
+  }
+  .blog-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+  .blog-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    transition: box-shadow .2s, transform .2s;
+  }
+  .blog-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-3px);
+  }
+  .blog-card__img {
+    width: 100%; aspect-ratio: 16/9;
+    background: linear-gradient(135deg, #e0f2fe, #dbeafe);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .blog-card__img svg { width: 60px; height: 60px; opacity: 0.5; }
+  .blog-card__body { padding: 1.5rem; }
+  .blog-card__tag {
+    display: inline-block;
+    background: var(--bg-alt);
+    color: var(--primary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 50px;
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .blog-card__title {
+    font-size: 1.1rem; font-weight: 700;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+    line-height: 1.4;
+  }
+  .blog-card__desc {
+    font-size: 0.9rem; color: var(--text-light);
+    margin-bottom: 1rem;
+    line-height: 1.5;
+  }
+  .blog-card__link {
+    color: var(--primary); font-size: 0.9rem;
+    font-weight: 600;
+    display: inline-flex; align-items: center; gap: 4px;
+    transition: gap .2s;
+  }
+  .blog-card__link:hover { gap: 8px; }
+  .blog-card__link svg { width: 14px; height: 14px; transition: transform .2s; }
+  .blog-card__link:hover svg { transform: translateX(4px); }
+
+  /* ===== CTA BAND ===== */
+  .cta-band {
+    background: var(--bg-dark);
+    padding: 5rem 2rem;
+    text-align: center;
+  }
+  .cta-band__content {
+    max-width: 600px; margin: 0 auto;
+  }
+  .cta-band h2 {
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.5px;
+    margin-bottom: 1rem;
+  }
+  .cta-band p {
+    font-size: 1.05rem;
+    color: #94a3b8;
+    margin-bottom: 2rem;
+  }
+  .cta-band .btn-accent {
+    padding: 16px 40px;
+    font-size: 1.1rem;
+  }
+
+  /* ===== FOOTER ===== */
+  .footer {
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    padding: 4rem 2rem 2rem;
+  }
+  .footer__inner {
+    max-width: 1280px; margin: 0 auto;
+  }
+  .footer__top {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+    gap: 3rem;
+    margin-bottom: 3rem;
+  }
+  .footer__brand {
+    max-width: 300px;
+  }
+  .footer__brand .footer__logo {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 1.2rem; font-weight: 700; color: var(--primary);
+    margin-bottom: 1rem;
+  }
+  .footer__brand .footer__logo svg { width: 24px; height: 24px; }
+  .footer__brand p {
+    font-size: 0.9rem; color: var(--text-light);
+    line-height: 1.6; margin-bottom: 1rem;
+  }
+  .footer__contact {
+    font-size: 0.9rem; color: var(--text-light);
+    line-height: 1.8;
+  }
+  .footer__contact a { color: var(--primary); }
+  .footer__col h4 {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 1rem;
+  }
+  .footer__col ul li {
+    margin-bottom: 8px;
+  }
+  .footer__col ul li a {
+    font-size: 0.9rem; color: var(--text-light);
+    transition: color .15s;
+  }
+  .footer__col ul li a:hover { color: var(--primary); }
+  .footer__certs {
+    display: flex; gap: 12px;
+    margin-top: 1rem;
+  }
+  .footer__cert {
+    width: 44px; height: 44px;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .footer__cert svg { width: 20px; height: 20px; color: var(--text-light); }
+  .footer__socials {
+    display: flex; gap: 10px;
+    margin-top: 1rem;
+  }
+  .footer__social {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--bg-alt);
+    display: flex; align-items: center; justify-content: center;
+    transition: background .2s, color .2s;
+  }
+  .footer__social:hover {
+    background: var(--primary);
+    color: #fff;
+  }
+  .footer__social svg { width: 16px; height: 16px; }
+  .footer__bottom {
+    border-top: 1px solid var(--border);
+    padding-top: 1.5rem;
+    display: flex; justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap; gap: 1rem;
+  }
+  .footer__bottom p {
+    font-size: 0.82rem; color: var(--text-lighter);
+  }
+  .footer__bottom-links {
+    display: flex; gap: 1.5rem;
+  }
+  .footer__bottom-links a {
+    font-size: 0.82rem; color: var(--text-lighter);
+    transition: color .15s;
+  }
+  .footer__bottom-links a:hover { color: var(--primary); }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 1024px) {
+    .hero { grid-template-columns: 1fr; gap: 2.5rem; padding-top: 4rem; }
+    .hero__visual { flex-direction: column; }
+    .hero__person, .hero__product { max-width: 500px; margin: 0 auto; }
+    .features-grid { grid-template-columns: 1fr; }
+    .cards-grid { grid-template-columns: repeat(2, 1fr); }
+    .footer__top { grid-template-columns: 1fr 1fr; }
+    .blog-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 768px) {
+    .header__nav { display: none; }
+    .header__right .header__login { display: none; }
+    .hamburger { display: flex; }
+    .hero { padding: 3rem 1.5rem; }
+    .hero__visual { flex-direction: column; }
+    .hero__person, .hero__product { max-width: 100%; }
+    .cards-grid { grid-template-columns: 1fr; }
+    .testimonials-grid { grid-template-columns: 1fr; }
+    .footer__top { grid-template-columns: 1fr; gap: 2rem; }
+    .footer__bottom { flex-direction: column; text-align: center; }
+    .hero__badges { justify-content: center; }
+    .hero__body { margin-left: auto; margin-right: auto; }
+  }
+  @media (max-width: 480px) {
+    .hero__headline { font-size: 1.6rem; }
+    .hero__buttons { flex-direction: column; }
+    .hero__buttons .btn { width: 100%; justify-content: center; }
+    .footer__certs { justify-content: center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header class="header">
+  <div class="header__inner">
+    <a href="#" class="header__logo">
+      <svg viewBox="0 0 28 28" fill="none">
+        <rect x="3" y="3" width="22" height="22" rx="5" fill="#0b5ebd"/>
+        <rect x="8" y="10" width="12" height="10" rx="2" fill="#fff"/>
+        <line x1="10" y1="13" x2="18" y2="13" stroke="#fff" stroke-width="1.5"/>
+        <line x1="10" y1="16" x2="18" y2="16" stroke="#fff" stroke-width="1.5"/>
+      </svg>
+      desk.box
+    </a>
+
+    <nav class="header__nav">
+      <div class="header__nav-item has-caret" id="nav-funktionen">
+        Funktionen
+        <div class="header__nav-dropdown">
+          <a href="#">Schnittstelle zu Steuerbüro</a>
+          <a href="#">E-Rechnung</a>
+          <a href="#">Banking</a>
+          <a href="#">Volltextsuche</a>
+          <a href="#">Multi-Betrieb</a>
+          <a href="#">Workflow-Management</a>
+          <a href="#">Mobile-App</a>
+          <a href="#">Archivierung</a>
+        </div>
+      </div>
+      <div class="header__nav-item has-caret" id="nav-preise">
+        Preise
+        <div class="header__nav-dropdown">
+          <a href="#">Einzel-Abon</a>
+          <a href="#">Team-Abon</a>
+          <a href="#">Unternehmens-Abon</a>
+          <a href="#">Freie Probenzeit</a>
+        </div>
+      </div>
+      <div class="header__nav-item has-caret" id="nav-service">
+        Service
+        <div class="header__nav-dropdown">
+          <a href="#">Onboarding</a>
+          <a href="#">Kundenunterstützung</a>
+          <a href="#">Webinare</a>
+          <a href="#">FAQ</a>
+          <a href="#">Partner</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="header__right">
+      <a href="#" class="header__login">Login</a>
+      <a href="#" class="header__cta">Jetzt testen</a>
+      <div class="hamburger" id="hamburger">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Mobile nav overlay -->
+<div class="mobile-nav" id="mobileNav" style="display:none; position:fixed; top:64px; left:0; right:0; bottom:0; background:rgba(255,255,255,0.98); backdrop-filter:blur(12px); z-index:150; padding:2rem; overflow-y:auto;">
+  <div style="display:flex; flex-direction:column; gap:0;">
+    <div class="mobile-nav__item" style="padding:16px 0; border-bottom:1px solid var(--border); cursor:pointer;" data-target="mobile-functions">Funktionen</div>
+    <div class="mobile-nav__dropdown" id="mobile-functions" style="display:none; padding-left:1rem; margin-bottom:8px;">
+      <a href="#" style="display:block; padding:10px 0; color:var(--text); font-size:0.95rem;">Schnittstelle zu Steuerbüro</a>
+      <a href="#" style="display:block; padding:10px 0; color:var(--text); font-size:0.95rem;">E-Rechnung</a>
+      <a href="#" style="display:block; padding:10px 0; color:var(--text); font-size:0.95rem;">Banking</a>
+      <a href="#" style="display:block; padding:10px 0; color:var(--text); font-size:0.95rem;">Volltextsuche</a>
+      <a href="#" style="display:block; padding:10px 0; color:var(--text); font-size:0.95rem;">Multi-Betrieb</a>
+      <a href="#" style="display:block; padding:10px 0; color:var(--text); font-size:0.95rem;">Workflow-Management</a>
+      <a href="#" style="display:block; padding:10px 0; color:var(--text); font-size:0.95rem;">Mobile-App</a>
+      <a href="#" style="display:block; padding:10px 0; color:var(--text); font-size:0.95rem;">Archivierung</a>
+    </div>
+    <div class="mobile-nav__item" style="padding:16px 0; border-bottom:1px solid var(--border); cursor:pointer;" data-target="mobile-preise">Preise</div>
+    <div class="mobile-nav__dropdown" id="mobile-preise" style="display:none; padding-left:1rem; margin-bottom:8px;">
+      <a href="#" style="display:block; padding:10px 0; color:var(--text); font-size:0.95rem;">Einzel-Abon</a>
+      <a href="#" style="display:block; padding:10px 0; color:var(--text); font-size:0.95rem;">Team-Abon</a>
+      <a href="#" style="display:block; padding:10px 0; color:var(--text); font-size:0.95rem;">Unternehmens-Abon</a>
+      <a href="#" style="display:block; padding:10px 0; color:var(--text); font-size:0.95rem;">Freie Probenzeit</a>
+    </div>
+    <div class="mobile-nav__item" style="padding:16px 0; border-bottom:1px solid var(--border); cursor:pointer;" data-target="mobile-service">Service</div>
+    <div class="mobile-nav__dropdown" id="mobile-service" style="display:none; padding-left:1rem; margin-bottom:8px;">
+      <a href="#" style="display:block; padding:10px 0; color:var(--text); font-size:0.95rem;">Onboarding</a>
+      <a href="#" style="display:block; padding:10px 0; color:var(--text); font-size:0.95rem;">Kundenunterstützung</a>
+      <a href="#" style="display:block; padding:10px 0; color:var(--text); font-size:0.95rem;">Webinare</a>
+      <a href="#" style="display:block; padding:10px 0; color:var(--text); font-size:0.95rem;">FAQ</a>
+      <a href="#" style="display:block; padding:10px 0; color:var(--text); font-size:0.95rem;">Partner</a>
+    </div>
+    <div style="padding:16px 0; border-top:1px solid var(--border); margin-top:1rem;">
+      <a href="#" style="display:block; padding:10px 0; color:var(--text); font-size:0.95rem;">Login</a>
+      <a href="#" class="btn btn-primary" style="margin-top:8px; width:100%; justify-content:center;">Jetzt testen</a>
+    </div>
+  </div>
+</div>
+
+<!-- ===== HERO ===== -->
+<section class="hero">
+  <div class="hero__content">
+    <div class="hero__badges">
+      <div class="hero__badge">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M9 16l-1 1 4 4 7-7 1-1M9 16H7V8a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v8z" stroke="#0b5ebd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        GoBD zertifiziert
+      </div>
+      <div class="hero__badge">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M12 2l-5 5v13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7l-5-5z" stroke="#0b5ebd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="12" cy="10" r="2" fill="#0b5ebd"/>
+        </svg>
+        Server in Deutschland
+      </div>
+      <div class="hero__badge">
+        <svg viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="4" width="20" height="16" rx="2" stroke="#0b5ebd" stroke-width="2"/>
+          <path d="M22 4v16H2" stroke="#0b5ebd" stroke-width="2" stroke-linecap="round"/>
+          <line x1="6" y1="8" x2="18" y2="8" stroke="#0b5ebd" stroke-width="1.5"/>
+          <line x1="6" y1="12" x2="18" y2="12" stroke="#0b5ebd" stroke-width="1.5"/>
+          <line x1="6" y1="16" x2="18" y2="16" stroke="#0b5ebd" stroke-width="1.5"/>
+        </svg>
+        E-Rechnung
+      </div>
+    </div>
+    <h1 class="hero__headline">
+      desk.box – Die smarte Bürosoftware für die <span>Landwirtschaft</span>
+    </h1>
+    <p class="hero__body">
+      Alles in einer Platform: von der E-Rechnung über das Banking bis zur intelligenten Volltextsuche. 
+      desk.box ist die Bürosoftware, die sich an Ihre Betriebssituation anpasst – sicher, schnell und 
+      vollständig GoBD-konform.
+    </p>
+    <div class="hero__buttons">
+      <a href="#" class="btn btn-primary">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 7l5 5 5-5"/>
+        </svg>
+        Kostenlos beraten lassen
+      </a>
+      <a href="#" class="btn btn-secondary">
+        Jetzt kostenlos testen
+      </a>
+    </div>
+  </div>
+  <div class="hero__visual">
+    <div class="hero__person">
+      <svg viewBox="0 0 200 266" fill="none">
+        <!-- Person placeholder -->
+        <ellipse cx="100" cy="100" rx="55" ry="55" fill="#0b5ebd" opacity="0.15"/>
+        <circle cx="100" cy="100" r="35" fill="#0b5ebd" opacity="0.08"/>
+        <path d="M90 120 Q100 110 110 120 Q100 130 90 120Z" fill="#0b5ebd" opacity="0.1"/>
+        <circle cx="94" cy="102" r="4" fill="#0b5ebd" opacity="0.2"/>
+        <circle cx="106" cy="102" r="4" fill="#0b5ebd" opacity="0.2"/>
+        <ellipse cx="100" cy="114" rx="8" ry="4" fill="#0b5ebd" opacity="0.15"/>
+        <rect x="70" y="140" width="60" height="100" rx="15" fill="#0b5ebd" opacity="0.05"/>
+        <path d="M80 160 Q100 150 120 160 V220 Q100 230 80 220V160Z" fill="#0b5ebd" opacity="0.08"/>
+        <circle cx="100" cy="240" r="4" fill="#0b5ebd" opacity="0.3"/>
+      </svg>
+    </div>
+    <div class="hero__product">
+      <svg viewBox="0 0 400 300" fill="none">
+        <!-- Product screenshot placeholder -->
+        <rect x="0" y="0" width="400" height="300" rx="12" fill="#0f172a"/>
+        <rect x="40" y="40" width="320" height="200" rx="8" fill="#1e293b"/>
+        <rect x="60" y="55" width="140" height="12" rx="3" fill="#334155"/>
+        <rect x="60" y="75" width="140" height="12" rx="3" fill="#334155"/>
+        <rect x="60" y="95" width="140" height="12" rx="3" fill="#334155"/>
+        <rect x="220" y="55" width="120" height="12" rx="3" fill="#334155"/>
+        <rect x="220" y="75" width="120" height="12" rx="3" fill="#334155"/>
+        <rect x="220" y="95" width="120" height="12" rx="3" fill="#334155"/>
+        <rect x="220" y="115" width="120" height="12" rx="3" fill="#334155"/>
+        <rect x="220" y="135" width="120" height="12" rx="3" fill="#334155"/>
+        <rect x="220" y="155" width="120" height="12" rx="3" fill="#334155"/>
+        <rect x="220" y="175" width="120" height="12" rx="3" fill="#334155"/>
+        <rect x="220" y="195" width="120" height="12" rx="3" fill="#334155"/>
+        <circle cx="330" cy="110" r="10" fill="#0b5ebd" opacity="0.3"/>
+        <circle cx="330" cy="110" r="6" fill="#0b5ebd" opacity="0.15"/>
+        <text x="100" y="230" text-anchor="middle" fill="#0b5ebd" font-size="20" font-weight="800" font-family="sans-serif">desk.box</text>
+        <text x="100" y="255" text-anchor="middle" fill="#64748b" font-size="10" font-family="sans-serif">Video abspielen</text>
+      </svg>
+      <div class="hero__play-btn">
+        <svg viewBox="0 0 24 24" fill="none">
+          <polygon points="6,3 20,12 6,21 6,3" fill="white"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FEATURES BULLETS ===== -->
+<section class="features-row">
+  <h2 class="features-row__title">Warum desk.box die richtige Lösung für deinen Betrieb</h2>
+  <div class="features-grid">
+    <div class="feature-item">
+      <div class="feature-item__icon">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M12 2l5 5 5-5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M12 22l-5-5-5 5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M22 12l-5-5-5 5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M2 12l5-5 5 5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="feature-item__text">
+        <h4>Direkte Schnittstelle zu deinem Steuerbüro</h4>
+        <p>Schnelles und automatisiertes Datenexchange mit allen relevanten Steuerberatungen in Deutschland.</p>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-item__icon">
+        <svg viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="4" width="20" height="16" rx="2" stroke="white" stroke-width="2"/>
+          <path d="M22 4v16H2" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          <line x1="6" y1="8" x2="18" y2="8" stroke="white" stroke-width="1.5"/>
+          <line x1="6" y1="12" x2="18" y2="12" stroke="white" stroke-width="1.5"/>
+          <line x1="6" y1="16" x2="18" y2="16" stroke="white" stroke-width="1.5"/>
+        </svg>
+      </div>
+      <div class="feature-item__text">
+        <h4>E-Rechnung inklusive</h4>
+        <p>Erstelle, speicher und versende E-Rechnungen direkt aus desk.box – vollständig GoBD-konform.</p>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-item__icon">
+        <svg viewBox="0 0 24 24" fill="none">
+          <rect x="3" y="3" width="18" height="18" rx="2" stroke="white" stroke-width="2"/>
+          <path d="M3 12h18" stroke="white" stroke-width="2"/>
+          <path d="M12 3v18" stroke="white" stroke-width="2"/>
+          <circle cx="18" cy="6" r="2" fill="white"/>
+        </svg>
+      </div>
+      <div class="feature-item__text">
+        <h4>Vollständiges Banking</h4>
+        <p>Kontoüberweisung, Zahlungen und Bankauszüge – alleFinance-Operationen in einem Schritt.</p>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-item__icon">
+        <svg viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="white" stroke-width="2"/>
+          <path d="M16 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0z" stroke="white" stroke-width="2"/>
+          <line x1="12" y1="3" x2="12" y2="1" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          <line x1="12" y1="23" x2="12" y2="24" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          <line x1="1" y1="12" x2="0" y2="12" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          <line x1="23" y1="12" x2="24" y2="12" stroke="white" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="feature-item__text">
+        <h4>Intelligente Volltextsuche durch alle Dokumente</h4>
+        <p>Finde jede Datei in Sekunden – durchsuche alle deine Documents, E-Rechnungen und Nachrichten.</p>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-item__icon">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M10 9V7c0-2.21 1.79-4 4-4s4 1.79 4 4v2M6 9h12M21 21l-1.4-1.4M21 21l-1.4-1.4M21 21l-1.4-1.4M21 21l-1.4-1.4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="2" y="15" width="20" height="8" rx="2" stroke="white" stroke-width="2"/>
+          <circle cx="7" cy="19" r="2" stroke="white" stroke-width="2"/>
+          <circle cx="17" cy="19" r="2" stroke="white" stroke-width="2"/>
+        </svg>
+      </div>
+      <div class="feature-item__text">
+        <h4>Alle deine Betriebe auf einen Blick</h4>
+        <p>Verwende desk.box für mehrere Betriebe – zentraler Zugriff auf alle Daten.</p>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-item__icon">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M12 2l3 3h9l-11 11 11 11H3l11-11z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="feature-item__text">
+        <h4>Einfacher Workflow</h4>
+        <p>Strukturierte Prozesse für deine täglichen Aufgaben – von der Eingabe bis zur Auswirkung.</p>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-item__icon">
+        <svg viewBox="0 0 24 24" fill="none">
+          <rect x="3" y="3" width="18" height="18" rx="2" stroke="white" stroke-width="2"/>
+          <path d="M7 3v4M17 3v4M7 21v-4M17 21v-4" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          <path d="M3 7h18M3 17h18" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          <rect x="7" y="7" width="10" height="10" rx="1" stroke="white" stroke-width="1.5"/>
+        </svg>
+      </div>
+      <div class="feature-item__text">
+        <h4>Alle deine Dokumente in deiner Hosentasche</h4>
+        <p>Mobile-App für jeden Betrieb – deine Daten sind überall und zu jeder Zeit verfügbar.</p>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-item__icon">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M12 15a3 3 0 0 1-3-3V6a3 3 0 1 1 6 0v6a3 3 0 0 1-3 3z" stroke="white" stroke-width="2"/>
+          <path d="M17 15a2 2 0 0 1-2-2V6a2 2 0 1 1 4 0v6a2 2 0 0 1-2 2z" stroke="white" stroke-width="2"/>
+          <path d="M7 15a2 2 0 0 1-2-2V6a2 2 0 1 1 4 0v6a2 2 0 0 1-2 2z" stroke="white" stroke-width="2"/>
+        </svg>
+      </div>
+      <div class="feature-item__text">
+        <h4>Sichere und gesetzeskonforme Archivierung</h4>
+        <p>GoBD-konforme Speicheroptionen – alle deine Daten sicher und rechtlich abgesichert.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Das bietet dir desk.box ===== -->
+<section class="section-cards">
+  <div class="section-title">
+    <h2>Das bietet dir desk.box</h2>
+    <p>Alle Werkzeuge für deinen Betrieb – in einer einzigen, intuitiven Plattform.</p>
+  </div>
+  <div class="cards-grid">
+    <div class="card">
+      <div class="card__icon">
+        <svg viewBox="0 0 24 24" fill="none">
+          <rect x="3" y="10" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
+          <rect x="5" y="4" width="14" height="8" rx="1" stroke="currentColor" stroke-width="2"/>
+          <rect x="10" y="2" width="4" height="2" stroke="currentColor" stroke-width="2"/>
+        </svg>
+      </div>
+      <h3 class="card__title">Schreibtisch</h3>
+      <p class="card__desc">Ein zentraler Arbeitsplatz für alle deine documents – Organisiert und übersichtlich.</p>
+      <a href="#" class="card__link">
+        Mehr erfahren
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </a>
+    </div>
+    <div class="card">
+      <div class="card__icon">
+        <svg viewBox="0 0 24 24" fill="none">
+          <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/>
+          <path d="M3 12h18M12 3v18" stroke="currentColor" stroke-width="2"/>
+          <circle cx="18" cy="6" r="2" stroke="currentColor" stroke-width="2"/>
+        </svg>
+      </div>
+      <h3 class="card__title">Banking</h3>
+      <p class="card__desc">Banküberweisung, Zahlungen und Bankauszüge – alle Finance-Operationen in einem Schritt.</p>
+      <a href="#" class="card__link">
+        Mehr erfahren
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </a>
+    </div>
+    <div class="card">
+      <div class="card__icon">
+        <svg viewBox="0 0 24 24" fill="none">
+          <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/>
+          <rect x="7" y="7" width="10" height="10" rx="1" stroke="currentColor" stroke-width="2"/>
+          <path d="M13 7l-1 1 1 1M7 13l1-1-1-1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h3 class="card__title">Aktenschrank</h3>
+      <p class="card__desc">Speicher und organisiere alle deine documents – mit voller Volltextsuche.</p>
+      <a href="#" class="card__link">
+        Mehr erfahren
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </a>
+    </div>
+    <div class="card">
+      <div class="card__icon">
+        <svg viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
+          <path d="M22 4v16H2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <line x1="6" y1="8" x2="18" y2="8" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="6" y1="12" x2="18" y2="12" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="6" y1="16" x2="18" y2="16" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+      </div>
+      <h3 class="card__title">Faktura</h3>
+      <p class="card__desc">Erstelle, speicher und versende E-Rechnungen direkt aus desk.box – GoBD-konform.</p>
+      <a href="#" class="card__link">
+        Mehr erfahren
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </a>
+    </div>
+    <div class="card">
+      <div class="card__icon">
+        <svg viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+          <path d="M12 8v4l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h3 class="card__title">Adressbuch</h3>
+      <p class="card__desc">Alle deine Kontakte – von Kunden bis zu Lieferanten – central verwaltet.</p>
+      <a href="#" class="card__link">
+        Mehr erfahren
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ===== TESTIMONIALS ===== -->
+<section class="testimonials">
+  <div class="section-title">
+    <h2>Was sagen unsere Kunden?</h2>
+    <p>Echte Erfahrungen von Landwirten, Buchhaltern und Betriebsbetreibern.</p>
+  </div>
+  <div class="testimonials-grid">
+    <div class="testimonial">
+      <p class="testimonial__quote">
+        "desk.box hat unseren Tag für Tag im Betrieb grundlegend verbessert. Die Schnittstelle zu unserem Steuerberater ist nahtlos und spart uns Stunden pro Woche."
+      </p>
+      <div class="testimonial__author">
+        <div class="testimonial__avatar">NA</div>
+        <div>
+          <div class="testimonial__name">Nico Ahlmann</div>
+          <div class="testimonial__role">Hof Ahlmann Groß Tessin</div>
+        </div>
+      </div>
+    </div>
+    <div class="testimonial">
+      <p class="testimonial__quote">
+        "Endlich eine Bürosoftware, die tatsächlich auf die Bedürfnisse der Landwirtschaft zugeschnitten ist. Alles läuft reibungslos."
+      </p>
+      <div class="testimonial__author">
+        <div class="testimonial__avatar">MK</div>
+        <div>
+          <div class="testimonial__name">Maria Kirschner</div>
+          <div class="testimonial__role">Biohof Kirschner Mecklenburg</div>
+        </div>
+      </div>
+    </div>
+    <div class="testimonial">
+      <p class="testimonial__quote">
+        "Das Banking-Module allein würde sich lohnen. Und mit der E-Rechnung und dem Aktenschrank ist desk.box für uns unentbehrlich geworden."
+      </p>
+      <div class="testimonial__author">
+        <div class="testimonial__avatar">JW</div>
+        <div>
+          <div class="testimonial__name">Jan Wenzel</div>
+          <div class="testimonial__role">Gutsverwaltung Wenzel Sachsen-Anhalt</div>
+        </div>
+      </div>
+    </div>
+    <div class="testimonial">
+      <p class="testimonial__quote">
+        "Die mobile App ist ein Game-Changer. Ich kann meine documents von überall her bearbeiten – auch direkt auf dem Hof."
+      </p>
+      <div class="testimonial__author">
+        <div class="testimonial__avatar">LS</div>
+        <div>
+          <div class="testimonial__name">Lena Schmitt</div>
+          <div class="testimonial__role">Biohof Schmitt Bayern</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== BLOG ===== -->
+<section class="blog-section">
+  <div class="section-title">
+    <h2>Blog &amp; News</h2>
+    <p>Actualisierungen über desk.box, die Landwirtschaft und das digitale Business.</p>
+  </div>
+  <div class="blog-grid">
+    <div class="blog-card">
+      <div class="blog-card__img">
+        <svg viewBox="0 0 100 75" fill="none">
+          <rect x="10" y="10" width="80" height="55" rx="6" fill="#0b5ebd" opacity="0.15"/>
+          <rect x="20" y="20" width="60" height="35" rx="4" fill="#0b5ebd" opacity="0.1"/>
+          <circle cx="45" cy="35" r="6" fill="#0b5ebd" opacity="0.15"/>
+          <circle cx="55" cy="35" r="6" fill="#0b5ebd" opacity="0.15"/>
+        </svg>
+      </div>
+      <div class="blog-card__body">
+        <span class="blog-card__tag">News</span>
+        <h3 class="blog-card__title">GoBD-Konformität: So vermeiden Sie häufige Fehler</h3>
+        <p class="blog-card__desc">Entdecken Sie die wichtigsten GoBD-Regeln und finden Sie heraus, wie desk.box Ihnen hilft, compliant zu bleiben.</p>
+        <a href="#" class="blog-card__link">
+          Weiterlesen
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+    <div class="blog-card">
+      <div class="blog-card__img">
+        <svg viewBox="0 0 100 75" fill="none">
+          <rect x="10" y="10" width="80" height="55" rx="6" fill="#0b5ebd" opacity="0.15"/>
+          <rect x="20" y="20" width="60" height="35" rx="4" fill="#0b5ebd" opacity="0.1"/>
+          <circle cx="45" cy="35" r="6" fill="#0b5ebd" opacity="0.15"/>
+          <circle cx="55" cy="35" r="6" fill="#0b5ebd" opacity="0.15"/>
+        </svg>
+      </div>
+      <div class="blog-card__body">
+        <span class="blog-card__tag">Tutorial</span>
+        <h3 class="blog-card__title">E-Rechnung in desk.box: Schritt für Schritt</h3>
+        <p class="blog-card__desc">Ein einfacher Leitfaden für Ihre erste E-Rechnung – von der Erstellung bis zur Versend.</p>
+        <a href="#" class="blog-card__link">
+          Weiterlesen
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+    <div class="blog-card">
+      <div class="blog-card__img">
+        <svg viewBox="0 0 100 75" fill="none">
+          <rect x="10" y="10" width="80" height="55" rx="6" fill="#0b5ebd" opacity="0.15"/>
+          <rect x="20" y="20" width="60" height="35" rx="4" fill="#0b5ebd" opacity="0.1"/>
+          <circle cx="45" cy="35" r="6" fill="#0b5ebd" opacity="0.15"/>
+          <circle cx="55" cy="35" r="6" fill="#0b5ebd" opacity="0.15"/>
+        </svg>
+      </div>
+      <div class="blog-card__body">
+        <span class="blog-card__tag">Tipp</span>
+        <h3 class="blog-card__title">So sparen Sie 5 Stunden pro Woche mit desk.box</h3>
+        <p class="blog-card__desc">Entdecken Sie die versteckten Effizienzgewinne in Ihrer Bürosoftware und optimieren Sie Ihren Workflow.</p>
+        <a href="#" class="blog-card__link">
+          Weiterlesen
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CTA BAND ===== -->
+<section class="cta-band">
+  <div class="cta-band__content">
+    <h2>60 Tage kostenlos testen</h2>
+    <p>Entdecke die volle Leistungskraft von desk.box – ohne Verpflichtung und ohne Risiko. simply starte.</p>
+    <a href="#" class="btn btn-accent">Jetzt registrieren</a>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">
+  <div class="footer__inner">
+    <div class="footer__top">
+      <div class="footer__brand">
+        <div class="footer__logo">
+          <svg viewBox="0 0 28 28" fill="none">
+            <rect x="3" y="3" width="22" height="22" rx="5" fill="#0b5ebd"/>
+            <rect x="8" y="10" width="12" height="10" rx="2" fill="#fff"/>
+            <line x1="10" y1="13" x2="18" y2="13" stroke="#fff" stroke-width="1.5"/>
+            <line x1="10" y1="16" x2="18" y2="16" stroke="#fff" stroke-width="1.5"/>
+          </svg>
+          desk.box
+        </div>
+        <p>Die smarte Bürosoftware für die Landwirtschaft. Alles in einer Platform – sicher, schnell und vollständig GoBD-konform.</p>
+        <div class="footer__certs">
+          <div class="footer__cert">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M9 16l-1 1 4 4 7-7 1-1M9 16H7V8a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="footer__cert">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M12 2l-5 5v13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7l-5-5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="12" cy="10" r="2" fill="currentColor"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div class="footer__col">
+        <h4>Kontakt</h4>
+        <div class="footer__contact">
+          <p>Telefon: <a href="tel:+4943153015418">+49(0)431 / 530 154 18</a></p>
+          <p>E-Mail: <a href="mailto:support@deskbox-office.de">support(at)deskbox-office.de</a></p>
+          <p>Supportzeiten: Mo bis Fr: 08:00 - 16:00 Uhr</p>
+        </div>
+      </div>
+      <div class="footer__col">
+        <h4>Produkt</h4>
+        <ul>
+          <li><a href="#">Funktionen</a></li>
+          <li><a href="#">Preise</a></li>
+          <li><a href="#">Onboarding</a></li>
+          <li><a href="#">Mobile-App</a></li>
+          <li><a href="#">Systemvoraussetzungen</a></li>
+        </ul>
+      </div>
+      <div class="footer__col">
+        <h4>Unternehmen</h4>
+        <ul>
+          <li><a href="#">Über uns</a></li>
+          <li><a href="#">Karriere</a></li>
+          <li><a href="#">Partner</a></li>
+          <li><a href="#">Blog</a></li>
+          <li><a href="#">Impressum</a></li>
+        </ul>
+      </div>
+      <div class="footer__col">
+        <h4>Follow Us</h4>
+        <div class="footer__socials">
+          <a href="#" class="footer__social">
+            <svg viewBox="0 0 24 24" fill="none">
+              <rect x="1" y="1" width="22" height="22" rx="5" stroke="currentColor" stroke-width="2"/>
+              <circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="2"/>
+              <line x1="17" y1="17" x2="17" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <line x1="17" y1="17" x2="12" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </a>
+          <a href="#" class="footer__social">
+            <svg viewBox="0 0 24 24" fill="none">
+              <rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" stroke-width="2"/>
+              <circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="2"/>
+              <path d="M8 14v2M14 10l-2 2 2 2M16 14v2M18 8l-2 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </a>
+          <a href="#" class="footer__social">
+            <svg viewBox="0 0 24 24" fill="none">
+              <rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" stroke-width="2"/>
+              <path d="M7 14l3 3-6 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="15" cy="11" r="3" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </a>
+          <a href="#" class="footer__social">
+            <svg viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+              <path d="M12 4v2M12 18v2M4 12h2M18 12h2M16 8l-2 2-2-2M8 8l2 2-2 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </a>
+          <a href="#" class="footer__social">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M17.94 15.94A10.5 10.5 0 0 1 12 20.06a10.5 10.5 0 0 1-9.94-4.06C.97 11.93 0 8.05 0 4.05c0-1.66.55-3.27 1.59-4.64M17.94 15.94l-5.56-5.56M17.94 15.94l-5.56-5.56M17.94 15.94l-5.56-5.56" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="footer__bottom">
+      <p>© 2026 stadt.werk konzeption.text.gestaltung GmbH</p>
+      <div class="footer__bottom-links">
+        <a href="#">Impressum</a>
+        <a href="#">Privatsphärenrichtlinie</a>
+        <a href="#">Terms of Service</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Mobile hamburger toggle
+  const hamburger = document.getElementById('hamburger');
+  const mobileNav = document.getElementById('mobileNav');
+  const mobileNavItems = document.querySelectorAll('.mobile-nav__item');
+
+  hamburger.addEventListener('click', function () {
+    const isOpen = mobileNav.style.display !== 'none';
+    if (isOpen) {
+      mobileNav.style.display = 'none';
+      hamburger.classList.remove('open');
+    } else {
+      mobileNav.style.display = 'block';
+      hamburger.classList.add('open');
+    }
+  });
+
+  // Mobile nav dropdown toggles
+  mobileNavItems.forEach(function (item) {
+    item.addEventListener('click', function () {
+      const targetId = this.getAttribute('data-target');
+      const dropdown = document.getElementById(targetId);
+      if (dropdown) {
+        const isOpen = dropdown.style.display !== 'none';
+        if (isOpen) {
+          dropdown.style.display = 'none';
+        } else {
+          dropdown.style.display = 'block';
+        }
+      }
+    });
+  });
+
+  // Close mobile nav when clicking a link
+  mobileNav.querySelectorAll('a').forEach(function (link) {
+    link.addEventListener('click', function () {
+      mobileNav.style.display = 'none';
+      hamburger.classList.remove('open');
+    });
+  });
+
+  // Close mobile nav on resize to desktop
+  window.addEventListener('resize', function () {
+    if (window.innerWidth > 768) {
+      mobileNav.style.display = 'none';
+      hamburger.classList.remove('open');
+    }
+  });
+</script>
+
+</body>
+</html>

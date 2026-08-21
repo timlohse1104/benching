@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Particle Simulation</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0a0f; }
+canvas { display: block; }
+#panel {
+  position: fixed; top: 16px; left: 16px;
+  background: rgba(10, 10, 18, 0.88);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 18px 20px;
+  color: #c8c8d8;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  width: 220px;
+  backdrop-filter: blur(10px);
+  z-index: 10;
+  user-select: none;
+}
+#panel h2 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e0e0f0;
+  margin-bottom: 14px;
+  letter-spacing: 0.5px;
+}
+.label {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.label span:first-child { min-width: 90px; }
+label { color: #9999aa; }
+input[type="range"] {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 2px;
+  outline: none;
+  margin-top: 6px;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #6c6cf0;
+  cursor: pointer;
+  border: 2px solid rgba(255,255,255,0.2);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #6c6cf0;
+  cursor: pointer;
+  border: 2px solid rgba(255,255,255,0.2);
+  border-radius: 2px;
+}
+.val {
+  color: #6c6cf0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+#fps {
+  position: fixed; bottom: 16px; right: 16px;
+  background: rgba(10, 10, 18, 0.75);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  padding: 8px 14px;
+  color: #8888aa;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  z-index: 10;
+  backdrop-filter: blur(10px);
+}
+#fps span { color: #6c6cf0; font-weight: 600; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="panel">
+  <h2>⚡ Controls</h2>
+  <div class="label"><label>Particles</label><span class="val" id="vN">300</span></div>
+  <input type="range" id="slN" min="50" max="2000" value="300">
+  <div class="label"><label>Gravity</label><span class="val" id="vG">0.15</span></div>
+  <input type="range" id="slG" min="0" max="2" step="0.01" value="0.15">
+  <div class="label"><label>Attraction</label><span class="val" id="vA">80</span></div>
+  <input type="range" id="slA" min="0" max="400" value="80">
+  <div class="label"><label>Repel</label><span class="val" id="vR">-50</span></div>
+  <input type="range" id="slR" min="-300" max="100" value="-50">
+  <div class="label"><label>Drag</label><span class="val" id="vD">0.98</span></div>
+  <input type="range" id="slD" min="0.8" max="0.99" step="0.01" value="0.98">
+</div>
+<div id="fps">FPS: <span>0</span></div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// Parameters
+let params = {
+  count: 300,
+  gravity: 0.15,
+  attraction: 80,
+  repel: -50,
+  drag: 0.98
+};
+
+// Slider bindings
+const bindSlider = (id, key, valEl, min, max, step) => {
+  const sl = document.getElementById(id);
+  sl.addEventListener('input', () => {
+    let v = parseFloat(sl.value);
+    if (step) v = Math.round(v * step) / step;
+    params[key] = v;
+    valEl.textContent = v.toFixed(step ? (step < 0.1 ? 2 : 1) : 0);
+  });
+};
+bindSlider('slN', 'count', document.getElementById('vN'), 50, 2000, 1);
+bindSlider('slG', 'gravity', document.getElementById('vG'), 0, 2, 0.01);
+bindSlider('slA', 'attraction', document.getElementById('vA'), 0, 400, 1);
+bindSlider('slR', 'repel', document.getElementById('vR'), -300, 100, 1);
+bindSlider('slD', 'drag', document.getElementById('vD'), 0.8, 0.99, 0.01);
+
+// Particles
+let particles = [];
+const hueBase = 200;
+
+function createParticle() {
+  const angle = Math.random() * Math.PI * 2;
+  const speed = 0.5 + Math.random() * 2.5;
+  return {
+    x: Math.random() * W,
+    y: Math.random() * H,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
+    r: 1.5 + Math.random() * 2.5,
+    hue: hueBase + (Math.random() - 0.5) * 80,
+    sat: 50 + Math.random() * 40,
+    lit: 40 + Math.random() * 30,
+    alpha: 0.4 + Math.random() * 0.6
+  };
+}
+
+function initParticles() {
+  particles = [];
+  for (let i = 0; i < params.count; i++) {
+    particles.push(createParticle());
+  }
+}
+initParticles();
+
+// Mouse
+let mouse = { x: -9999, y: -9999, active: false };
+canvas.addEventListener('mousemove', e => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+  mouse.active = true;
+});
+canvas.addEventListener('mouseleave', () => { mouse.active = false; });
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  mouse.x = e.touches[0].clientX;
+  mouse.y = e.touches[0].clientY;
+  mouse.active = true;
+}, { passive: false });
+canvas.addEventListener('touchend', () => { mouse.active = false; });
+
+// FPS
+let lastTime = performance.now();
+let frameCount = 0;
+const fpsEl = document.querySelector('#fps span');
+
+function update(time) {
+  requestAnimationFrame(update);
+  const dt = Math.min((time - lastTime) / 1000, 0.05);
+  lastTime = time;
+
+  frameCount++;
+  if (frameCount % 60 === 0) {
+    fpsEl.textContent = Math.round(1 / (dt || 0.001));
+  }
+
+  // Adjust particle count
+  if (params.count !== particles.length) {
+    while (particles.length < params.count) particles.push(createParticle());
+    while (particles.length > params.count) particles.pop();
+  }
+
+  // Update particles
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i];
+
+    // Gravity
+    p.vy += params.gravity * dt * 60;
+
+    // Mouse interaction
+    if (mouse.active) {
+      const dx = mouse.x - p.x;
+      const dy = mouse.y - p.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) + 0.01;
+      const force = (params.attraction + params.repel) / (dist * dt * 60);
+      const ax = (dx / dist) * force;
+      const ay = (dy / dist) * force;
+      p.vx += ax * dt;
+      p.vy += ay * dt;
+    }
+
+    // Drag
+    p.vx *= params.drag;
+    p.vy *= params.drag;
+
+    // Position
+    p.x += p.vx * dt * 60;
+    p.y += p.vy * dt * 60;
+
+    // Wrap edges
+    if (p.x < -10) p.x = W + 10;
+    if (p.x > W + 10) p.x = -10;
+    if (p.y < -10) p.y = H + 10;
+    if (p.y > H + 10) p.y = -10;
+  }
+
+  // Render
+  ctx.fillStyle = '#0a0a0f';
+  ctx.fillRect(0, 0, W, H);
+
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i];
+    const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+    const brightness = Math.max(0.3, Math.min(1, p.alpha + speed * 0.15));
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${p.hue}, ${p.sat}%, ${p.lit * brightness}%, ${brightness * 0.85})`;
+    ctx.fill();
+
+    // Glow
+    if (speed > 1) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${p.hue}, ${p.sat}%, ${p.lit * brightness * 0.3}%, ${brightness * 0.15})`;
+      ctx.fill();
+    }
+  }
+}
+
+requestAnimationFrame(update);
+</script>
+</body>
+</html>
