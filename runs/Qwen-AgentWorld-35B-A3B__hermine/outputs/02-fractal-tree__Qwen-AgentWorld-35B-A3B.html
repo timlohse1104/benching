@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fractal Tree L-System</title>
+<style>
+    body {
+        margin: 0;
+        overflow: hidden;
+        background: #0f172a;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    #canvas {
+        display: block;
+    }
+    #controls {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: rgba(15, 23, 42, 0.85);
+        padding: 20px;
+        border-radius: 12px;
+        color: #e2e8f0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        min-width: 220px;
+    }
+    #controls h3 {
+        margin-top: 0;
+        color: #38bdf8;
+        font-size: 18px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+    }
+    .control-group {
+        margin-bottom: 15px;
+    }
+    .control-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 14px;
+        color: #94a3b8;
+    }
+    .control-group input[type=range] {
+        width: 100%;
+        cursor: pointer;
+    }
+    .control-group .value {
+        float: right;
+        color: #38bdf8;
+        font-weight: bold;
+    }
+    button {
+        width: 100%;
+        padding: 10px;
+        background: #38bdf8;
+        color: #0f172a;
+        border: none;
+        border-radius: 6px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background 0.2s;
+        margin-top: 5px;
+    }
+    button:hover {
+        background: #0ea5e9;
+    }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="controls">
+    <h3>Fractal Tree</h3>
+    <div class="control-group">
+        <label>Iterations (Depth) <span class="value" id="val-depth">5</span></label>
+        <input type="range" id="inp-depth" min="3" max="7" value="5">
+    </div>
+    <div class="control-group">
+        <label>Branch Angle (deg) <span class="value" id="val-angle">25</span></label>
+        <input type="range" id="inp-angle" min="10" max="45" value="25">
+    </div>
+    <div class="control-group">
+        <label>Length Ratio <span class="value" id="val-ratio">0.75</span></label>
+        <input type="range" id="inp-ratio" min="0.60" max="0.85" step="0.01" value="0.75">
+    </div>
+    <div class="control-group">
+        <label>Jitter Amount <span class="value" id="val-jitter">0.1</span></label>
+        <input type="range" id="inp-jitter" min="0" max="0.5" step="0.01" value="0.1">
+    </div>
+    <button id="btn-regenerate">Regenerate</button>
+</div>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+let depthBuckets = {};
+let maxDepth = 0;
+let animationStartTime = null;
+let isAnimating = true;
+
+const depthDelayMs = 300;
+const drawDurationMs = 500;
+const basePathLen = 120;
+const maxLineWidth = 8;
+const lineWidthStep = 0.8;
+
+function generateLSystem(axiom, rules, iterations) {
+    let str = axiom;
+    for (let i = 0; i < iterations; i++) {
+        let nextStr = '';
+        for (let char of str) {
+            nextStr += rules[char] !== undefined ? rules[char] : char;
+        }
+        str = nextStr;
+    }
+    return str;
+}
+
+function getBranchColor(depth, maxD) {
+    let t = maxD > 0 ? depth / maxD : 0;
+    let r = Math.round(60 + (130 - 60) * t);
+    let g = Math.round(35 + (210 - 35) * t);
+    let b = Math.round(20 + (110 - 20) * t);
+    return `rgb(${r},${g},${b})`;
+}
+
+function interpretLSystem(str, basePathLen, baseAngleRad, lengthRatio, jitterAmount) {
+    let x = canvas.width / 2;
+    let y = canvas.height;
+    let angle = -Math.PI / 2;
+    let stack = [];
+    let currentDepth = 0;
+
+    depthBuckets = {};
+
+    let seed = Math.floor(Math.random() * 100000);
+    function rand() {
+        seed = (seed * 9301 + 49297) % 233280;
+        return seed / 233280;
+    }
+
+    for (let i = 0; i < str.length; i++) {
+        let char = str[i];
+        if (char === 'F') {
+            let len = basePathLen * Math.pow(lengthRatio, currentDepth);
+            let jitter = (rand() - 0.5) * jitterAmount;
+            let effectiveAngle = angle + jitter;
+
+            let x2 = x + len * Math.cos(effectiveAngle);
+            let y2 = y + len * Math.sin(effectiveAngle);
+
+            if (!depthBuckets[currentDepth]) depthBuckets[currentDepth] = [];
+            depthBuckets[currentDepth].push({x, y, x2, y2});
+
+            x = x2;
+            y = y2;
+        } else if (char === '+') {
+            let jumpAngle = baseAngleRad + (rand() - 0.5) * jitterAmount;
+            angle += jumpAngle;
+        } else if (char === '-') {
+            let jumpAngle = baseAngleRad + (rand() - 0.5) * jitterAmount;
+            angle -= jumpAngle;
+        } else if (char === '[') {
+            stack.push({x, y, angle, depth: currentDepth});
+            currentDepth++;
+            if (!depthBuckets[currentDepth]) depthBuckets[currentDepth] = [];
+        } else if (char === ']') {
+            let state = stack.pop();
+            x = state.x;
+            y = state.y;
+            angle = state.angle;
+            currentDepth = state.depth;
+        }
+    }
+
+    maxDepth = 0;
+    for (let d in depthBuckets) {
+        let dd = parseInt(d, 10);
+        if (dd > maxDepth) maxDepth = dd;
+    }
+}
+
+function regenerateTree() {
+    let iterations = parseInt(document.getElementById('inp-depth').value, 10);
+    let angleDeg = parseInt(document.getElementById('inp-angle').value, 10);
+    let angleRad = (angleDeg * Math.PI) / 180;
+    let lengthRatio = parseFloat(document.getElementById('inp-ratio').value);
+    let jitterAmount = parseFloat(document.getElementById('inp-jitter').value);
+
+    document.getElementById('val-depth').textContent = iterations;
+    document.getElementById('val-angle').textContent = angleDeg;
+    document.getElementById('val-ratio').textContent = lengthRatio;
+    document.getElementById('val-jitter').textContent = jitterAmount;
+
+    let axiom = 'F';
+    let rules = { 'F': 'F[+F]F[-F]F' };
+    let str = generateLSystem(axiom, rules, iterations);
+
+    interpretLSystem(str, basePathLen, angleRad, lengthRatio, jitterAmount);
+
+    animationStartTime = null;
+}
+
+function animate(timestamp) {
+    if (!animationStartTime) animationStartTime = timestamp;
+    let elapsed = timestamp - animationStartTime;
+
+    let bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    bgGrad.addColorStop(0, '#0f172a');
+    bgGrad.addColorStop(0.7, '#1e293b');
+    bgGrad.addColorStop(1, '#334155');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let d in depthBuckets) {
+        let depthNum = parseInt(d, 10);
+        let bucket = depthBuckets[d];
+        if (!bucket) continue;
+
+        let startTime = depthNum * depthDelayMs;
+        let progress = 0;
+        if (elapsed >= startTime) {
+            let drawTime = elapsed - startTime;
+            progress = Math.min(1, drawTime / drawDurationMs);
+        }
+
+        if (progress < 0.01) continue;
+
+        ctx.beginPath();
+        ctx.lineWidth = Math.max(0.5, maxLineWidth - depthNum * lineWidthStep);
+        ctx.strokeStyle = getBranchColor(depthNum, maxDepth);
+
+        for (let cmd of bucket) {
+            let p = progress;
+            let curX2 = cmd.x + (cmd.x2 - cmd.x) * p;
+            let curY2 = cmd.y + (cmd.y2 - cmd.y) * p;
+
+            if (p > 0.01) {
+                ctx.moveTo(cmd.x, cmd.y);
+                ctx.lineTo(curX2, curY2);
+            }
+        }
+        ctx.stroke();
+    }
+
+    for (let d = Math.max(0, maxDepth - 1); d <= maxDepth; d++) {
+        if (!depthBuckets[d]) continue;
+        let startTime = d * depthDelayMs;
+        let progress = 0;
+        if (elapsed >= startTime) {
+            let drawTime = elapsed - startTime;
+            progress = Math.min(1, drawTime / drawDurationMs);
+        }
+        if (progress < 0.7) continue;
+
+        let leafColor = d === maxDepth ? 'rgba(255, 180, 200, 0.9)' : 'rgba(180, 220, 150, 0.8)';
+        let leafSize = d === maxDepth ? 3 : 2;
+
+        ctx.fillStyle = leafColor;
+        for (let cmd of depthBuckets[d]) {
+            let lx = cmd.x2;
+            let ly = cmd.y2;
+
+            ctx.beginPath();
+            ctx.arc(lx, ly, leafSize * progress, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    requestAnimationFrame(animate);
+}
+
+document.getElementById('btn-regenerate').addEventListener('click', regenerateTree);
+
+document.getElementById('inp-depth').addEventListener('input', function() {
+    document.getElementById('val-depth').textContent = this.value;
+});
+document.getElementById('inp-angle').addEventListener('input', function() {
+    document.getElementById('val-angle').textContent = this.value;
+});
+document.getElementById('inp-ratio').addEventListener('input', function() {
+    document.getElementById('val-ratio').textContent = this.value;
+});
+document.getElementById('inp-jitter').addEventListener('input', function() {
+    document.getElementById('val-jitter').textContent = this.value;
+});
+
+regenerateTree();
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>

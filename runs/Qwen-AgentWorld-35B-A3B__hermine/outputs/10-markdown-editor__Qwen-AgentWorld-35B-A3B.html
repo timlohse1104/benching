@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Editor with Live Preview</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background-color: #f8f9fa;
+        }
+        .toolbar {
+            padding: 10px 15px;
+            background: #e9ecef;
+            border-bottom: 1px solid #ced4da;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .toolbar button {
+            padding: 6px 12px;
+            font-size: 14px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        .toolbar button:hover {
+            background: #0056b3;
+        }
+        .stats {
+            margin-left: auto;
+            font-size: 13px;
+            color: #495057;
+        }
+        .container {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - 50px);
+        }
+        .pane {
+            flex: 1;
+            padding: 15px;
+            overflow: auto;
+        }
+        #editor {
+            width: 100%;
+            height: 100%;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            resize: none;
+            padding: 15px;
+            background: #fff;
+        }
+        #preview {
+            width: 100%;
+            height: 100%;
+            font-family: system-ui, -apple-system, sans-serif;
+            font-size: 16px;
+            line-height: 1.6;
+            padding: 15px 25px;
+            background: #fff;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            overflow: auto;
+        }
+        #preview h1, #preview h2, #preview h3, #preview h4, #preview h5, #preview h6 {
+            margin-top: 24px;
+            margin-bottom: 16px;
+            font-weight: 600;
+            line-height: 1.25;
+        }
+        #preview h1 { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+        #preview h2 { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+        #preview h3 { font-size: 1.25em; }
+        #preview p { margin-top: 0; margin-bottom: 16px; }
+        #preview code {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background-color: rgba(27,31,35,0.05);
+            border-radius: 3px;
+            padding: 0.2em 0.4em;
+            font-size: 85%;
+        }
+        #preview pre {
+            background-color: #f6f8fa;
+            border-radius: 3px;
+            padding: 16px;
+            overflow: auto;
+            margin-bottom: 16px;
+        }
+        #preview pre code {
+            background-color: transparent;
+            padding: 0;
+            font-size: 100%;
+        }
+        #preview blockquote {
+            padding: 0 1em;
+            color: #6a737d;
+            border-left: 0.25em solid #dfe2e5;
+            margin: 0 0 16px 0;
+        }
+        #preview ul, #preview ol {
+            margin-top: 0;
+            margin-bottom: 16px;
+            padding-left: 2em;
+        }
+        #preview li {
+            margin-top: 0.25em;
+        }
+        #preview a {
+            color: #0366d6;
+            text-decoration: none;
+        }
+        #preview a:hover {
+            text-decoration: underline;
+        }
+        #preview img {
+            max-width: 100%;
+            height: auto;
+        }
+        #preview hr {
+            height: 0.25em;
+            padding: 0;
+            margin: 24px 0;
+            background-color: #e1e4e8;
+            border: 0;
+        }
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            .pane {
+                height: 50%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <button id="copyHtmlBtn">Copy HTML</button>
+        <div class="stats">
+            <span id="wordCount">Words: 0</span> | <span id="charCount">Characters: 0</span>
+        </div>
+    </div>
+    <div class="container">
+        <div class="pane">
+            <textarea id="editor" placeholder="Enter Markdown here..."></textarea>
+        </div>
+        <div class="pane">
+            <div id="preview"></div>
+        </div>
+    </div>
+
+    <script>
+        function escapeHtml(text) {
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function processInline(text) {
+            // Images: ![alt](url)
+            text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, function(match, alt, url) {
+                return '<img src="' + url + '" alt="' + alt + '">';
+            });
+
+            // Links: [text](url)
+            text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(match, linkText, url) {
+                return '<a href="' + url + '">' + linkText + '</a>';
+            });
+
+            // Bold: **text** or __text__
+            text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            text = text.replace(/__(.*?)__/g, '<strong>$1</strong>');
+
+            // Italic: *text* or _text_
+            text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            text = text.replace(/_(.*?)_/g, '<em>$1</em>');
+
+            return text;
+        }
+
+        function parseMarkdown(md) {
+            const codeBlocks = [];
+            const inlineCodes = [];
+
+            // Protect fenced code blocks
+            md = md.replace(/```[\s\S]*?```/g, function(match) {
+                const id = codeBlocks.length;
+                let inner = match.slice(3, -3);
+                let lang = '';
+                let codeContent = inner;
+                
+                const firstNewline = inner.indexOf('\n');
+                if (firstNewline !== -1) {
+                    const firstLine = inner.slice(0, firstNewline).trim();
+                    if (firstLine && /^[\w-]+$/.test(firstLine)) {
+                        lang = firstLine;
+                        codeContent = inner.slice(firstNewline + 1);
+                    }
+                }
+                
+                if (codeContent.endsWith('\n')) codeContent = codeContent.slice(0, -1);
+                
+                const escapedCode = escapeHtml(codeContent);
+                const langStr = escapeHtml(lang);
+                const html = '<pre><code class="language-' + langStr + '">' + escapedCode + '</code></pre>';
+                codeBlocks.push(html);
+                return '\n\n:::CB' + id + ':::\n\n';
+            });
+
+            // Protect inline code
+            md = md.replace(/`([^`]+)`/g, function(match, code) {
+                const id = inlineCodes.length;
+                const escapedCode = escapeHtml(code);
+                const html = '<code>' + escapedCode + '</code>';
+                inlineCodes.push(html);
+                return ':::IC' + id + ':::';
+            });
+
+            // Escape remaining text
+            md = escapeHtml(md);
+
+            // Split into lines for block processing
+            const lines = md.split('\n');
+            const parsedBlocks = [];
+            let i = 0;
+            while (i < lines.length) {
+                let line = lines[i];
+
+                // Horizontal rule
+                if (/^ {0,3}([*\-_])\1{2,}\s*$/.test(line)) {
+                    parsedBlocks.push('<hr>');
+                    i++;
+                    continue;
+                }
+
+                // Headings
+                let headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+                if (headingMatch) {
+                    const level = headingMatch[1].length;
+                    const text = headingMatch[2];
+                    parsedBlocks.push('<h' + level + '>' + processInline(text) + '</h' + level + '>');
+                    i++;
+                    continue;
+                }
+
+                // Blockquote
+                if (/^>\s?/.test(line)) {
+                    let blockquoteLines = [];
+                    while (i < lines.length && /^>\s?/.test(lines[i])) {
+                        blockquoteLines.push(lines[i].replace(/^>\s?/, ''));
+                        i++;
+                    }
+                    const bqText = blockquoteLines.map(function(l) { return processInline(l); }).join(' ');
+                    parsedBlocks.push('<blockquote>' + bqText + '</blockquote>');
+                    continue;
+                }
+
+                // Unordered list
+                if (/^ {0,3}[-*+]\s+/.test(line)) {
+                    let listItems = [];
+                    while (i < lines.length && /^ {0,3}[-*+]\s+/.test(lines[i])) {
+                        let itemText = lines[i].replace(/^ {0,3}[-*+]\s+/, '');
+                        listItems.push('<li>' + processInline(itemText) + '</li>');
+                        i++;
+                    }
+                    parsedBlocks.push('<ul>\n' + listItems.join('\n') + '</ul>');
+                    continue;
+                }
+
+                // Ordered list
+                if (/^ {0,3}\d+\.\s+/.test(line)) {
+                    let listItems = [];
+                    while (i < lines.length && /^ {0,3}\d+\.\s+/.test(lines[i])) {
+                        let itemText = lines[i].replace(/^ {0,3}\d+\.\s+/, '');
+                        listItems.push('<li>' + processInline(itemText) + '</li>');
+                        i++;
+                    }
+                    parsedBlocks.push('<ol>\n' + listItems.join('\n') + '</ol>');
+                    continue;
+                }
+
+                // Empty line
+                if (/^\s*$/.test(line)) {
+                    i++;
+                    continue;
+                }
+
+                // Paragraph or code block placeholder or other
+                let paraLines = [];
+                while (i < lines.length) {
+                    let l = lines[i];
+                    if (/^\s*$/.test(l)) break;
+                    if (/^ {0,3}([*\-_])\1{2,}\s*$/.test(l)) break;
+                    if (l.match(/^(#{1,6})\s+/)) break;
+                    if (/^>\s?/.test(l)) break;
+                    if (/^ {0,3}[-*+]\s+/.test(l)) break;
+                    if (/^ {0,3}\d+\.\s+/.test(l)) break;
+                    paraLines.push(l);
+                    i++;
+                }
+                if (paraLines.length > 0) {
+                    let paraText = paraLines.join(' ');
+                    parsedBlocks.push('<p>' + processInline(paraText) + '</p>');
+                }
+            }
+
+            let html = parsedBlocks.join('\n');
+
+            // Replace placeholders
+            for (let j = 0; j < codeBlocks.length; j++) {
+                html = html.replace(':::CB' + j + ':::', codeBlocks[j]);
+            }
+            for (let j = 0; j < inlineCodes.length; j++) {
+                html = html.replace(':::IC' + j + ':::', inlineCodes[j]);
+            }
+
+            return html;
+        }
+
+        const editor = document.getElementById('editor');
+        const preview = document.getElementById('preview');
+        const wordCountEl = document.getElementById('wordCount');
+        const charCountEl = document.getElementById('charCount');
+        const copyHtmlBtn = document.getElementById('copyHtmlBtn');
+
+        const sampleMarkdown = `# Heading 1
+## Heading 2
+### Heading 3
+#### Heading 4
+##### Heading 5
+###### Heading 6
+
+This is a paragraph with **bold text**, *italic text*, and **_bold and italic_**.
+
+Here is some \`inline code\` and a fenced code block:
+
+\`\`\`javascript
+function greet(name) {
+    console.log("Hello, " + name + "!");
+}
+\`\`\`
+
+- Unordered list item 1
+- Unordered list item 2
+  - Nested item
+
+1. Ordered list item 1
+2. Ordered list item 2
+
+> This is a blockquote.
+
+[A Link](https://example.com) and an image:
+
+![An Image](https://example.com/image.png)
+
+---
+
+That's all!
+`;
+
+        editor.value = sampleMarkdown;
+
+        function updatePreview() {
+            const mdText = editor.value;
+            const html = parseMarkdown(mdText);
+            preview.innerHTML = html;
+            
+            const chars = mdText.length;
+            const words = mdText.trim() === '' ? 0 : mdText.trim().split(/\s+/).length;
+            wordCountEl.textContent = 'Words: ' + words;
+            charCountEl.textContent = 'Characters: ' + chars;
+        }
+
+        editor.addEventListener('input', updatePreview);
+
+        copyHtmlBtn.addEventListener('click', function() {
+            const htmlContent = preview.innerHTML;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(htmlContent).then(function() {
+                    copyHtmlBtn.textContent = 'Copied!';
+                    setTimeout(function() { copyHtmlBtn.textContent = 'Copy HTML'; }, 2000);
+                }).catch(function(err) {
+                    console.error('Failed to copy: ', err);
+                });
+            } else {
+                // Fallback
+                const textArea = document.createElement("textarea");
+                textArea.value = htmlContent;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    copyHtmlBtn.textContent = 'Copied!';
+                    setTimeout(function() { copyHtmlBtn.textContent = 'Copy HTML'; }, 2000);
+                } catch (err) {
+                    console.error('Fallback: Oops, unable to copy', err);
+                }
+                document.body.removeChild(textArea);
+            }
+        });
+
+        updatePreview();
+    </script>
+</body>
+</html>

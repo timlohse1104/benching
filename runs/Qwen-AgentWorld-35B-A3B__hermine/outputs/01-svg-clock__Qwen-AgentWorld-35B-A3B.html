@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analog Clock</title>
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+    body {
+        background-color: #121212;
+        color: #e0e0e0;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+    }
+    .clock-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+    }
+    svg {
+        width: 400px;
+        height: 400px;
+    }
+    .digital-time {
+        font-size: 24px;
+        font-weight: 300;
+        letter-spacing: 2px;
+        font-variant-numeric: tabular-nums;
+        color: #ffffff;
+    }
+</style>
+</head>
+<body>
+<div class="clock-container">
+    <svg viewBox="0 0 400 400" id="clock-svg">
+        <!-- Clock face -->
+        <circle cx="200" cy="200" r="190" fill="#1e1e2e" stroke="#333344" stroke-width="2"/>
+        <circle cx="200" cy="200" r="185" fill="none" stroke="#2a2a3a" stroke-width="1"/>
+        
+        <!-- Tick marks -->
+        <g id="tick-marks"></g>
+        
+        <!-- Hands -->
+        <g id="hands">
+            <!-- Hour hand -->
+            <line id="hour-hand" x1="200" y1="200" x2="200" y2="130" stroke="#e0e0e0" stroke-width="6" stroke-linecap="round"/>
+            <!-- Minute hand -->
+            <line id="minute-hand" x1="200" y1="200" x2="200" y2="90" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/>
+            <!-- Second hand -->
+            <line id="second-hand" x1="200" y1="200" x2="200" y2="75" stroke="#ff4757" stroke-width="1.5" stroke-linecap="round"/>
+        </g>
+        
+        <!-- Center dot -->
+        <circle cx="200" cy="200" r="6" fill="#ff4757"/>
+        <circle cx="200" cy="200" r="3" fill="#ffffff"/>
+    </svg>
+    <div class="digital-time" id="digital-time">00:00:00</div>
+</div>
+
+<script>
+    (function() {
+        const tickMarksGroup = document.getElementById('tick-marks');
+        const cx = 200;
+        const cy = 200;
+        
+        // Generate tick marks
+        for (let i = 0; i < 60; i++) {
+            const isHour = i % 5 === 0;
+            const angle = (i * 6 - 90) * (Math.PI / 180);
+            
+            const r1 = isHour ? 165 : 175;
+            const r2 = 185;
+            
+            const x1 = cx + r1 * Math.cos(angle);
+            const y1 = cy + r1 * Math.sin(angle);
+            const x2 = cx + r2 * Math.cos(angle);
+            const y2 = cy + r2 * Math.sin(angle);
+            
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', x1);
+            line.setAttribute('y1', y1);
+            line.setAttribute('x2', x2);
+            line.setAttribute('y2', y2);
+            line.setAttribute('stroke', isHour ? '#ffffff' : '#888899');
+            line.setAttribute('stroke-width', isHour ? '3' : '1');
+            line.setAttribute('stroke-linecap', 'round');
+            tickMarksGroup.appendChild(line);
+        }
+        
+        const hourHand = document.getElementById('hour-hand');
+        const minuteHand = document.getElementById('minute-hand');
+        const secondHand = document.getElementById('second-hand');
+        const digitalTime = document.getElementById('digital-time');
+        
+        function updateClock() {
+            const now = new Date();
+            const h = now.getHours();
+            const m = now.getMinutes();
+            const s = now.getSeconds();
+            
+            // Calculate angles
+            const sDeg = s * 6;
+            const mDeg = m * 6 + s * 0.1;
+            const hDeg = (h % 12) * 30 + m * 0.5;
+            
+            // Apply rotations
+            hourHand.setAttribute('transform', `rotate(${hDeg}, 200, 200)`);
+            minuteHand.setAttribute('transform', `rotate(${mDeg}, 200, 200)`);
+            secondHand.setAttribute('transform', `rotate(${sDeg}, 200, 200)`);
+            
+            // Digital time
+            const pad = (num) => String(num).padStart(2, '0');
+            digitalTime.textContent = `${pad(h)}:${pad(m)}:${pad(s)}`;
+        }
+        
+        updateClock();
+        setInterval(updateClock, 1000);
+    })();
+</script>
+</body>
+</html>

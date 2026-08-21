@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conway's Game of Life</title>
+<style>
+    body {
+        background-color: #121212;
+        color: #e0e0e0;
+        font-family: Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 0;
+        padding: 20px;
+    }
+    h1 { margin-bottom: 10px; }
+    .controls {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-bottom: 15px;
+        align-items: center;
+    }
+    button {
+        padding: 8px 16px;
+        background-color: #333;
+        color: #fff;
+        border: 1px solid #555;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    button:hover { background-color: #444; }
+    select, input[type="range"] {
+        padding: 6px;
+        background-color: #333;
+        color: #fff;
+        border: 1px solid #555;
+        border-radius: 4px;
+    }
+    .stats {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 10px;
+        font-size: 14px;
+    }
+    canvas {
+        background-color: #0a0a0a;
+        border: 1px solid #333;
+        cursor: crosshair;
+    }
+</style>
+</head>
+<body>
+    <h1>Conway's Game of Life</h1>
+    <div class="stats">
+        <span>Generation: <span id="genCount">0</span></span>
+        <span>Population: <span id="popCount">0</span></span>
+    </div>
+    <div class="controls">
+        <button id="startPauseBtn">Start</button>
+        <button id="stepBtn">Step</button>
+        <button id="clearBtn">Clear</button>
+        <button id="randomBtn">Randomize</button>
+        <select id="presetSelect">
+            <option value="">-- Select Pattern --</option>
+            <option value="glider">Glider</option>
+            <option value="blinker">Blinker</option>
+            <option value="toad">Toad</option>
+        </select>
+        <button id="loadPresetBtn">Load Pattern</button>
+        <label>Speed: <input type="range" id="speedSlider" min="10" max="500" value="100"></label>
+    </div>
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const COLS = 60;
+const ROWS = 40;
+const CELL_SIZE = 10;
+
+let grid = makeGrid(COLS, ROWS);
+let isRunning = false;
+let generation = 0;
+let population = 0;
+let interval = 100;
+let lastTime = 0;
+let animationId = null;
+
+function makeGrid(w, h) {
+    return Array(h).fill().map(() => Array(w).fill(0));
+}
+
+function randomizeGrid() {
+    grid = makeGrid(COLS, ROWS);
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            grid[r][c] = Math.random() > 0.85 ? 1 : 0;
+        }
+    }
+    population = 0;
+    for(let r=0; r<ROWS; r++) {
+        for(let c=0; c<COLS; c++) {
+            if(grid[r][c] === 1) population++;
+        }
+    }
+    generation = 0;
+    updateStats();
+    drawGrid();
+}
+
+function clearGrid() {
+    grid = makeGrid(COLS, ROWS);
+    generation = 0;
+    population = 0;
+    updateStats();
+    drawGrid();
+}
+
+function countNeighbors(grid, x, y) {
+    let sum = 0;
+    for (let i = -1; i < 2; i++) {
+        for (let j = -1; j < 2; j++) {
+            if (i === 0 && j === 0) continue;
+            let col = x + j;
+            let row = y + i;
+            if (col >= 0 && col < COLS && row >= 0 && row < ROWS) {
+                sum += grid[row][col];
+            }
+        }
+    }
+    return sum;
+}
+
+function step() {
+    let nextGrid = makeGrid(COLS, ROWS);
+    let pop = 0;
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            let state = grid[r][c];
+            let neighbors = countNeighbors(grid, c, r);
+            if (state === 0 && neighbors === 3) {
+                state = 1;
+            } else if (state === 1 && (neighbors < 2 || neighbors > 3)) {
+                state = 0;
+            }
+            nextGrid[r][c] = state;
+            if (state === 1) pop++;
+        }
+    }
+    grid = nextGrid;
+    generation++;
+    population = pop;
+    updateStats();
+    drawGrid();
+}
+
+function drawGrid() {
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            ctx.strokeStyle = '#1a1a1a';
+            ctx.strokeRect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+            if (grid[r][c] === 1) {
+                ctx.fillStyle = '#00ff9d';
+                ctx.fillRect(c * CELL_SIZE + 1, r * CELL_SIZE + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+            }
+        }
+    }
+}
+
+function updateStats() {
+    document.getElementById('genCount').textContent = generation;
+    document.getElementById('popCount').textContent = population;
+}
+
+function loop(timestamp) {
+    if (!isRunning) return;
+    if (timestamp - lastTime > interval) {
+        step();
+        lastTime = timestamp;
+    }
+    animationId = requestAnimationFrame(loop);
+}
+
+function toggleRun() {
+    isRunning = !isRunning;
+    document.getElementById('startPauseBtn').textContent = isRunning ? 'Pause' : 'Start';
+    if (isRunning) {
+        lastTime = performance.now();
+        animationId = requestAnimationFrame(loop);
+    } else {
+        cancelAnimationFrame(animationId);
+    }
+}
+
+const patterns = {
+    glider: [[0,1], [1,2], [2,0], [2,1], [2,2]],
+    blinker: [[1,0], [1,1], [1,2]],
+    toad: [[0,1], [0,2], [0,3], [1,0], [1,1], [2,1], [2,2]]
+};
+
+function loadPreset(name) {
+    clearGrid();
+    const p = patterns[name];
+    if (!p) return;
+    let minR = 1000, maxR = -1, minC = 1000, maxC = -1;
+    for (let cell of p) {
+        let r = cell[0], c = cell[1];
+        if (r < minR) minR = r;
+        if (r > maxR) maxR = r;
+        if (c < minC) minC = c;
+        if (c > maxC) maxC = c;
+    }
+    let height = maxR - minR + 1;
+    let width = maxC - minC + 1;
+    let startR = Math.floor((ROWS - height) / 2) - minR;
+    let startC = Math.floor((COLS - width) / 2) - minC;
+
+    for (let cell of p) {
+        let r = cell[0] + startR;
+        let c = cell[1] + startC;
+        if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+            grid[r][c] = 1;
+        }
+    }
+    population = p.length;
+    updateStats();
+    drawGrid();
+}
+
+function getCellFromMouse(evt) {
+    const rect = canvas.getBoundingClientRect();
+    const x = evt.clientX - rect.left;
+    const y = evt.clientY - rect.top;
+    const c = Math.floor(x / CELL_SIZE);
+    const r = Math.floor(y / CELL_SIZE);
+    if (c >= 0 && c < COLS && r >= 0 && r < ROWS) {
+        return { r, c };
+    }
+    return null;
+}
+
+let isDragging = false;
+
+canvas.addEventListener('mousedown', (e) => {
+    if (isRunning) return;
+    isDragging = true;
+    const cell = getCellFromMouse(e);
+    if (cell) {
+        if (grid[cell.r][cell.c] === 1) {
+            grid[cell.r][cell.c] = 0;
+            population--;
+        } else {
+            grid[cell.r][cell.c] = 1;
+            population++;
+        }
+        updateStats();
+        drawGrid();
+    }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    if (!isDragging || isRunning) return;
+    const cell = getCellFromMouse(e);
+    if (cell) {
+        if (grid[cell.r][cell.c] === 1) {
+            grid[cell.r][cell.c] = 0;
+            population--;
+        } else {
+            grid[cell.r][cell.c] = 1;
+            population++;
+        }
+        updateStats();
+        drawGrid();
+    }
+});
+
+canvas.addEventListener('mouseup', () => {
+    isDragging = false;
+});
+
+document.getElementById('startPauseBtn').addEventListener('click', toggleRun);
+document.getElementById('stepBtn').addEventListener('click', () => {
+    if (!isRunning) {
+        step();
+    }
+});
+document.getElementById('clearBtn').addEventListener('click', clearGrid);
+document.getElementById('randomBtn').addEventListener('click', randomizeGrid);
+document.getElementById('loadPresetBtn').addEventListener('click', () => {
+    const val = document.getElementById('presetSelect').value;
+    if (val) loadPreset(val);
+});
+document.getElementById('speedSlider').addEventListener('input', (e) => {
+    interval = parseInt(e.target.value);
+});
+
+drawGrid();
+</script>
+</body>
+</html>

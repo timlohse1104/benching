@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neon Tower Defense: Rogue Core</title>
+<style>
+    body {
+        margin: 0;
+        padding: 0;
+        background: #050510;
+        color: #fff;
+        font-family: 'Courier New', Courier, monospace;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+    }
+    #gameContainer {
+        position: relative;
+        box-shadow: 0 0 20px #00f3ff, 0 0 40px #00f3ff;
+        border: 2px solid #00f3ff;
+    }
+    canvas {
+        display: block;
+        background: #0a0a1a;
+    }
+    #ui-layer {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+    }
+    .ui-panel {
+        pointer-events: auto;
+        background: rgba(5, 5, 16, 0.85);
+        border: 1px solid #00f3ff;
+        box-shadow: 0 0 10px #00f3ff;
+        padding: 10px;
+        margin: 10px;
+        position: absolute;
+    }
+    #top-bar {
+        top: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 20px;
+        margin: 0;
+        border-radius: 0;
+        border-top: none;
+        border-left: none;
+        border-right: none;
+    }
+    .stat {
+        margin: 0 15px;
+        font-size: 16px;
+        font-weight: bold;
+        text-shadow: 0 0 5px currentColor;
+    }
+    .stat.money { color: #ffff00; }
+    .stat.health { color: #ff3333; }
+    .stat.wave { color: #00f3ff; }
+    .stat.shards { color: #ffff00; }
+    #turret-panel {
+        bottom: 10px;
+        left: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .turret-btn {
+        background: rgba(0, 243, 255, 0.1);
+        border: 1px solid #00f3ff;
+        color: #00f3ff;
+        padding: 8px 12px;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 12px;
+        transition: all 0.2s;
+        text-shadow: 0 0 5px #00f3ff;
+        box-shadow: 0 0 5px #00f3ff;
+    }
+    .turret-btn:hover {
+        background: rgba(0, 243, 255, 0.3);
+    }
+    .turret-btn.selected {
+        background: rgba(0, 243, 255, 0.5);
+        box-shadow: 0 0 15px #00f3ff;
+    }
+    .turret-btn.sniper { border-color: #ff00ff; color: #ff00ff; text-shadow: 0 0 5px #ff00ff; box-shadow: 0 0 5px #ff00ff; }
+    .turret-btn.sniper:hover { background: rgba(255, 0, 255, 0.3); }
+    .turret-btn.sniper.selected { background: rgba(255, 0, 255, 0.5); box-shadow: 0 0 15px #ff00ff; }
+    .turret-btn.splash { border-color: #ff9900; color: #ff9900; text-shadow: 0 0 5px #ff9900; box-shadow: 0 0 5px #ff9900; }
+    .turret-btn.splash:hover { background: rgba(255, 153, 0, 0.3); }
+    .turret-btn.splash.selected { background: rgba(255, 153, 0, 0.5); box-shadow: 0 0 15px #ff9900; }
+
+    #overload-panel {
+        bottom: 10px;
+        right: 10px;
+        text-align: center;
+    }
+    #overload-btn {
+        background: rgba(255, 0, 85, 0.2);
+        border: 2px solid #ff0055;
+        color: #ff0055;
+        padding: 15px 20px;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: bold;
+        text-shadow: 0 0 10px #ff0055;
+        box-shadow: 0 0 15px #ff0055;
+        transition: all 0.2s;
+    }
+    #overload-btn.ready {
+        background: rgba(255, 0, 85, 0.5);
+        animation: pulse 1s infinite;
+    }
+    #overload-btn.cooldown {
+        background: rgba(50, 0, 20, 0.5);
+        border-color: #550022;
+        color: #550022;
+        text-shadow: none;
+        box-shadow: none;
+        cursor: not-allowed;
+    }
+    @keyframes pulse {
+        0% { box-shadow: 0 0 15px #ff0055; }
+        50% { box-shadow: 0 0 30px #ff0055, 0 0 50px #ff0055; }
+        100% { box-shadow: 0 0 15px #ff0055; }
+    }
+    #skill-tree-btn {
+        position: absolute;
+        top: 60px;
+        right: 10px;
+        background: rgba(255, 255, 0, 0.1);
+        border: 1px solid #ffff00;
+        color: #ffff00;
+        padding: 8px 12px;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 12px;
+        text-shadow: 0 0 5px #ffff00;
+        box-shadow: 0 0 5px #ffff00;
+    }
+    .overlay {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(5, 5, 16, 0.95);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        pointer-events: auto;
+        z-index: 100;
+    }
+    .overlay h2 {
+        color: #00f3ff;
+        text-shadow: 0 0 10px #00f3ff;
+        font-size: 32px;
+        margin-bottom: 20px;
+    }
+    .overlay button {
+        background: rgba(0, 243, 255, 0.2);
+        border: 1px solid #00f3ff;
+        color: #00f3ff;
+        padding: 10px 20px;
+        margin: 10px;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 16px;
+        box-shadow: 0 0 10px #00f3ff;
+    }
+    .overlay button:hover {
+        background: rgba(0, 243, 255, 0.4);
+    }
+    .skill-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 300px;
+        padding: 10px;
+        margin: 5px 0;
+        border: 1px solid #ffff00;
+        color: #ffff00;
+        background: rgba(255, 255, 0, 0.05);
+    }
+    .skill-item button {
+        background: rgba(255, 255, 0, 0.2);
+        border: 1px solid #ffff00;
+        color: #ffff00;
+        padding: 5px 10px;
+        cursor: pointer;
+    }
+    .skill-item button:disabled {
+        background: rgba(50, 50, 0, 0.2);
+        border-color: #555;
+        color: #555;
+        cursor: not-allowed;
+    }
+    .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div id="gameContainer">
+    <canvas id="gameCanvas" width="704" height="512"></canvas>
+    <div id="ui-layer">
+        <div id="top-bar" class="ui-panel">
+            <div class="stat health">HP: <span id="hp-val">100</span>/<span id="max-hp-val">100</span></div>
+            <div class="stat money"> Credits: <span id="money-val">150</span></div>
+            <div class="stat wave">Wave: <span id="wave-val">1</span></div>
+            <div class="stat shards">Shards: <span id="shards-val">0</span></div>
+        </div>
+        <button id="skill-tree-btn" class="ui-panel">SKILL TREE</button>
+        <div id="turret-panel" class="ui-panel">
+            <div class="turret-btn selected" data-type="blaster">BLASTER (50c)</div>
+            <div class="turret-btn sniper" data-type="sniper">SNIPER (120c)</div>
+            <div class="turret-btn splash" data-type="splash">SPLASH (200c)</div>
+        </div>
+        <div id="overload-panel" class="ui-panel">
+            <button id="overload-btn" class="ready">CORE OVERLOAD [SPACE]</button>
+        </div>
+    </div>
+    <div id="game-over-overlay" class="overlay hidden">
+        <h2>SYSTEM FAILURE</h2>
+        <p>Wave Reached: <span id="go-wave">1</span></p>
+        <p>Shards Earned: <span id="go-shards">0</span></p>
+        <button id="restart-btn">REBOOT SYSTEM</button>
+        <button id="skill-tree-btn-go">OPEN SKILL TREE</button>
+    </div>
+    <div id="skill-tree-overlay" class="overlay hidden">
+        <h2>NEON SKILL TREE</h2>
+        <p>Available Shards: <span id="st-shards">0</span></p>
+        <div id="skill-list"></div>
+        <button id="close-skill-tree-btn">RETURN TO SYSTEM</button>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const CELL = 32;
+const COLS = 22;
+const ROWS = 16;
+
+// Game State
+let gameState = 'PLAYING'; // PLAYING, GAMEOVER, SKILL_TREE
+let wave = 1;
+let money = 150;
+let maxHealth = 100;
+let health = 100;
+let enemies = [];
+let turrets = [];
+let projectiles = [];
+let particles = [];
+let grid = [];
+let selectedTurretType = 'blaster';
+let totalShards = 0; // persistent shards
+
+// Skill Tree State
+let skillTree = {
+    maxHpUpgrades: 0,
+    startMoneyUpgrades: 0,
+    turretDamageUpgrades: 0,
+    overloadCooldownDown: 0,
+    overloadDamageUp: 0
+};
+
+// Wave State
+let enemiesToSpawn = [];
+let spawnTimer = 0;
+let waveInProgress = true;
+let waveTimer = 0;
+
+// Core Overload
+let coreOverloadReady = true;
+let coreOverloadCooldown = 0;
+let coreOverloadMaxCooldown = 30; // seconds
+let coreOverloadDamageMultiplier = 1;
+
+// Turret Definitions
+const TURRET_DEFS = {
+    blaster: { cost: 50, range: 120, damage: 10, fireRate: 30, color: '#00f3ff', type: 'blaster' },
+    sniper: { cost: 120, range: 250, damage: 50, fireRate: 90, color: '#ff00ff', type: 'sniper' },
+    splash: { cost: 200, range: 100, damage: 20, fireRate: 60, splashRadius: 60, color: '#ff9900', type: 'splash' }
+};
+
+// Waypoints (pixel coordinates)
+const WAYPOINTS = [
+    {x: 0, y: 3*CELL + CELL/2},
+    {x: 0, y: 11*CELL + CELL/2},
+    {x: 19*CELL + CELL/2, y: 11*CELL + CELL/2},
+    {x: 19*CELL + CELL/2, y: 3*CELL + CELL/2},
+    {x: 6*CELL + CELL/2, y: 3*CELL + CELL/2},
+    {x: 6*CELL + CELL/2, y: 8*CELL + CELL/2},
+    {x: 18*CELL + CELL/2, y: 8*CELL + CELL/2},
+    {x: 18*CELL + CELL/2, y: 14*CELL + CELL/2},
+    {x: 21*CELL + CELL/2, y: 14*CELL + CELL/2}
+];
+
+// Initialize Grid
+function initGrid() {
+    grid = [];
+    for(let r=0; r<ROWS; r++) {
+        let row = [];
+        for(let c=0; c<COLS; c++) {
+            row.push(0); // 0 = buildable, 1 = path
+        }
+        grid.push(row);
+    }
+    const path = [
+        {c:0, r:3}, {c:0, r:4}, {c:0, r:5}, {c:0, r:6}, {c:0, r:7}, {c:0, r:8}, {c:0, r:9}, {c:0, r:10}, {c:0, r:11},
+        {c:1, r:11}, {c:2, r:11}, {c:3, r:11}, {c:4, r:11}, {c:5, r:11}, {c:6, r:11}, {c:7, r:11}, {c:8, r:11}, {c:9, r:11}, {c:10, r:11}, {c:11, r:11}, {c:12, r:11}, {c:13, r:11}, {c:14, r:11}, {c:15, r:11}, {c:16, r:11}, {c:17, r:11}, {c:18, r:11}, {c:19, r:11},
+        {c:19, r:10}, {c:19, r:9}, {c:19, r:8}, {c:19, r:7}, {c:19, r:6}, {c:19, r:5}, {c:19, r:4}, {c:19, r:3},
+        {c:18, r:3}, {c:17, r:3}, {c:16, r:3}, {c:15, r:3}, {c:14, r:3}, {c:13, r:3}, {c:12, r:3}, {c:11, r:3}, {c:10, r:3}, {c:9, r:3}, {c:8, r:3}, {c:7, r:3}, {c:6, r:3},
+        {c:6, r:4}, {c:6, r:5}, {c:6, r:6}, {c:6, r:7}, {c:6, r:8},
+        {c:7, r:8}, {c:8, r:8}, {c:9, r:8}, {c:10, r:8}, {c:11, r:8}, {c:12, r:8}, {c:13, r:8}, {c:14, r:8}, {c:15, r:8}, {c:16, r:8}, {c:17, r:8}, {c:18, r:8},
+        {c:18, r:9}, {c:18, r:10}, {c:18, r:11}, {c:18, r:12}, {c:18, r:13}, {c:18, r:14},
+        {c:19, r:14}, {c:20, r:14}, {c:21, r:14}
+    ];
+    for(let p of path) {
+        if(p.r >= 0 && p.r < ROWS && p.c >= 0 && p.c < COLS) {
+            grid[p.r][p.c] = 1;
+        }
+    }
+}
+
+// Enemy Class
+class Enemy {
+    constructor(type, waveNum) {
+        this.type = type;
+        this.waypointIndex = 0;
+        this.x = WAYPOINTS[0].x;
+        this.y = WAYPOINTS[0].y;
+        this.dead = false;
+        this.healTimer = 0;
+
+        // Stats based on type and wave
+        const w = waveNum;
+        if(type === 'drone') {
+            this.speed = 1.5; this.maxHp = 20 + w*5; this.hp = this.maxHp; this.reward = 10; this.color = '#00ffff'; this.radius = 6;
+        } else if(type === 'tank') {
+            this.speed = 0.5; this.maxHp = 100 + w*20; this.hp = this.maxHp; this.reward = 30; this.color = '#ff3333'; this.radius = 10;
+        } else if(type === 'speeder') {
+            this.speed = 2.5; this.maxHp = 10 + w*3; this.hp = this.maxHp; this.reward = 15; this.color = '#ffff00'; this.radius = 5;
+        } else if(type === 'healer') {
+            this.speed = 1.0; this.maxHp = 60 + w*15; this.hp = this.maxHp; this.reward = 25; this.color = '#33ff33'; this.radius = 8;
+        } else if(type === 'mimic') {
+            this.speed = 1.2; this.maxHp = 40 + w*10; this.hp = this.maxHp; this.reward = 20; this.color = '#bb33ff'; this.radius = 7; this.invisible = true;
+        } else if(type === 'boss') {
+            this.speed = 0.3; this.maxHp = 500 + w*100; this.hp = this.maxHp; this.reward = 200; this.color = '#ff0055'; this.radius = 16;
+        }
+    }
+
+    update() {
+        if(this.dead) return;
+
+        // Healer logic
+        if(this.type === 'healer') {
+            this.healTimer++;
+            if(this.healTimer >= 120) { // every 2 seconds approx
+                for(let e of enemies) {
+                    if(e !== this && !e.dead) {
+                        let dx = e.x - this.x;
+                        let dy = e.y - this.y;
+                        if(Math.sqrt(dx*dx + dy*dy) < 100) {
+                            e.hp = Math.min(e.maxHp, e.hp + 20);
+                        }
+                    }
+                }
+                this.healTimer = 0;
+            }
+        }
+
+        // Movement
+        let wp = WAYPOINTS[this.waypointIndex];
+        if(!wp) { 
+            this.dead = true;
+            health -= 10;
+            updateUI();
+            checkWaveComplete();
+            return;
+        }
+        let dx = wp.x - this.x;
+        let dy = wp.y - this.y;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        if(dist < this.speed) {
+            this.x = wp.x;
+            this.y = wp.y;
+            this.waypointIndex++;
+            if(this.waypointIndex >= WAYPOINTS.length) {
+                this.dead = true;
+                health -= 10;
+                updateUI();
+                checkWaveComplete();
+            }
+        } else {
+            this.x += (dx/dist) * this.speed;
+            this.y += (dy/dist) * this.speed;
+        }
+
+        // Mimic visibility
+        if(this.type === 'mimic') {
+            this.invisible = true;
+            for(let t of turrets) {
+                let dx = t.x - this.x;
+                let dy = t.y - this.y;
+                if(Math.sqrt(dx*dx + dy*dy) < t.range) {
+                    this.invisible = false;
+                    break;
+                }
+            }
+        }
+    }
+
+    draw() {
+        if(this.dead) return;
+        if(this.type === 'mimic' && this.invisible) return;
+
+        ctx.save();
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = this.color;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        if(this.type === 'drone' || this.type === 'speeder') {
+            ctx.moveTo(this.x, this.y - this.radius);
+            ctx.lineTo(this.x + this.radius, this.y + this.radius);
+            ctx.lineTo(this.x - this.radius, this.y + this.radius);
+        } else if(this.type === 'tank') {
+            ctx.rect(this.x - this.radius, this.y - this.radius, this.radius*2, this.radius*2);
+        } else if(this.type === 'healer') {
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+            ctx.fill();
+            ctx.restore();
+            ctx.save();
+            ctx.shadowBlur = 5;
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(this.x, this.y - this.radius - 4);
+            ctx.lineTo(this.x, this.y + this.radius + 4);
+            ctx.moveTo(this.x - this.radius - 4, this.y);
+            ctx.lineTo(this.x + this.radius + 4, this.y);
+            ctx.stroke();
+        } else if(this.type === 'mimic') {
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+        } else if(this.type === 'boss') {
+            ctx.rect(this.x - this.radius, this.y - this.radius, this.radius*2, this.radius*2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+            ctx.fillStyle = this.color;
+        }
+        ctx.fill();
+        ctx.restore();
+
+        // Health bar
+        let hpPercent = this.hp / this.maxHp;
+        ctx.fillStyle = 'red';
+        ctx.fillRect(this.x - 10, this.y - this.radius - 8, 20, 4);
+        ctx.fillStyle = '#0f0';
+        ctx.fillRect(this.x - 10, this.y - this.radius - 8, 20 * hpPercent, 4);
+    }
+
+    takeDamage(dmg) {
+        this.hp -= dmg;
+        if(this.hp <= 0) {
+            this.dead = true;
+            money += this.reward;
+            createExplosion(this.x, this.y, this.color);
+            updateUI();
+            checkWaveComplete();
+        }
+    }
+}
+
+// Turret Class
+class Turret {
+    constructor(gridX, gridY, type) {
+        this.gridX = gridX;
+        this.gridY = gridY;
+        this.x = gridX * CELL + CELL/2;
+        this.y = gridY * CELL + CELL/2;
+        this.type = type;
+        this.level = 1;
+        this.fireTimer = 0;
+        this.angle = 0;
+
+        let def = TURRET_DEFS[type];
+        this.range = def.range;
+        this.baseDamage = def.damage;
+        this.baseFireRate = def.fireRate;
+        this.color = def.color;
+        this.splashRadius = def.splashRadius || 0;
+
+        // Apply skill tree damage upgrade
+        this.damageMultiplier = 1 + (skillTree.turretDamageUpgrades * 0.15);
+    }
+
+    update() {
+        if(this.fireTimer > 0) this.fireTimer--;
+
+        // Find target
+        let target = null;
+        let minDist = Infinity;
+
+        for(let e of enemies) {
+            if(e.dead) continue;
+            let dx = e.x - this.x;
+            let dy = e.y - this.y;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            if(dist <= this.range && dist < minDist) {
+                minDist = dist;
+                target = e;
+            }
+        }
+
+        if(target) {
+            this.angle = Math.atan2(target.y - this.y, target.x - this.x);
+            if(this.fireTimer <= 0) {
+                this.fire(target);
+            }
+        }
+    }
+
+    fire(target) {
+        let dmg = this.baseDamage * this.damageMultiplier;
+        let projType = this.type;
+        projectiles.push(new Projectile(this.x, this.y, target, dmg, this.color, projType, this.splashRadius));
+        this.fireTimer = this.baseFireRate;
+    }
+
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = this.color;
+        ctx.fillStyle = this.color;
+
+        if(this.type === 'blaster') {
+            ctx.rotate(this.angle);
+            ctx.fillRect(-10, -10, 20, 20);
+            ctx.fillRect(0, -4, 18, 8);
+        } else if(this.type === 'sniper') {
+            ctx.rotate(this.angle);
+            ctx.beginPath();
+            ctx.moveTo(15, 0);
+            ctx.lineTo(-10, -12);
+            ctx.lineTo(-10, 12);
+            ctx.fill();
+        } else if(this.type === 'splash') {
+            ctx.beginPath();
+            for(let i=0; i<6; i++) {
+                let angle = (i / 6) * Math.PI * 2;
+                let r = 12;
+                ctx.lineTo(Math.cos(angle)*r, Math.sin(angle)*r);
+            }
+            ctx.closePath();
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    upgrade() {
+        let upgradeCost = this.level * 100;
+        if(money >= upgradeCost) {
+            money -= upgradeCost;
+            this.level++;
+            this.baseDamage *= 1.3;
+            this.damageMultiplier = 1 + (skillTree.turretDamageUpgrades * 0.15) + (this.level * 0.1);
+            updateUI();
+            return true;
+        }
+        return false;
+    }
+}
+
+// Projectile Class
+class Projectile {
+    constructor(x, y, target, damage, color, type, splashRadius) {
+        this.x = x;
+        this.y = y;
+        this.target = target;
+        this.damage = damage;
+        this.color = color;
+        this.type = type;
+        this.splashRadius = splashRadius;
+        this.speed = 8;
+        this.dead = false;
+    }
+
+    update() {
+        if(this.target.dead) {
+            this.dead = true;
+            return;
+        }
+        let dx = this.target.x - this.x;
+        let dy = this.target.y - this.y;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        if(dist < this.speed) {
+            // Hit
+            if(this.type === 'splash') {
+                for(let e of enemies) {
+                    if(!e.dead) {
+                        let edx = e.x - this.target.x;
+                        let edy = e.y - this.target.y;
+                        if(Math.sqrt(edx*edx + edy*edy) <= this.splashRadius) {
+                            e.takeDamage(this.damage);
+                        }
+                    }
+                }
+                createExplosion(this.target.x, this.target.y, this.color, 20);
+            } else {
+                this.target.takeDamage(this.damage);
+            }
+            this.dead = true;
+        } else {
+            this.x += (dx/dist) * this.speed;
+            this.y += (dy/dist) * this.speed;
+        }
+    }
+
+    draw() {
+        ctx.save();
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = this.color;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 3, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
+// Particle Class
+class Particle {
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        let angle = Math.random() * Math.PI * 2;
+        let speed = Math.random() * 3 + 1;
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed;
+        this.life = 1.0;
+        this.decay = Math.random() * 0.03 + 0.02;
+    }
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life -= this.decay;
+    }
+    draw() {
+        ctx.save();
+        ctx.globalAlpha = this.life;
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, 3, 3);
+        ctx.restore();
+    }
+}
+
+function createExplosion(x, y, color, count=10) {
+    for(let i=0; i<count; i++) {
+        particles.push(new Particle(x, y, color));
+    }
+}
+
+// Wave Management
+function startWave() {
+    enemiesToSpawn = [];
+    let numNormal = wave * 3;
+    for(let i=0; i<numNormal; i++) {
+        let r = Math.random();
+        if(wave > 3 && r < 0.1) enemiesToSpawn.push('healer');
+        else if(wave > 2 && r < 0.2) enemiesToSpawn.push('mimic');
+        else if(wave > 1 && r < 0.35) enemiesToSpawn.push('speeder');
+        else if(wave > 1 && r < 0.5) enemiesToSpawn.push('tank');
+        else enemiesToSpawn.push('drone');
+    }
+    enemiesToSpawn.push('boss');
+    spawnTimer = 0;
+}
+
+function checkWaveComplete() {
+    let activeEnemies = enemies.filter(e => !e.dead).length;
+    let spawning = enemiesToSpawn.length > 0;
+    if(activeEnemies === 0 && !spawning) {
+        waveInProgress = false;
+        waveTimer++;
+        if(waveTimer > 180) { // 3 seconds between waves
+            wave++;
+            updateUI();
+            startWave();
+            waveInProgress = true;
+            waveTimer = 0;
+        }
+    }
+}
+
+// Input & UI
+canvas.addEventListener('click', (e) => {
+    if(gameState !== 'PLAYING') return;
+    let rect = canvas.getBoundingClientRect();
+    let x = e.clientX - rect.left;
+    let y = e.clientY - rect.top;
+    let c = Math.floor(x / CELL);
+    let r = Math.floor(y / CELL);
+
+    if(c >= 0 && c < COLS && r >= 0 && r < ROWS) {
+        if(grid[r][c] === 0 || grid[r][c] === 2) {
+            let existingTurret = turrets.find(t => t.gridX === c && t.gridY === r);
+            if(existingTurret) {
+                existingTurret.upgrade();
+            } else if(grid[r][c] === 0) {
+                let def = TURRET_DEFS[selectedTurretType];
+                if(money >= def.cost) {
+                    money -= def.cost;
+                    let t = new Turret(c, r, selectedTurretType);
+                    turrets.push(t);
+                    grid[r][c] = 2; // 2 = turret
+                    updateUI();
+                }
+            }
+        }
+    }
+});
+
+document.querySelectorAll('.turret-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.turret-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedTurretType = btn.dataset.type;
+    });
+});
+
+document.getElementById('overload-btn').addEventListener('click', activateCoreOverload);
+document.addEventListener('keydown', (e) => {
+    if(e.code === 'Space') {
+        activateCoreOverload();
+    }
+});
+
+function activateCoreOverload() {
+    if(coreOverloadReady && gameState === 'PLAYING') {
+        coreOverloadReady = false;
+        coreOverloadCooldown = coreOverloadMaxCooldown;
+        let dmg = 100 * (1 + skillTree.overloadDamageUp * 0.25);
+        for(let e of enemies) {
+            if(!e.dead) {
+                e.takeDamage(dmg);
+            }
+        }
+        createExplosion(canvas.width/2, canvas.height/2, '#ff0055', 100);
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
+        updateUI();
+    }
+}
+
+// Skill Tree UI
+const SKILLS = [
+    { id: 'maxHpUpgrades', name: 'Augment Hull (+20 HP)', cost: 10, max: 5 },
+    { id: 'startMoneyUpgrades', name: 'Funding Boost (+50 Start)', cost: 15, max: 3 },
+    { id: 'turretDamageUpgrades', name: 'Overclock Turrets (+15% Dmg)', cost: 20, max: 5 },
+    { id: 'overloadCooldownDown', name: 'Cooldown Reduction (-10%)', cost: 25, max: 3 },
+    { id: 'overloadDamageUp', name: 'Overload Yield (+25% Dmg)', cost: 30, max: 3 }
+];
+
+function openSkillTree() {
+    gameState = 'SKILL_TREE';
+    document.getElementById('skill-tree-overlay').classList.remove('hidden');
+    document.getElementById('st-shards').textContent = totalShards;
+    renderSkillTree();
+}
+
+function renderSkillTree() {
+    let list = document.getElementById('skill-list');
+    list.innerHTML = '';
+    for(let skill of SKILLS) {
+        let level = skillTree[skill.id];
+        let canUpgrade = level < skill.max && totalShards >= skill.cost;
+        let div = document.createElement('div');
+        div.className = 'skill-item';
+        div.innerHTML = `
+            <span>${skill.name} (Lvl ${level}/${skill.max})</span>
+            <button ${canUpgrade ? '' : 'disabled'} data-skill="${skill.id}" data-cost="${skill.cost}">UPGRADE (${skill.cost}s)</button>
+        `;
+        list.appendChild(div);
+    }
+    document.querySelectorAll('#skill-list button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            let skillId = btn.dataset.skill;
+            let cost = parseInt(btn.dataset.cost);
+            if(totalShards >= cost && skillTree[skillId] < SKILLS.find(s=>s.id===skillId).max) {
+                totalShards -= cost;
+                skillTree[skillId]++;
+                if(skillId === 'overloadCooldownDown') {
+                    coreOverloadMaxCooldown = 30 * Math.pow(0.9, skillTree.overloadCooldownDown);
+                }
+                document.getElementById('st-shards').textContent = totalShards;
+                renderSkillTree();
+            }
+        });
+    });
+}
+
+document.getElementById('skill-tree-btn').addEventListener('click', openSkillTree);
+document.getElementById('skill-tree-btn-go').addEventListener('click', openSkillTree);
+document.getElementById('close-skill-tree-btn').addEventListener('click', () => {
+    document.getElementById('skill-tree-overlay').classList.add('hidden');
+    gameState = 'PLAYING';
+});
+
+document.getElementById('restart-btn').addEventListener('click', () => {
+    location.reload();
+});
+
+function updateUI() {
+    document.getElementById('hp-val').textContent = Math.max(0, health);
+    document.getElementById('max-hp-val').textContent = maxHealth;
+    document.getElementById('money-val').textContent = money;
+    document.getElementById('wave-val').textContent = wave;
+    document.getElementById('shards-val').textContent = totalShards;
+
+    let overloadBtn = document.getElementById('overload-btn');
+    if(coreOverloadReady) {
+        overloadBtn.classList.remove('cooldown');
+        overloadBtn.classList.add('ready');
+        overloadBtn.textContent = 'CORE OVERLOAD [SPACE]';
+    } else {
+        overloadBtn.classList.remove('ready');
+        overloadBtn.classList.add('cooldown');
+        overloadBtn.textContent = `OVERLOAD CD: ${Math.ceil(coreOverloadCooldown)}s`;
+    }
+}
+
+function gameOver() {
+    gameState = 'GAMEOVER';
+    let earnedShards = Math.floor(wave * 5 + money / 10);
+    totalShards += earnedShards;
+    document.getElementById('go-wave').textContent = wave;
+    document.getElementById('go-shards').textContent = earnedShards;
+    document.getElementById('game-over-overlay').classList.remove('hidden');
+}
+
+function initGame() {
+    maxHealth = 100 + skillTree.maxHpUpgrades * 20;
+    health = maxHealth;
+    money = 150 + skillTree.startMoneyUpgrades * 50;
+    coreOverloadMaxCooldown = 30 * Math.pow(0.9, skillTree.overloadCooldownDown);
+    coreOverloadReady = true;
+    coreOverloadCooldown = 0;
+
+    initGrid();
+    turrets = [];
+    enemies = [];
+    projectiles = [];
+    particles = [];
+    wave = 1;
+    startWave();
+    updateUI();
+}
+
+let lastTime = 0;
+function gameLoop(timestamp) {
+    let dt = (timestamp - lastTime) / 1000;
+    lastTime = timestamp;
+
+    if(gameState === 'PLAYING') {
+        if(waveInProgress && enemiesToSpawn.length > 0) {
+            spawnTimer -= dt;
+            if(spawnTimer <= 0) {
+                let type = enemiesToSpawn.shift();
+                enemies.push(new Enemy(type, wave));
+                spawnTimer = 0.5;
+            }
+        }
+
+        for(let e of enemies) e.update();
+        enemies = enemies.filter(e => !e.dead);
+
+        for(let t of turrets) t.update();
+
+        for(let p of projectiles) p.update();
+        projectiles = projectiles.filter(p => !p.dead);
+
+        for(let p of particles) p.update();
+        particles = particles.filter(p => p.life > 0);
+
+        if(!coreOverloadReady) {
+            coreOverloadCooldown -= dt;
+            if(coreOverloadCooldown <= 0) {
+                coreOverloadCooldown = 0;
+                coreOverloadReady = true;
+            }
+            updateUI();
+        }
+
+        if(health <= 0) {
+            gameOver();
+        }
+    }
+
+    ctx.fillStyle = '#0a0a1a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for(let r=0; r<ROWS; r++) {
+        for(let c=0; c<COLS; c++) {
+            let x = c * CELL;
+            let y = r * CELL;
+            if(grid[r][c] === 1) {
+                ctx.strokeStyle = '#00f3ff33';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x, y, CELL, CELL);
+            } else {
+                ctx.strokeStyle = '#111';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x, y, CELL, CELL);
+            }
+        }
+    }
+
+    ctx.save();
+    ctx.strokeStyle = '#00f3ff';
+    ctx.lineWidth = 2;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#00f3ff';
+    ctx.beginPath();
+    for(let i=0; i<WAYPOINTS.length; i++) {
+        let wp = WAYPOINTS[i];
+        if(i===0) ctx.moveTo(wp.x, wp.y);
+        else ctx.lineTo(wp.x, wp.y);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    for(let t of turrets) t.draw();
+    for(let e of enemies) e.draw();
+    for(let p of projectiles) p.draw();
+    for(let p of particles) p.draw();
+
+    requestAnimationFrame(gameLoop);
+}
+
+initGame();
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
