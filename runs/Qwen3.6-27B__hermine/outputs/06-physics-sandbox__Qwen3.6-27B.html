@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2D Physics Sandbox</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #1a1a2e; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #e0e0e0; }
+  canvas { display: block; }
+  #controls {
+    position: absolute; top: 12px; left: 12px;
+    background: rgba(16, 16, 32, 0.92); border: 1px solid #333;
+    border-radius: 10px; padding: 16px 20px; min-width: 240px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5); user-select: none;
+  }
+  #controls h2 { font-size: 15px; margin-bottom: 12px; color: #8be9fd; letter-spacing: 1px; }
+  .param { margin-bottom: 10px; }
+  .param label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px; color: #ccc; }
+  .param label span { color: #8be9fd; font-weight: bold; }
+  input[type=range] {
+    width: 100%; height: 6px; -webkit-appearance: none; appearance: none;
+    background: #333; border-radius: 3px; outline: none; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 16px; height: 16px;
+    border-radius: 50%; background: #8be9fd; cursor: pointer; border: 2px solid #1a1a2e;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 16px; height: 16px; border-radius: 50%; background: #8be9fd;
+    cursor: pointer; border: 2px solid #1a1a2e;
+  }
+  .btn-row { display: flex; gap: 8px; margin-top: 14px; }
+  button {
+    flex: 1; padding: 8px 0; border: 1px solid #444; border-radius: 6px;
+    background: #2a2a4a; color: #e0e0e0; font-size: 12px; cursor: pointer;
+    transition: background 0.2s;
+  }
+  button:hover { background: #3a3a6a; }
+  button.active { background: #8be9fd; color: #1a1a2e; font-weight: bold; }
+  #ball-count {
+    margin-top: 12px; font-size: 12px; color: #aaa; text-align: center;
+    padding-top: 10px; border-top: 1px solid #333;
+  }
+  #ball-count span { color: #8be9fd; font-weight: bold; font-size: 14px; }
+  #hint {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    font-size: 12px; color: #666; pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="controls">
+  <h2>⚙ PHYSICS CONTROLS</h2>
+  <div class="param">
+    <label>Gravity <span id="grav-val">980</span></label>
+    <input type="range" id="gravity" min="0" max="2000" value="980" step="10">
+  </div>
+  <div class="param">
+    <label>Restitution <span id="rest-val">0.70</span></label>
+    <input type="range" id="restitution" min="0" max="100" value="70" step="1">
+  </div>
+  <div class="param">
+    <label>Friction <span id="fric-val">0.02</span></label>
+    <input type="range" id="friction" min="0" max="100" value="2" step="1">
+  </div>
+  <div class="btn-row">
+    <button id="btn-reset">⟲ Reset</button>
+    <button id="btn-collide" class="active">Collisions: ON</button>
+  </div>
+  <div id="ball-count">Balls: <span id="count">0</span></div>
+</div>
+<div id="hint">Click to spawn · Click &amp; drag to fling</div>
+
+<script>
+(function() {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  // Controls
+  const gravSlider = document.getElementById('gravity');
+  const restSlider = document.getElementById('restitution');
+  const fricSlider = document.getElementById('friction');
+  const gravVal = document.getElementById('grav-val');
+  const restVal = document.getElementById('rest-val');
+  const fricVal = document.getElementById('fric-val');
+  const btnReset = document.getElementById('btn-reset');
+  const btnCollide = document.getElementById('btn-collide');
+  const countEl = document.getElementById('count');
+
+  let gravity = 980;
+  let restitution = 0.70;
+  let friction = 0.02;
+  let collisionsOn = true;
+
+  gravSlider.addEventListener('input', () => {
+    gravity = parseInt(gravSlider.value);
+    gravVal.textContent = gravity;
+  });
+  restSlider.addEventListener('input', () => {
+    restitution = parseInt(restSlider.value) / 100;
+    restVal.textContent = restitution.toFixed(2);
+  });
+  fricSlider.addEventListener('input', () => {
+    friction = parseInt(fricSlider.value) / 100;
+    fricVal.textContent = friction.toFixed(2);
+  });
+  btnReset.addEventListener('click', () => { balls.length = 0; });
+  btnCollide.addEventListener('click', () => {
+    collisionsOn = !collisionsOn;
+    btnCollide.textContent = 'Collisions: ' + (collisionsOn ? 'ON' : 'OFF');
+    btnCollide.classList.toggle('active', collisionsOn);
+  });
+
+  // Resize
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Ball colors
+  const palette = [
+    '#ff6b6b','#feca57','#48dbfb','#ff9ff3','#54a0ff',
+    '#5f27cd','#01a3a4','#f368e0','#ff6348','#7bed9f',
+    '#70a1ff','#ffa502','#2ed573','#1e90ff','#ff4757',
+    '#eccc68','#a4b0be','#00d2d3','#ee5a24','#c8d6e5'
+  ];
+
+  function randomColor() {
+    return palette[Math.floor(Math.random() * palette.length)];
+  }
+
+  // Ball class
+  class Ball {
+    constructor(x, y, vx, vy, radius, color) {
+      this.x = x;
+      this.y = y;
+      this.vx = vx;
+      this.vy = vy;
+      this.radius = radius;
+      this.color = color;
+      this.mass = radius * radius; // mass proportional to area
+    }
+  }
+
+  let balls = [];
+
+  // Mouse interaction
+  let mouseDown = false;
+  let mouseStartX = 0, mouseStartY = 0;
+  let mouseCurX = 0, mouseCurY = 0;
+
+  canvas.addEventListener('mousedown', (e) => {
+    mouseDown = true;
+    mouseStartX = e.clientX;
+    mouseStartY = e.clientY;
+    mouseCurX = e.clientX;
+    mouseCurY = e.clientY;
+  });
+  canvas.addEventListener('mousemove', (e) => {
+    mouseCurX = e.clientX;
+    mouseCurY = e.clientY;
+  });
+  canvas.addEventListener('mouseup', (e) => {
+    if (!mouseDown) return;
+    mouseDown = false;
+    const dx = mouseStartX - e.clientX;
+    const dy = mouseStartY - e.clientY;
+    const speed = Math.sqrt(dx * dx + dy * dy);
+    const radius = 10 + Math.random() * 25;
+    let vx = 0, vy = 0;
+    if (speed > 5) {
+      const scale = 3.5;
+      vx = dx * scale;
+      vy = dy * scale;
+    }
+    // Clamp spawn position inside canvas
+    const sx = Math.max(radius, Math.min(canvas.width - radius, mouseStartX));
+    const sy = Math.max(radius, Math.min(canvas.height - radius, mouseStartY));
+    balls.push(new Ball(sx, sy, vx, vy, radius, randomColor()));
+  });
+
+  // Touch support
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const t = e.touches[0];
+    mouseDown = true;
+    mouseStartX = t.clientX;
+    mouseStartY = t.clientY;
+    mouseCurX = t.clientX;
+    mouseCurY = t.clientY;
+  }, { passive: false });
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    const t = e.touches[0];
+    mouseCurX = t.clientX;
+    mouseCurY = t.clientY;
+  }, { passive: false });
+  canvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (!mouseDown) return;
+    mouseDown = false;
+    const dx = mouseStartX - mouseCurX;
+    const dy = mouseStartY - mouseCurY;
+    const speed = Math.sqrt(dx * dx + dy * dy);
+    const radius = 10 + Math.random() * 25;
+    let vx = 0, vy = 0;
+    if (speed > 5) {
+      const scale = 3.5;
+      vx = dx * scale;
+      vy = dy * scale;
+    }
+    const sx = Math.max(radius, Math.min(canvas.width - radius, mouseStartX));
+    const sy = Math.max(radius, Math.min(canvas.height - radius, mouseStartY));
+    balls.push(new Ball(sx, sy, vx, vy, radius, randomColor()));
+  }, { passive: false });
+
+  // Physics step
+  const SUBSTEPS = 4;
+  const MAX_VELOCITY = 3000;
+
+  function physicsStep(dt) {
+    const n = balls.length;
+
+    // Apply gravity and friction
+    for (let i = 0; i < n; i++) {
+      const b = balls[i];
+      b.vy += gravity * dt;
+      // Air friction
+      const frictionFactor = 1 - friction * dt * 60;
+      b.vx *= frictionFactor;
+      b.vy *= frictionFactor;
+    }
+
+    // Update positions
+    for (let i = 0; i < n; i++) {
+      const b = balls[i];
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+    }
+
+    // Wall collisions
+    for (let i = 0; i < n; i++) {
+      const b = balls[i];
+      // Floor
+      if (b.y + b.radius > canvas.height) {
+        b.y = canvas.height - b.radius;
+        b.vy = -Math.abs(b.vy) * restitution;
+        // Apply ground friction
+        b.vx *= (1 - friction * 2);
+        if (Math.abs(b.vy) < 5) b.vy = 0;
+      }
+      // Ceiling
+      if (b.y - b.radius < 0) {
+        b.y = b.radius;
+        b.vy = Math.abs(b.vy) * restitution;
+      }
+      // Left wall
+      if (b.x - b.radius < 0) {
+        b.x = b.radius;
+        b.vx = Math.abs(b.vx) * restitution;
+      }
+      // Right wall
+      if (b.x + b.radius > canvas.width) {
+        b.x = canvas.width - b.radius;
+        b.vx = -Math.abs(b.vx) * restitution;
+      }
+    }
+
+    // Ball-ball collisions
+    if (collisionsOn) {
+      for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+          const a = balls[i];
+          const b = balls[j];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const distSq = dx * dx + dy * dy;
+          const minDist = a.radius + b.radius;
+
+          if (distSq < minDist * minDist && distSq > 0.0001) {
+            const dist = Math.sqrt(distSq);
+            const nx = dx / dist;
+            const ny = dy / dist;
+
+            // Separate overlapping balls
+            const overlap = minDist - dist;
+            const totalMass = a.mass + b.mass;
+            const moveA = overlap * (b.mass / totalMass);
+            const moveB = overlap * (a.mass / totalMass);
+            a.x -= nx * moveA;
+            a.y -= ny * moveA;
+            b.x += nx * moveB;
+            b.y += ny * moveB;
+
+            // Relative velocity along collision normal
+            const dvx = a.vx - b.vx;
+            const dvy = a.vy - b.vy;
+            const relVelNormal = dvx * nx + dvy * ny;
+
+            // Only resolve if approaching
+            if (relVelNormal > 0) {
+              const impulse = (1 + restitution) * relVelNormal / totalMass;
+              a.vx -= impulse * b.mass * nx;
+              a.vy -= impulse * b.mass * ny;
+              b.vx += impulse * a.mass * nx;
+              b.vy += impulse * a.mass * ny;
+            }
+          }
+        }
+      }
+    }
+
+    // Clamp velocities to prevent runaway
+    for (let i = 0; i < n; i++) {
+      const b = balls[i];
+      const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+      if (speed > MAX_VELOCITY) {
+        const scale = MAX_VELOCITY / speed;
+        b.vx *= scale;
+        b.vy *= scale;
+      }
+    }
+  }
+
+  // Rendering
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw subtle grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    ctx.lineWidth = 1;
+    const gridSize = 60;
+    for (let x = gridSize; x < canvas.width; x += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+    for (let y = gridSize; y < canvas.height; y += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+
+    // Draw balls
+    for (let i = 0; i < balls.length; i++) {
+      const b = balls[i];
+      // Shadow
+      ctx.beginPath();
+      ctx.arc(b.x + 2, b.y + 2, b.radius, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.fill();
+
+      // Ball body with gradient
+      const grad = ctx.createRadialGradient(
+        b.x - b.radius * 0.3, b.y - b.radius * 0.3, b.radius * 0.1,
+        b.x, b.y, b.radius
+      );
+      grad.addColorStop(0, lightenColor(b.color, 40));
+      grad.addColorStop(1, b.color);
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Highlight
+      ctx.beginPath();
+      ctx.arc(b.x - b.radius * 0.25, b.y - b.radius * 0.25, b.radius * 0.35, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      ctx.fill();
+    }
+
+    // Draw drag line
+    if (mouseDown) {
+      const dx = mouseStartX - mouseCurX;
+      const dy = mouseStartY - mouseCurY;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len > 5) {
+        // Arrow line
+        ctx.beginPath();
+        ctx.moveTo(mouseStartX, mouseStartY);
+        ctx.lineTo(mouseStartX + dx * 0.5, mouseStartY + dy * 0.5);
+        ctx.strokeStyle = 'rgba(139,233,253,0.6)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Arrowhead
+        const angle = Math.atan2(dy, dx);
+        const headLen = 10;
+        const tipX = mouseStartX + dx * 0.5;
+        const tipY = mouseStartY + dy * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(tipX, tipY);
+        ctx.lineTo(tipX - headLen * Math.cos(angle - 0.4), tipY - headLen * Math.sin(angle - 0.4));
+        ctx.lineTo(tipX - headLen * Math.cos(angle + 0.4), tipY - headLen * Math.sin(angle + 0.4));
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(139,233,253,0.6)';
+        ctx.fill();
+
+        // Spawn preview
+        const previewRadius = 15;
+        ctx.beginPath();
+        ctx.arc(mouseStartX, mouseStartY, previewRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(139,233,253,0.4)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    }
+
+    // Ball count
+    countEl.textContent = balls.length;
+  }
+
+  function lightenColor(hex, amount) {
+    const num = parseInt(hex.slice(1), 16);
+    const r = Math.min(255, (num >> 16) + amount);
+    const g = Math.min(255, ((num >> 8) & 0xff) + amount);
+    const b = Math.min(255, (num & 0xff) + amount);
+    return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  }
+
+  // Main loop
+  let lastTime = 0;
+  function loop(timestamp) {
+    if (!lastTime) lastTime = timestamp;
+    let dt = (timestamp - lastTime) / 1000;
+    lastTime = timestamp;
+
+    // Clamp dt to avoid huge jumps
+    if (dt > 0.05) dt = 0.05;
+
+    const subDt = dt / SUBSTEPS;
+    for (let s = 0; s < SUBSTEPS; s++) {
+      physicsStep(subDt);
+    }
+
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

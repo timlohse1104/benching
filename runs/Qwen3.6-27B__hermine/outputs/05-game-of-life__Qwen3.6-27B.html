@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conway's Game of Life</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  h1 {
+    font-size: 1.8rem;
+    margin-bottom: 12px;
+    color: #00d4ff;
+    text-shadow: 0 0 10px rgba(0,212,255,0.3);
+    letter-spacing: 2px;
+  }
+  #stats {
+    display: flex;
+    gap: 30px;
+    margin-bottom: 10px;
+    font-size: 1rem;
+  }
+  #stats span { color: #00d4ff; font-weight: bold; }
+  #canvas-wrap {
+    border: 2px solid #333;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 0 30px rgba(0,212,255,0.1);
+    cursor: crosshair;
+  }
+  canvas { display: block; background: #0f0f1a; }
+  #controls {
+    margin-top: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    max-width: 740px;
+  }
+  button {
+    background: #16213e;
+    color: #e0e0e0;
+    border: 1px solid #0f3460;
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  button:hover { background: #0f3460; border-color: #00d4ff; }
+  button.active { background: #00d4ff; color: #1a1a2e; border-color: #00d4ff; }
+  label { font-size: 0.9rem; color: #aaa; }
+  select {
+    background: #16213e;
+    color: #e0e0e0;
+    border: 1px solid #0f3460;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+  input[type=range] {
+    width: 120px;
+    accent-color: #00d4ff;
+    cursor: pointer;
+  }
+  #speed-val { color: #00d4ff; font-weight: bold; min-width: 40px; display: inline-block; }
+</style>
+</head>
+<body>
+<h1>GAME OF LIFE</h1>
+<div id="stats">
+  <div>Generation: <span id="gen-count">0</span></div>
+  <div>Population: <span id="pop-count">0</span></div>
+</div>
+<div id="canvas-wrap">
+  <canvas id="canvas"></canvas>
+</div>
+<div id="controls">
+  <button id="btn-start">▶ Start</button>
+  <button id="btn-step">⏭ Step</button>
+  <button id="btn-clear">✖ Clear</button>
+  <button id="btn-random">🎲 Random</button>
+  <select id="preset-select">
+    <option value="">— Presets —</option>
+    <option value="glider">Glider</option>
+    <option value="lwss">Lightweight Spaceship</option>
+    <option value="pulsar">Pulsar</option>
+    <option value="rpentomino">R-Pentomino</option>
+    <option value="gosper">Gosper Glider Gun</option>
+    <option value="acorn">Acorn</option>
+  </select>
+  <label>Speed: <input type="range" id="speed-slider" min="1" max="60" value="10"><span id="speed-val">10</span> fps</label>
+</div>
+
+<script>
+(function() {
+  const COLS = 60;
+  const ROWS = 40;
+  const CELL = 12;
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = COLS * CELL;
+  canvas.height = ROWS * CELL;
+
+  let grid = createGrid();
+  let generation = 0;
+  let running = false;
+  let timerId = null;
+  let fps = 10;
+  let dragging = false;
+  let dragValue = 1;
+
+  const genEl = document.getElementById('gen-count');
+  const popEl = document.getElementById('pop-count');
+  const btnStart = document.getElementById('btn-start');
+  const btnStep = document.getElementById('btn-step');
+  const btnClear = document.getElementById('btn-clear');
+  const btnRandom = document.getElementById('btn-random');
+  const presetSelect = document.getElementById('preset-select');
+  const speedSlider = document.getElementById('speed-slider');
+  const speedVal = document.getElementById('speed-val');
+
+  function createGrid() {
+    return Array.from({ length: ROWS }, () => new Uint8Array(COLS));
+  }
+
+  function countNeighbors(g, r, c) {
+    let count = 0;
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        const nr = (r + dr + ROWS) % ROWS;
+        const nc = (c + dc + COLS) % COLS;
+        count += g[nr][nc];
+      }
+    }
+    return count;
+  }
+
+  function step() {
+    const next = createGrid();
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const n = countNeighbors(grid, r, c);
+        if (grid[r][c]) {
+          next[r][c] = (n === 2 || n === 3) ? 1 : 0;
+        } else {
+          next[r][c] = (n === 3) ? 1 : 0;
+        }
+      }
+    }
+    grid = next;
+    generation++;
+    updateStats();
+    draw();
+  }
+
+  function updateStats() {
+    let pop = 0;
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        pop += grid[r][c];
+    genEl.textContent = generation;
+    popEl.textContent = pop;
+  }
+
+  function draw() {
+    ctx.fillStyle = '#0f0f1a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const x = c * CELL;
+        const y = r * CELL;
+        if (grid[r][c]) {
+          ctx.fillStyle = '#00d4ff';
+          ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
+        }
+        ctx.strokeStyle = '#1e1e3a';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(x, y, CELL, CELL);
+      }
+    }
+  }
+
+  function startTimer() {
+    stopTimer();
+    timerId = setInterval(step, 1000 / fps);
+  }
+
+  function stopTimer() {
+    if (timerId) { clearInterval(timerId); timerId = null; }
+  }
+
+  function toggleRunning() {
+    running = !running;
+    if (running) {
+      btnStart.textContent = '⏸ Pause';
+      btnStart.classList.add('active');
+      startTimer();
+    } else {
+      btnStart.textContent = '▶ Start';
+      btnStart.classList.remove('active');
+      stopTimer();
+    }
+  }
+
+  function clearGrid() {
+    stopTimer();
+    running = false;
+    btnStart.textContent = '▶ Start';
+    btnStart.classList.remove('active');
+    grid = createGrid();
+    generation = 0;
+    updateStats();
+    draw();
+  }
+
+  function randomize() {
+    clearGrid();
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        grid[r][c] = Math.random() < 0.3 ? 1 : 0;
+    updateStats();
+    draw();
+  }
+
+  function setCell(r, c, val) {
+    if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+      grid[r][c] = val;
+    }
+  }
+
+  function getCellPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    return { c: Math.floor(x / CELL), r: Math.floor(y / CELL) };
+  }
+
+  canvas.addEventListener('mousedown', function(e) {
+    if (running) return;
+    e.preventDefault();
+    dragging = true;
+    const pos = getCellPos(e);
+    dragValue = grid[pos.r][pos.c] ? 0 : 1;
+    setCell(pos.r, pos.c, dragValue);
+    updateStats();
+    draw();
+  });
+
+  canvas.addEventListener('mousemove', function(e) {
+    if (!dragging || running) return;
+    const pos = getCellPos(e);
+    setCell(pos.r, pos.c, dragValue);
+    updateStats();
+    draw();
+  });
+
+  window.addEventListener('mouseup', function() { dragging = false; });
+
+  canvas.addEventListener('mouseleave', function() { dragging = false; });
+
+  btnStart.addEventListener('click', toggleRunning);
+
+  btnStep.addEventListener('click', function() {
+    if (!running) { step(); }
+  });
+
+  btnClear.addEventListener('click', clearGrid);
+  btnRandom.addEventListener('click', randomize);
+
+  speedSlider.addEventListener('input', function() {
+    fps = parseInt(this.value);
+    speedVal.textContent = fps;
+    if (running) startTimer();
+  });
+
+  const presets = {
+    glider: [
+      [0,1],[1,2],[2,0],[2,1],[2,2]
+    ],
+    lwss: [
+      [0,1],[0,4],[1,0],[2,0],[2,4],[3,0],[3,1],[3,2],[3,3]
+    ],
+    pulsar: [],
+    rpentomino: [
+      [0,1],[0,2],[1,0],[1,1],[2,1]
+    ],
+    gosper: [
+      [0,24],[1,22],[1,24],[2,12],[2,13],[2,20],[2,21],[2,34],[2,35],
+      [3,11],[3,15],[3,20],[3,21],[3,34],[3,35],[4,0],[4,1],[4,10],
+      [4,16],[4,20],[4,21],[5,0],[5,1],[5,10],[5,14],[5,16],[5,17],
+      [5,22],[5,24],[6,10],[6,16],[6,24],[7,11],[7,15],[8,12],[8,13]
+    ],
+    acorn: [
+      [0,1],[1,3],[2,0],[2,1],[2,4],[2,5],[2,6]
+    ]
+  };
+
+  // Build pulsar
+    (function() {
+      const p = presets.pulsar;
+      const offsets = [
+        [2,4],[2,5],[2,6],[2,10],[2,11],[2,12],
+        [4,2],[5,2],[6,2],[4,5],[4,6],[5,5],[5,6],[6,5],[6,6],
+        [4,9],[5,9],[6,9],[4,12],[5,12],[6,12],
+        [8,4],[8,5],[8,6],[8,10],[8,11],[8,12]
+      ];
+      offsets.forEach(function(o) { p.push(o); p.push([o[0], o[1] + 1]); });
+    })();
+
+  presetSelect.addEventListener('change', function() {
+    const name = this.value;
+    if (!name) return;
+    clearGrid();
+    const pattern = presets[name];
+    if (!pattern) return;
+    const offR = Math.floor(ROWS / 2) - 4;
+    const offC = Math.floor(COLS / 2) - 4;
+    pattern.forEach(function(p) {
+      const r = p[0] + offR;
+      const c = p[1] + offC;
+      if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+        grid[r][c] = 1;
+      }
+    });
+    updateStats();
+    draw();
+    this.value = '';
+  });
+
+  // Initial draw
+  updateStats();
+  draw();
+})();
+</script>
+</body>
+</html>

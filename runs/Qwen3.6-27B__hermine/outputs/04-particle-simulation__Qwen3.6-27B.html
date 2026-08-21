@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Particle Simulation</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0f; overflow: hidden; font-family: 'Segoe UI', system-ui, sans-serif; }
+canvas { display: block; }
+#controls {
+  position: fixed; top: 16px; right: 16px;
+  background: rgba(15, 15, 25, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 18px 20px;
+  color: #c0c0d0;
+  font-size: 13px;
+  min-width: 220px;
+  z-index: 10;
+  user-select: none;
+}
+#controls h3 {
+  margin: 0 0 14px 0;
+  font-weight: 600;
+  font-size: 14px;
+  color: #e0e0f0;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding-bottom: 10px;
+}
+.ctrl-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.ctrl-row label {
+  flex: 0 0 100px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+.ctrl-row input[type="range"] {
+  flex: 1;
+  margin: 0 8px;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.ctrl-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #6e8efb;
+  border: 2px solid #0a0a0f;
+  cursor: pointer;
+}
+.ctrl-row input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #6e8efb;
+  border: 2px solid #0a0a0f;
+  cursor: pointer;
+}
+.ctrl-row .val {
+  flex: 0 0 36px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: #6e8efb;
+}
+#fps {
+  position: fixed; top: 16px; left: 16px;
+  background: rgba(15, 15, 25, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 10px 16px;
+  color: #6e8efb;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  z-index: 10;
+  letter-spacing: 0.5px;
+}
+#hint {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  color: rgba(255,255,255,0.25);
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 10;
+}
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="fps">FPS: --</div>
+<div id="controls">
+  <h3>⚙ Controls</h3>
+  <div class="ctrl-row">
+    <label>Particles</label>
+    <input type="range" id="sCount" min="50" max="800" value="350">
+    <span class="val" id="vCount">350</span>
+  </div>
+  <div class="ctrl-row">
+    <label>Gravity</label>
+    <input type="range" id="sGravity" min="0" max="100" value="30">
+    <span class="val" id="vGravity">0.30</span>
+  </div>
+  <div class="ctrl-row">
+    <label>Attraction</label>
+    <input type="range" id="sAttraction" min="-50" max="50" value="25">
+    <span class="val" id="vAttraction">0.25</span>
+  </div>
+  <div class="ctrl-row">
+    <label>Radius</label>
+    <input type="range" id="sRadius" min="30" max="300" value="150">
+    <span class="val" id="vRadius">150</span>
+  </div>
+  <div class="ctrl-row">
+    <label>Drag</label>
+    <input type="range" id="sDrag" min="80" max="100" value="98">
+    <span class="val" id="vDrag">0.98</span>
+  </div>
+</div>
+<div id="hint">Move mouse over canvas • Scroll to zoom interaction radius</div>
+
+<script>
+(function() {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const fpsEl = document.getElementById('fps');
+
+  // Controls
+  const sCount = document.getElementById('sCount');
+  const sGravity = document.getElementById('sGravity');
+  const sAttraction = document.getElementById('sAttraction');
+  const sRadius = document.getElementById('sRadius');
+  const sDrag = document.getElementById('sDrag');
+
+  const vCount = document.getElementById('vCount');
+  const vGravity = document.getElementById('vGravity');
+  const vAttraction = document.getElementById('vAttraction');
+  const vRadius = document.getElementById('vRadius');
+  const vDrag = document.getElementById('vDrag');
+
+  let params = {
+    count: parseInt(sCount.value),
+    gravity: parseFloat(sGravity.value) / 100,
+    attraction: parseFloat(sAttraction.value) / 100,
+    radius: parseInt(sRadius.value),
+    drag: parseFloat(sDrag.value) / 100
+  };
+
+  sCount.addEventListener('input', () => {
+    params.count = parseInt(sCount.value);
+    vCount.textContent = params.count;
+    syncParticles();
+  });
+  sGravity.addEventListener('input', () => {
+    params.gravity = parseFloat(sGravity.value) / 100;
+    vGravity.textContent = params.gravity.toFixed(2);
+  });
+  sAttraction.addEventListener('input', () => {
+    params.attraction = parseFloat(sAttraction.value) / 100;
+    vAttraction.textContent = params.attraction.toFixed(2);
+  });
+  sRadius.addEventListener('input', () => {
+    params.radius = parseInt(sRadius.value);
+    vRadius.textContent = params.radius;
+  });
+  sDrag.addEventListener('input', () => {
+    params.drag = parseFloat(sDrag.value) / 100;
+    vDrag.textContent = params.drag.toFixed(2);
+  });
+
+  // Mouse
+  let mouse = { x: -9999, y: -9999, active: false };
+  canvas.addEventListener('mousemove', (e) => {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+    mouse.active = true;
+  });
+  canvas.addEventListener('mouseleave', () => {
+    mouse.active = false;
+    mouse.x = -9999;
+    mouse.y = -9999;
+  });
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    mouse.x = e.touches[0].clientX;
+    mouse.y = e.touches[0].clientY;
+    mouse.active = true;
+  }, { passive: false });
+  canvas.addEventListener('touchend', () => {
+    mouse.active = false;
+    mouse.x = -9999;
+    mouse.y = -9999;
+  });
+
+  // Resize
+  let W, H;
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Color palette - subtle cool tones
+  const palette = [
+    [110, 142, 251],  // soft blue
+    [162, 155, 254],  // lavender
+    [106, 198, 209],  // teal
+    [129, 236, 236],  // mint
+    [251, 191, 140],  // peach
+    [253, 186, 140],  // warm orange
+    [167, 139, 250],  // purple
+    [132, 201, 219],  // sky blue
+    [148, 163, 184],  // steel
+    [244, 114, 182],  // pink
+    [250, 204, 21],   // gold
+    [52, 211, 153],   // emerald
+  ];
+
+  // Particles
+  let particles = [];
+
+  function createParticle() {
+    const col = palette[Math.floor(Math.random() * palette.length)];
+    const size = 1.5 + Math.random() * 3;
+    return {
+      x: Math.random() * W,
+      y: Math.random() * H,
+      vx: (Math.random() - 0.5) * 2,
+      vy: (Math.random() - 0.5) * 2,
+      r: col[0],
+      g: col[1],
+      b: col[2],
+      size: size,
+      alpha: 0.5 + Math.random() * 0.5
+    };
+  }
+
+  function syncParticles() {
+    while (particles.length < params.count) {
+      particles.push(createParticle());
+    }
+    while (particles.length > params.count) {
+      particles.pop();
+    }
+  }
+
+  syncParticles();
+
+  // FPS tracking
+  let frameCount = 0;
+  let lastFpsTime = performance.now();
+  let displayFps = 0;
+
+  // Animation
+  function animate(now) {
+    requestAnimationFrame(animate);
+
+    // FPS
+    frameCount++;
+    if (now - lastFpsTime >= 500) {
+      displayFps = Math.round(frameCount / ((now - lastFpsTime) / 1000));
+      fpsEl.textContent = 'FPS: ' + displayFps;
+      frameCount = 0;
+      lastFpsTime = now;
+    }
+
+    // Clear with slight trail
+    ctx.fillStyle = 'rgba(10, 10, 15, 0.3)';
+    ctx.fillRect(0, 0, W, H);
+
+    const grav = params.gravity;
+    const attr = params.attraction;
+    const rad = params.radius;
+    const radSq = rad * rad;
+    const drag = params.drag;
+
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+
+      // Gravity
+      p.vy += grav;
+
+      // Mouse interaction
+      if (mouse.active) {
+        const dx = mouse.x - p.x;
+        const dy = mouse.y - p.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq < radSq && distSq > 1) {
+          const dist = Math.sqrt(distSq);
+          const force = (1 - dist / rad) * attr * 0.5;
+          p.vx += (dx / dist) * force;
+          p.vy += (dy / dist) * force;
+        }
+      }
+
+      // Drag
+      p.vx *= drag;
+      p.vy *= drag;
+
+      // Update position
+      p.x += p.vx;
+      p.y += p.vy;
+
+      // Edge wrapping
+      if (p.x < -10) p.x = W + 10;
+      if (p.x > W + 10) p.x = -10;
+      if (p.y < -10) p.y = H + 10;
+      if (p.y > H + 10) p.y = -10;
+
+      // Draw
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(' + p.r + ',' + p.g + ',' + p.b + ',' + p.alpha + ')';
+      ctx.fill();
+    }
+
+    // Draw connections between nearby particles
+    ctx.lineWidth = 0.5;
+    const connectionDist = 80;
+    const connectionDistSq = connectionDist * connectionDist;
+    for (let i = 0; i < particles.length; i++) {
+      const pi = particles[i];
+      for (let j = i + 1; j < particles.length; j++) {
+        const pj = particles[j];
+        const dx = pi.x - pj.x;
+        const dy = pi.y - pj.y;
+        const dSq = dx * dx + dy * dy;
+        if (dSq < connectionDistSq) {
+          const alpha = (1 - Math.sqrt(dSq) / connectionDist) * 0.15;
+          ctx.strokeStyle = 'rgba(' + pi.r + ',' + pi.g + ',' + pi.b + ',' + alpha + ')';
+          ctx.beginPath();
+          ctx.moveTo(pi.x, pi.y);
+          ctx.lineTo(pj.x, pj.y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Mouse glow
+    if (mouse.active) {
+      const gradient = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, rad);
+      gradient.addColorStop(0, 'rgba(110, 142, 251, 0.06)');
+      gradient.addColorStop(1, 'rgba(110, 142, 251, 0)');
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(mouse.x, mouse.y, rad, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

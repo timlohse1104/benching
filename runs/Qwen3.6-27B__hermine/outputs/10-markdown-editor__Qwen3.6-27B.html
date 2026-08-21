@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Markdown Editor</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #f0f2f5;
+    color: #1a1a2e;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  header {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  header h1 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .stats {
+    font-size: 0.85rem;
+    color: #a0a0b8;
+    white-space: nowrap;
+  }
+  .stats span { color: #7ec8e3; font-weight: 600; }
+  button.copy-btn {
+    background: #7ec8e3;
+    color: #1a1a2e;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+  }
+  button.copy-btn:hover { background: #5bb8d8; }
+  button.copy-btn:active { background: #4aa3c7; }
+  .main-container {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+  .pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .pane-header {
+    background: #16213e;
+    color: #a0a0b8;
+    padding: 6px 16px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    flex-shrink: 0;
+  }
+  .editor-pane { border-right: 2px solid #16213e; }
+  #markdown-input {
+    flex: 1;
+    width: 100%;
+    padding: 16px;
+    border: none;
+    outline: none;
+    resize: none;
+    font-family: "Cascadia Code", "Fira Code", "JetBrains Mono", Consolas, "Courier New", monospace;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    background: #0f3460;
+    color: #e0e0e0;
+    tab-size: 2;
+  }
+  #markdown-input::placeholder { color: #5a6a8a; }
+  #markdown-input::-webkit-scrollbar, #preview::-webkit-scrollbar {
+    width: 8px;
+  }
+  #markdown-input::-webkit-scrollbar-track { background: #0a2647; }
+  #markdown-input::-webkit-scrollbar-thumb { background: #2a4a6a; border-radius: 4px; }
+  #preview {
+    flex: 1;
+    padding: 20px 24px;
+    overflow-y: auto;
+    background: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: #2c3e50;
+  }
+  #preview::-webkit-scrollbar-track { background: #f0f0f0; }
+  #preview::-webkit-scrollbar-thumb { background: #c0c0c0; border-radius: 4px; }
+  #preview h1, #preview h2, #preview h3, #preview h4, #preview h5, #preview h6 {
+    margin: 1.2em 0 0.5em;
+    line-height: 1.3;
+    color: #1a1a2e;
+  }
+  #preview h1 { font-size: 1.8rem; border-bottom: 2px solid #e0e0e0; padding-bottom: 0.3em; }
+  #preview h2 { font-size: 1.5rem; border-bottom: 1px solid #e8e8e8; padding-bottom: 0.25em; }
+  #preview h3 { font-size: 1.25rem; }
+  #preview h4 { font-size: 1.1rem; }
+  #preview h5 { font-size: 1rem; }
+  #preview h6 { font-size: 0.9rem; color: #555; }
+  #preview p { margin: 0.8em 0; }
+  #preview strong { font-weight: 700; }
+  #preview em { font-style: italic; }
+  #preview a { color: #2980b9; text-decoration: none; }
+  #preview a:hover { text-decoration: underline; }
+  #preview img { max-width: 100%; height: auto; border-radius: 4px; margin: 0.5em 0; }
+  #preview code {
+    font-family: "Cascadia Code", "Fira Code", Consolas, "Courier New", monospace;
+    background: #f4f6f8;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.88em;
+    color: #c0392b;
+  }
+  #preview pre {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 1em 0;
+  }
+  #preview pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+  #preview blockquote {
+    border-left: 4px solid #7ec8e3;
+    margin: 1em 0;
+    padding: 0.5em 1em;
+    background: #f4f9fc;
+    border-radius: 0 4px 4px 0;
+    color: #34495e;
+  }
+  #preview blockquote p { margin: 0.3em 0; }
+  #preview ul, #preview ol {
+    margin: 0.8em 0;
+    padding-left: 2em;
+  }
+  #preview li { margin: 0.3em 0; }
+  #preview li > ul, #preview li > ol { margin: 0.2em 0; }
+  #preview hr {
+    border: none;
+    height: 2px;
+    background: linear-gradient(to right, transparent, #ccc, transparent);
+    margin: 2em 0;
+  }
+  #preview table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+  #preview th, #preview td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+  #preview th { background: #f4f6f8; font-weight: 600; }
+  #preview .task-list-item { list-style: none; margin-left: -1.5em; }
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #1a1a2e;
+    color: #fff;
+    padding: 10px 24px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    opacity: 0;
+    transition: all 0.3s ease;
+    pointer-events: none;
+    z-index: 1000;
+  }
+  .toast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+  @media (max-width: 768px) {
+    .main-container { flex-direction: column; }
+    .editor-pane { border-right: none; border-bottom: 2px solid #16213e; }
+    .pane { min-height: 40vh; }
+    header { padding: 8px 12px; }
+    header h1 { font-size: 1rem; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>✏️ Markdown Editor</h1>
+  <div class="toolbar">
+    <div class="stats">
+      Words: <span id="word-count">0</span> &nbsp;|&nbsp; Chars: <span id="char-count">0</span>
+    </div>
+    <button class="copy-btn" id="copy-html-btn" onclick="copyHtml()">Copy HTML</button>
+  </div>
+</header>
+<div class="main-container">
+  <div class="pane editor-pane">
+    <div class="pane-header">Markdown</div>
+    <textarea id="markdown-input" spellcheck="false" placeholder="Type your Markdown here..."></textarea>
+  </div>
+  <div class="pane preview-pane">
+    <div class="pane-header">Preview</div>
+    <div id="preview"></div>
+  </div>
+</div>
+<div class="toast" id="toast">Copied to clipboard!</div>
+
+<script>
+(function() {
+  'use strict';
+
+  var textarea = document.getElementById('markdown-input');
+  var preview = document.getElementById('preview');
+  var wordCountEl = document.getElementById('word-count');
+  var charCountEl = document.getElementById('char-count');
+  var toast = document.getElementById('toast');
+
+  function escapeHtml(str) {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function processInline(text) {
+    // Inline code (must be first to protect content)
+    text = text.replace(/`([^`\n]+)`/g, function(match, code) {
+      return '<code>' + escapeHtml(code) + '</code>';
+    });
+
+    // Images (before links, since images use similar syntax)
+    text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, function(match, alt, src) {
+      return '<img src="' + escapeHtml(src) + '" alt="' + escapeHtml(alt) + '">';
+    });
+
+    // Links
+    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(match, linkText, href) {
+      return '<a href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">' + linkText + '</a>';
+    });
+
+    // Bold + Italic (***text*** or ___text___)
+    text = text.replace(/\*\*\*([^*]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+    text = text.replace(/___([^_]+)___/g, '<strong><em>$1</em></strong>');
+
+    // Bold (**text** or __text__)
+    text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+
+    // Italic (*text* or _text_)
+    text = text.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    text = text.replace(/(?<!\w)_([^_]+)_(?!\w)/g, '<em>$1</em>');
+
+    // Strikethrough
+    text = text.replace(/~~([^~]+)~~/g, '<del>$1</del>');
+
+    return text;
+  }
+
+  function markdownToHtml(md) {
+    var lines = md.split('\n');
+    var html = [];
+    var i = 0;
+    var len = lines.length;
+
+    while (i < len) {
+      var line = lines[i];
+      var trimmed = line.trim();
+
+      // Fenced code blocks
+      if (trimmed.match(/^```/)) {
+        var langMatch = trimmed.match(/^```(\w*)/);
+        var lang = langMatch ? langMatch[1] : '';
+        var codeLines = [];
+        i++;
+        while (i < len && !lines[i].trim().match(/^```/)) {
+          codeLines.push(escapeHtml(lines[i]));
+          i++;
+        }
+        i++; // skip closing ```
+        html.push('<pre><code>' + codeLines.join('\n') + '</code></pre>');
+        continue;
+      }
+
+      // Blank lines
+      if (trimmed === '') {
+        i++;
+        continue;
+      }
+
+      // Headings
+      var headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
+      if (headingMatch) {
+        var level = headingMatch[1].length;
+        var headingText = processInline(headingMatch[2].replace(/\s+#+\s*$/, ''));
+        html.push('<h' + level + '>' + headingText + '</h' + level + '>');
+        i++;
+        continue;
+      }
+
+      // Horizontal rules
+      if (trimmed.match(/^(\*{3,}|-{3,}|_{3,})(\s*\1)*$/)) {
+        html.push('<hr>');
+        i++;
+        continue;
+      }
+
+      // Blockquotes
+      if (trimmed.startsWith('>')) {
+        var bqLines = [];
+        while (i < len && lines[i].trim().startsWith('>')) {
+          bqLines.push(lines[i].trim().replace(/^>\s?/, ''));
+          i++;
+        }
+        var innerHtml = markdownToHtml(bqLines.join('\n'));
+        html.push('<blockquote>' + innerHtml + '</blockquote>');
+        continue;
+      }
+
+      // Unordered lists
+      if (trimmed.match(/^[\s]*[*\-+]\s/)) {
+        html.push('<ul>');
+        while (i < len && lines[i].trim().match(/^[\s]*[*\-+]\s/)) {
+          var itemContent = lines[i].trim().replace(/^[\s]*[*\-+]\s+/, '');
+          html.push('<li>' + processInline(itemContent) + '</li>');
+          i++;
+        }
+        html.push('</ul>');
+        continue;
+      }
+
+      // Ordered lists
+      if (trimmed.match(/^[\s]*\d+\.\s/)) {
+        html.push('<ol>');
+        while (i < len && lines[i].trim().match(/^[\s]*\d+\.\s/)) {
+          var itemContent = lines[i].trim().replace(/^[\s]*\d+\.\s+/, '');
+          html.push('<li>' + processInline(itemContent) + '</li>');
+          i++;
+        }
+        html.push('</ol>');
+        continue;
+      }
+
+      // Paragraphs (collect consecutive non-empty, non-special lines)
+      var paraLines = [];
+      while (i < len) {
+        var t = lines[i].trim();
+        if (t === '' ||
+            t.match(/^#{1,6}\s/) ||
+            t.match(/^(\*{3,}|-{3,}|_{3,})/) ||
+            t.startsWith('>') ||
+            t.match(/^[\s]*[*\-+]\s/) ||
+            t.match(/^[\s]*\d+\.\s/) ||
+            t.match(/^```/)) {
+          break;
+        }
+        paraLines.push(t);
+        i++;
+      }
+      if (paraLines.length > 0) {
+        html.push('<p>' + processInline(paraLines.join(' ')) + '</p>');
+      }
+    }
+
+    return html.join('\n');
+  }
+
+  function updatePreview() {
+    var md = textarea.value;
+    preview.innerHTML = markdownToHtml(md);
+
+    // Word count
+    var words = md.trim() === '' ? 0 : md.trim().split(/\s+/).length;
+    wordCountEl.textContent = words;
+
+    // Character count
+    charCountEl.textContent = md.length;
+  }
+
+  textarea.addEventListener('input', updatePreview);
+  textarea.addEventListener('scroll', function() {
+    var ratio = textarea.scrollTop / (textarea.scrollHeight - textarea.clientHeight);
+    preview.scrollTop = ratio * (preview.scrollHeight - preview.clientHeight);
+  });
+
+  // Copy HTML to clipboard
+  window.copyHtml = function() {
+    var html = markdownToHtml(textarea.value);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(html).then(function() {
+        showToast();
+      }).catch(function() {
+        fallbackCopy(html);
+      });
+    } else {
+      fallbackCopy(html);
+    }
+  };
+
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+      showToast();
+    } catch (e) {
+      alert('Failed to copy. Please copy manually.');
+    }
+    document.body.removeChild(ta);
+  }
+
+  function showToast() {
+    toast.classList.add('show');
+    setTimeout(function() {
+      toast.classList.remove('show');
+    }, 2000);
+  }
+
+  // Prefill with sample markdown
+  var sampleMarkdown = [
+    '# Welcome to the Markdown Editor',
+    '',
+    'This is a **live Markdown editor** with a split-pane layout. Edit the text on the left and see the rendered preview on the right.',
+    '',
+    '---',
+    '',
+    '## Headings',
+    '',
+    'Headings use `#` symbols. Here are examples of all six levels:',
+    '',
+    '### Heading Level 3',
+    '',
+    '#### Heading Level 4',
+    '',
+    '##### Heading Level 5',
+    '',
+    '###### Heading Level 6',
+    '',
+    '## Text Formatting',
+    '',
+    'You can write **bold text**, *italic text*, or ***bold and italic*** together. You can also use ~~strikethrough~~ text.',
+    '',
+    'For inline code, wrap it in backticks like `console.log("hello")`.',
+    '',
+    '## Code Blocks',
+    '',
+    'Fenced code blocks use triple backticks:',
+    '',
+    '```javascript',
+    'function greet(name) {',
+    '  return `Hello, ${name}!`;',
+    '}',
+    '',
+    'console.log(greet("World"));',
+    '```',
+    '',
+    '```python',
+    'def fibonacci(n):',
+    '    a, b = 0, 1',
+    '    for _ in range(n):',
+    '        yield a',
+    '        a, b = b, a + b',
+    '',
+    'print(list(fibonacci(10)))',
+    '```',
+    '',
+    '## Lists',
+    '',
+    '### Unordered List',
+    '',
+    '- First item
+    - Second item
+      - Nested item A
+      - Nested item B
+    - Third item',
+    '',
+    '### Ordered List',
+    '',
+    '1. Step one
+    2. Step two
+    3. Step three
+       1. Sub-step 3a
+       2. Sub-step 3b
+    4. Step four',
+    '',
+    '## Blockquotes',
+    '',
+    '> "The best way to predict the future is to invent it."
+    > — Alan Kay',
+    '',
+    '> Blockquotes can span multiple lines
+    > and even contain **formatted text** and `inline code`.',
+    '',
+    '## Links and Images',
+    '',
+    'Here is a [link to Example.com](https://example.com) and a [GitHub link](https://github.com).',
+    '',
+    'Images use similar syntax: `![alt text](image-url)`',
+    '',
+    '![Sample Image](https://via.placeholder.com/600x200/7ec8e3/1a1a2e?text=Markdown+Editor)',
+    '',
+    '## Horizontal Rule',
+    '',
+    '---',
+    '',
+    '## HTML Safety',
+    '',
+    'Raw HTML is escaped for security. Try typing `<script>alert("xss")</script>` in the editor — it will be displayed as text, not executed.',
+    '',
+    'Here is some escaped HTML: `<div class="test">Hello</div>`',
+    '',
+    '---',
+    '',
+    '### Character Count: live tracking below the header',
+    '',
+    'Start typing to see the word and character counts update in real time!'
+  ].join('\n');
+
+  textarea.value = sampleMarkdown;
+  updatePreview();
+})();
+</script>
+</body>
+</html>
