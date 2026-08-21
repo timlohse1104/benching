@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>The Lindenmayer Grove · L-system Fractal Tree</title>
+<style>
+  :root{
+    --ink:#efe7d4;
+    --muted:#93a894;
+    --faint:#6d8574;
+    --panel:rgba(13,24,18,0.92);
+    --line:#27402f;
+    --accent:#f2a84b;
+    --accent-hi:#ffd9a0;
+    --track:#22382c;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,monospace;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0; overflow:hidden; background:#0a141c; color:var(--ink);
+    font-family:var(--sans); touch-action:manipulation;
+  }
+  #scene{ position:fixed; inset:0; display:block; cursor:crosshair; }
+
+  /* ---------- masthead ---------- */
+  .masthead{
+    position:fixed; top:30px; left:34px; z-index:5; pointer-events:none;
+    animation:rise .9s .15s both cubic-bezier(.2,.7,.2,1);
+  }
+  .kicker{
+    margin:0 0 10px; font:600 10.5px/1 var(--mono);
+    letter-spacing:.32em; text-transform:uppercase; color:var(--accent);
+  }
+  .masthead h1{
+    margin:0; font:600 clamp(34px,4.6vw,54px)/1.02 var(--serif);
+    color:#f5ecd8; text-shadow:0 2px 26px rgba(0,0,0,.5);
+  }
+  .masthead h1 em{ font-style:italic; color:var(--accent-hi); }
+  .rule{
+    margin:12px 0 0; font:400 11.5px/1.6 var(--mono); color:#a9bfa9;
+    text-shadow:0 1px 10px rgba(0,0,0,.6);
+  }
+  .rule code{
+    font-family:var(--mono); color:#ffe0b0;
+    background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.13);
+    padding:2px 7px; border-radius:5px;
+  }
+
+  /* ---------- control panel ---------- */
+  #panel{
+    position:fixed; top:20px; right:20px; z-index:6; width:308px;
+    max-height:calc(100dvh - 40px); overflow-y:auto;
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    box-shadow:0 24px 70px rgba(0,0,0,.55); backdrop-filter:blur(7px);
+    padding:18px 18px 16px;
+    animation:rise .9s .3s both cubic-bezier(.2,.7,.2,1);
+  }
+  #panel::-webkit-scrollbar{ width:8px; }
+  #panel::-webkit-scrollbar-thumb{ background:#2c4436; border-radius:8px; }
+  .p-head h2{
+    margin:6px 0 0; font:italic 600 19px/1.2 var(--serif); color:#f0e6cd;
+  }
+  .ctl{ margin:16px 0 0; }
+  .row{
+    display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;
+  }
+  .row label,.row .lbl{
+    font:600 12.5px/1 var(--sans); color:#d8d2bd; letter-spacing:.02em;
+  }
+  .row output{
+    font:600 11.5px/1 var(--mono); color:var(--accent-hi);
+    background:rgba(242,168,75,.1); border:1px solid rgba(242,168,75,.25);
+    padding:3px 7px; border-radius:6px; min-width:46px; text-align:center;
+  }
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; width:100%; height:20px;
+    background:var(--track); border-radius:2px; outline:none; cursor:pointer; margin:0;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; width:15px; height:15px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #ffd9a0, var(--accent) 62%);
+    border:2px solid #20130a; box-shadow:0 1px 6px rgba(0,0,0,.5);
+    transition:transform .18s ease, box-shadow .18s ease;
+  }
+  input[type=range]:hover::-webkit-slider-thumb,
+  input[type=range]:active::-webkit-slider-thumb{
+    transform:scale(1.22); box-shadow:0 0 0 6px rgba(242,168,75,.16), 0 1px 6px rgba(0,0,0,.5);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:13px; height:13px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #ffd9a0, var(--accent) 62%);
+    border:2px solid #20130a; box-shadow:0 1px 6px rgba(0,0,0,.5);
+    transition:transform .18s ease;
+  }
+  input[type=range]:hover::-moz-range-thumb{ transform:scale(1.22); }
+  input[type=range]:focus-visible{ outline:2px solid var(--accent); outline-offset:3px; }
+
+  .seg{
+    display:flex; gap:3px; background:#0b1410; border:1px solid var(--line);
+    border-radius:9px; padding:3px;
+  }
+  .seg button{
+    flex:1; appearance:none; border:none; background:transparent; cursor:pointer;
+    font:600 10.5px/1 var(--mono); letter-spacing:.08em; text-transform:uppercase;
+    color:var(--muted); padding:8px 0; border-radius:6px;
+    transition:background .2s, color .2s, box-shadow .2s;
+  }
+  .seg button:hover{ color:#d9e4d2; }
+  .seg button[aria-pressed="true"]{
+    background:linear-gradient(180deg,#24402f,#1b3123); color:var(--accent-hi);
+    box-shadow:inset 0 0 0 1px #3c5a45, 0 2px 8px rgba(0,0,0,.35);
+  }
+  .seg button:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+
+  .switches{ display:grid; gap:10px; margin:18px 0; }
+  .sw{
+    display:flex; justify-content:space-between; align-items:center; cursor:pointer;
+    font:600 12.5px/1 var(--sans); color:#d8d2bd; position:relative;
+  }
+  .sw input{ position:absolute; opacity:0; pointer-events:none; }
+  .sw i{
+    flex:none; width:36px; height:20px; border-radius:20px; position:relative;
+    background:#1b2c22; border:1px solid #33513f; transition:background .25s, border-color .25s;
+  }
+  .sw i::after{
+    content:""; position:absolute; top:2px; left:2px; width:14px; height:14px;
+    border-radius:50%; background:#6d8a76; transition:left .25s, background .25s, box-shadow .25s;
+  }
+  .sw input:checked + i{ background:#3a2f17; border-color:var(--accent); }
+  .sw input:checked + i::after{
+    left:18px; background:var(--accent); box-shadow:0 0 10px rgba(242,168,75,.6);
+  }
+  .sw input:focus-visible + i{ outline:2px solid var(--accent); outline-offset:2px; }
+
+  #regen{
+    width:100%; appearance:none; border:none; cursor:pointer; margin-bottom:12px;
+    padding:13px 12px; border-radius:10px;
+    background:linear-gradient(180deg,#f6b35c,#e08f2f); color:#241505;
+    font:700 13.5px/1 var(--sans); letter-spacing:.03em;
+    box-shadow:0 6px 20px rgba(240,160,60,.28), inset 0 1px 0 rgba(255,255,255,.35);
+    transition:transform .15s ease, box-shadow .2s ease, filter .2s ease;
+  }
+  #regen:hover{ transform:translateY(-1px); filter:brightness(1.06); box-shadow:0 9px 26px rgba(240,160,60,.4), inset 0 1px 0 rgba(255,255,255,.35); }
+  #regen:active{ transform:translateY(1px) scale(.99); }
+  #regen:focus-visible{ outline:2px solid var(--accent-hi); outline-offset:3px; }
+  #regen small{ font:400 10px/1 var(--mono); opacity:.72; letter-spacing:.05em; }
+  #regen .ic{ display:inline-block; margin-right:4px; }
+  #regen .ic.spin{ animation:spin .55s ease; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .seedline{ font:400 10.5px/1 var(--mono); color:var(--faint); margin-bottom:10px; }
+  .seedline code{ color:var(--accent-hi); font-family:var(--mono); }
+  .stats{
+    display:flex; justify-content:space-between; gap:8px;
+    font:400 10.5px/1 var(--mono); color:var(--muted);
+  }
+  .stats b{ color:var(--ink); font-weight:600; }
+  .growbar{
+    margin-top:10px; height:4px; border-radius:4px; background:#16241c; overflow:hidden;
+  }
+  .growbar i{
+    display:block; height:100%; width:0%;
+    background:linear-gradient(90deg,var(--accent),#ffd98a);
+    box-shadow:0 0 8px rgba(242,168,75,.55); border-radius:4px;
+  }
+  .note{ margin:10px 0 0; font:400 10px/1.5 var(--mono); color:var(--faint); letter-spacing:.03em; }
+
+  /* ---------- hint ---------- */
+  .hint{
+    position:fixed; left:34px; bottom:20px; z-index:5; margin:0; pointer-events:none;
+    font:400 11px/1 var(--mono); color:rgba(207,216,200,.68);
+    text-shadow:0 1px 8px rgba(0,0,0,.6);
+    animation:rise 1s .7s both cubic-bezier(.2,.7,.2,1);
+  }
+  .hint .dot{
+    display:inline-block; width:6px; height:6px; border-radius:50%;
+    background:var(--accent); margin-right:9px; vertical-align:1px;
+    animation:pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse{ 0%,100%{ opacity:.35; } 50%{ opacity:1; } }
+  @keyframes rise{ from{ opacity:0; transform:translateY(14px); } to{ opacity:1; transform:none; } }
+
+  @media (max-width:760px){
+    .masthead{ top:16px; left:18px; }
+    .masthead h1{ font-size:30px; }
+    .rule{ font-size:10px; }
+    .hint{ display:none; }
+    #panel{ left:12px; right:12px; top:auto; bottom:12px; width:auto; max-height:44dvh; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="scene" role="img" aria-label="Animated fractal tree growing under a dusk sky with fireflies"></canvas>
+
+<header class="masthead">
+  <p class="kicker">L-System · Canvas 2D · Plate 01</p>
+  <h1>The Lindenmayer<br><em>Grove</em></h1>
+  <p class="rule">axiom <code>F</code> &nbsp;·&nbsp; rule <code>F → F[+F][−F]</code></p>
+</header>
+
+<aside id="panel" aria-label="Tree controls">
+  <div class="p-head">
+    <p class="kicker">Controls</p>
+    <h2>Growth parameters</h2>
+  </div>
+
+  <div class="ctl">
+    <div class="row"><label for="depth">Recursion depth</label><output id="outDepth">8</output></div>
+    <input id="depth" type="range" min="3" max="9" step="1" value="8">
+  </div>
+  <div class="ctl">
+    <div class="row"><label for="angle">Branch angle</label><output id="outAngle">26°</output></div>
+    <input id="angle" type="range" min="8" max="70" step="1" value="26">
+  </div>
+  <div class="ctl">
+    <div class="row"><label for="ratio">Length ratio</label><output id="outRatio">0.72</output></div>
+    <input id="ratio" type="range" min="0.55" max="0.85" step="0.01" value="0.72">
+  </div>
+  <div class="ctl">
+    <div class="row"><label for="jitter">Jitter</label><output id="outJitter">35%</output></div>
+    <input id="jitter" type="range" min="0" max="1" step="0.01" value="0.35">
+  </div>
+
+  <div class="ctl">
+    <div class="row"><span class="lbl">Tips</span></div>
+    <div class="seg" role="group" aria-label="Tip style">
+      <button type="button" data-tip="none" aria-pressed="false">None</button>
+      <button type="button" data-tip="leaf" aria-pressed="false">Leaves</button>
+      <button type="button" data-tip="blossom" aria-pressed="true">Blossom</button>
+    </div>
+  </div>
+
+  <div class="switches">
+    <label class="sw"><span>Fireflies</span><input type="checkbox" id="fireflies" checked><i></i></label>
+    <label class="sw"><span>Wind</span><input type="checkbox" id="wind" checked><i></i></label>
+  </div>
+
+  <button id="regen" type="button" title="Regrow with a fresh random seed (R)"><span class="ic">↻</span>Regenerate <small>· new seed</small></button>
+  <div class="seedline">seed <code id="seedHex">00000000</code></div>
+  <div class="stats">
+    <span>branches <b id="statSegs">–</b></span>
+    <span>tips <b id="statTips">–</b></span>
+    <span id="fps">–</span>
+  </div>
+  <div class="growbar" aria-hidden="true"><i id="growFill"></i></div>
+  <p class="note">3<sup>n</sup> segments, batched per generation to stay smooth at depth 9.</p>
+</aside>
+
+<p class="hint"><span class="dot"></span>click the sky for a gust · drag sliders to regrow in place · press R to reseed</p>
+<noscript><p style="position:fixed;top:50%;left:0;right:0;text-align:center">This grove needs JavaScript to grow.</p></noscript>
+
+<script>
+(function(){
+'use strict';
+
+/* ---------------- setup ---------------- */
+var canvas = document.getElementById('scene');
+var ctx = canvas.getContext('2d');
+function $(id){ return document.getElementById(id); }
+var ui = {
+  depth:$('depth'), angle:$('angle'), ratio:$('ratio'), jitter:$('jitter'),
+  outDepth:$('outDepth'), outAngle:$('outAngle'), outRatio:$('outRatio'), outJitter:$('outJitter'),
+  fireflies:$('fireflies'), wind:$('wind'),
+  regen:$('regen'), seedHex:$('seedHex'),
+  segs:$('statSegs'), tipsStat:$('statTips'), fps:$('fps'), grow:$('growFill')
+};
+var tipButtons = Array.prototype.slice.call(document.querySelectorAll('.seg button'));
+var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+var MOT = reduced ? 0.25 : 1;
+
+var state = {
+  seed: (Math.random()*0xffffffff)>>>0,
+  depth: 8, angle: 26, ratio: 0.72, jitter: 0.35,
+  tipStyle: 'blossom',
+  fireflies: true, wind: !reduced,
+  gust: 0,
+  px: 0.5, py: 0.5, tx: 0.5, ty: 0.5
+};
+if (reduced) ui.wind.checked = false;
+
+var W=0, H=0, DPR=1, groundY=0, baseX=0;
+var skyGrad=null, glowGrad=null, groundGrad=null, vigGrad=null;
+var stars=[], mist=[], flies=[], ridge=[];
+var tree=null, growthStart=0;
+
+/* ---------------- helpers ---------------- */
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a>>>15, 1|a);
+    t = t + Math.imul(t ^ t>>>7, 61|t) ^ t;
+    return ((t ^ t>>>14) >>> 0) / 4294967296;
+  };
+}
+function hex2rgb(h){
+  return [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+}
+function mix(a,b,t){
+  var A=hex2rgb(a), B=hex2rgb(b);
+  return 'rgb('+Math.round(A[0]+(B[0]-A[0])*t)+','+Math.round(A[1]+(B[1]-A[1])*t)+','+Math.round(A[2]+(B[2]-A[2])*t)+')';
+}
+var BARK_STOPS = ['#4a2c1a','#6b4526','#86603a','#94804a','#9fae58','#b3cd6f','#c9e489'];
+
+/* ---------------- sprites ---------------- */
+function makeSprite(draw){
+  var s=48, c=document.createElement('canvas');
+  c.width=c.height=s;
+  var g=c.getContext('2d');
+  g.translate(s/2, s/2);
+  draw(g);
+  return c;
+}
+var PETALS=[['#f6b9c9','#ffe3ea'],['#f2a3b8','#ffd9c4'],['#f8c9a0','#ffe9c9'],['#eea7bd','#ffe0f0']];
+var blossoms = PETALS.map(function(pc){
+  return makeSprite(function(g){
+    for (var k=0;k<5;k++){
+      g.rotate(Math.PI*2/5);
+      g.beginPath(); g.ellipse(0,-9,4.6,9,0,0,Math.PI*2); g.fillStyle=pc[0]; g.fill();
+      g.beginPath(); g.ellipse(0,-10.5,2.3,5,0,0,Math.PI*2); g.fillStyle=pc[1]; g.fill();
+    }
+    g.beginPath(); g.arc(0,0,4.2,0,7); g.fillStyle='#ffd27c'; g.fill();
+    g.beginPath(); g.arc(0,0,2,0,7); g.fillStyle='#fff2cf'; g.fill();
+  });
+});
+var LEAF_COLS=[['#8fc96e','#cdeaa8'],['#7ab85e','#b5dd8a'],['#a5d17c','#dff2b4'],['#6fae57','#a8d488']];
+var leafSprites = LEAF_COLS.map(function(lc){
+  return makeSprite(function(g){
+    g.rotate(0.6);
+    g.beginPath(); g.ellipse(0,0,4.5,11,0,0,Math.PI*2); g.fillStyle=lc[0]; g.fill();
+    g.beginPath(); g.ellipse(-2.4,0,2,9,0,0,Math.PI*2); g.fillStyle=lc[1]; g.fill();
+    g.strokeStyle='rgba(40,70,30,0.5)'; g.lineWidth=1;
+    g.beginPath(); g.moveTo(0,-10); g.lineTo(0,10); g.stroke();
+  });
+});
+var glowSpr = makeSprite(function(g){
+  var gr=g.createRadialGradient(0,0,0,0,0,24);
+  gr.addColorStop(0,'rgba(255,240,200,1)');
+  gr.addColorStop(0.25,'rgba(255,214,130,0.85)');
+  gr.addColorStop(0.6,'rgba(255,190,90,0.28)');
+  gr.addColorStop(1,'rgba(255,190,90,0)');
+  g.fillStyle=gr; g.fillRect(-24,-24,48,48);
+});
+
+/* ---------------- L-system build ----------------
+   axiom F, rule F -> F[+F][-F], applied `depth` times.
+   Turtle: F draw, + / - turn, [ ] push / pop.
+   Branch length = 10 * ratio^nesting, seeded jitter on length & angle.
+   Timing: a segment grows after its parent finished -> organic unfold.  */
+function buildTree(){
+  var p = state;
+  var rand = mulberry32(p.seed);
+  var s = 'F';
+  var rule = 'F[+F][-F]';
+  for (var i=0;i<p.depth;i++) s = s.replace(/F/g, rule);
+
+  var levels = [], d;
+  for (d=0; d<=p.depth; d++) levels.push([]);
+  var leaves = [];
+  var x=0, y=0, dir=-Math.PI/2;
+  var ang = p.angle*Math.PI/180;
+  var st = [], bt = 0;
+  function jr(){ return (rand()+rand()+rand()-1.5)/1.5; }
+
+  for (i=0;i<s.length;i++){
+    var ch = s.charAt(i);
+    if (ch==='F'){
+      var depthN = st.length;
+      var len = Math.pow(p.ratio, depthN) * (1 + p.jitter*0.35*jr());
+      var dx = Math.cos(dir)*len, dy = Math.sin(dir)*len;
+      var dur = 720*Math.pow(0.8, depthN);
+      levels[depthN].push({x0:x, y0:y, x1:x+dx, y1:y+dy, start:bt, dur:dur});
+      if (depthN===p.depth) leaves.push({x:x+dx, y:y+dy, t:bt+dur, ph:rand()*6.283, v:(rand()*4)|0});
+      x+=dx; y+=dy; bt+=dur;
+    } else if (ch==='+'){
+      dir += ang*(1 + p.jitter*0.6*jr());
+    } else if (ch==='-'){
+      dir -= ang*(1 + p.jitter*0.6*jr());
+    } else if (ch==='['){
+      st.push(bt);
+    } else if (ch===']'){
+      bt = st.pop();
+    }
+  }
+
+  var maxEnd = 0;
+  for (i=0;i<leaves.length;i++) if (leaves[i].t > maxEnd) maxEnd = leaves[i].t;
+  maxEnd += 520;
+
+  var colors = [];
+  for (d=0; d<=p.depth; d++){
+    var t = p.depth ? d/p.depth : 0;
+    var f = t*(BARK_STOPS.length-1);
+    var idx = Math.min(BARK_STOPS.length-2, Math.floor(f));
+    colors.push(mix(BARK_STOPS[idx], BARK_STOPS[idx+1], f-idx));
+  }
+  var widths = [];
+  for (d=0; d<=p.depth; d++) widths.push(Math.max(1, 13*Math.pow(0.7, d)));
+
+  var maxReach = 10*(1-Math.pow(p.ratio, p.depth+1))/(1-p.ratio);
+  var segCount = 0;
+  for (d=0; d<levels.length; d++) segCount += levels[d].length;
+
+  tree = { levels:levels, leaves:leaves, maxEnd:maxEnd, colors:colors,
+           widths:widths, maxReach:maxReach, segCount:segCount,
+           tipCount:leaves.length, paths:null };
+  growthStart = performance.now();
+
+  ui.segs.textContent = segCount.toLocaleString();
+  ui.tipsStat.textContent = leaves.length.toLocaleString();
+}
+
+/* ---------------- resize / scenery cache ---------------- */
+function resize(){
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.round(W*DPR); canvas.height = Math.round(H*DPR);
+  canvas.style.width = W+'px'; canvas.style.height = H+'px';
+  groundY = H*0.86;
+  baseX = W*(W>760 ? 0.44 : 0.5);
+
+  skyGrad = ctx.createLinearGradient(0,0,0,groundY);
+  skyGrad.addColorStop(0,'#0a1420');
+  skyGrad.addColorStop(0.42,'#17303c');
+  skyGrad.addColorStop(0.68,'#3c4f46');
+  skyGrad.addColorStop(0.84,'#8a5f38');
+  skyGrad.addColorStop(1,'#d69a55');
+
+  groundGrad = ctx.createLinearGradient(0,groundY,0,H);
+  groundGrad.addColorStop(0,'#20301f');
+  groundGrad.addColorStop(0.25,'#141f15');
+  groundGrad.addColorStop(1,'#0a100c');
+
+  glowGrad = ctx.createRadialGradient(baseX,groundY,10,baseX,groundY,Math.max(W,H)*0.55);
+  glowGrad.addColorStop(0,'rgba(255,196,120,0.5)');
+  glowGrad.addColorStop(0.35,'rgba(255,170,90,0.18)');
+  glowGrad.addColorStop(1,'rgba(255,170,90,0)');
+
+  vigGrad = ctx.createRadialGradient(W/2,H*0.55,Math.min(W,H)*0.35,W/2,H*0.55,Math.max(W,H)*0.78);
+  vigGrad.addColorStop(0,'rgba(0,0,0,0)');
+  vigGrad.addColorStop(1,'rgba(4,10,14,0.55)');
+
+  var r2 = mulberry32(1234);
+  stars = [];
+  var n = Math.round(W*H/16000);
+  for (var i=0;i<n;i++){
+    stars.push({x:r2()*W, y:r2()*groundY*0.6, r:0.5+r2()*1.1, ph:r2()*6.283, sp:0.5+r2()});
+  }
+
+  mist = [];
+  var bands=[
+    {y:groundY*0.75, h:90,  c:'rgba(190,215,225,0.05)'},
+    {y:groundY*0.9,  h:110, c:'rgba(250,190,130,0.06)'},
+    {y:groundY*0.97, h:70,  c:'rgba(255,205,150,0.08)'}
+  ];
+  for (i=0;i<bands.length;i++){
+    var b=bands[i];
+    var g=ctx.createLinearGradient(0,b.y-b.h/2,0,b.y+b.h/2);
+    g.addColorStop(0,'rgba(255,255,255,0)');
+    g.addColorStop(0.5,b.c);
+    g.addColorStop(1,'rgba(255,255,255,0)');
+    mist.push({g:g, y:b.y, h:b.h, sp:4+r2()*6, off:r2()*W*2});
+  }
+
+  ridge = [];
+  var rr = mulberry32(777), hgt = 14;
+  for (var x=0; x<=W+40; x+=40){
+    hgt += (rr()-0.5)*10;
+    if (hgt<4) hgt=4; if (hgt>26) hgt=26;
+    ridge.push({x:x, h:hgt});
+  }
+
+  flies = [];
+  for (i=0;i<26;i++){
+    flies.push({x:r2()*W, y:groundY*(0.35+r2()*0.6), ph:r2()*6.283,
+                sp:0.4+r2()*0.9, ax:20+r2()*40, ay:12+r2()*22, r:5+r2()*9});
+  }

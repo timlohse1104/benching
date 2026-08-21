@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conway's Game of Life</title>
+<style>
+  :root{
+    --bg:#0a0d12;
+    --panel:#10151d;
+    --panel2:#151c26;
+    --line:#223047;
+    --line-soft:#1c2431;
+    --text:#d9e1ec;
+    --muted:#7d8a9c;
+    --amber:#ffb454;
+    --amber-bright:#ffd166;
+    --amber-deep:#ff8c3a;
+    --green:#3ddc97;
+    --mono:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:"Avenir Next","Segoe UI",system-ui,-apple-system,"Helvetica Neue",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{min-height:100%}
+  body{
+    font-family:var(--sans);
+    color:var(--text);
+    background:
+      radial-gradient(1100px 560px at 82% -12%, rgba(255,180,84,.07), transparent 62%),
+      radial-gradient(900px 520px at 8% 112%, rgba(80,150,255,.06), transparent 60%),
+      var(--bg);
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:
+      linear-gradient(rgba(125,150,190,.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(125,150,190,.05) 1px, transparent 1px);
+    background-size:44px 44px;
+    -webkit-mask-image:radial-gradient(ellipse at 50% 28%, #000 30%, transparent 78%);
+    mask-image:radial-gradient(ellipse at 50% 28%, #000 30%, transparent 78%);
+  }
+  body::after{
+    content:"";position:fixed;width:64vmax;height:64vmax;left:-16vmax;top:-24vmax;border-radius:50%;
+    background:radial-gradient(circle, rgba(255,180,84,.07), transparent 62%);
+    pointer-events:none;z-index:0;
+    animation:drift 26s ease-in-out infinite alternate;
+  }
+  @keyframes drift{to{transform:translate(34vmax,20vmax)}}
+
+  .app{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:28px 22px 40px}
+
+  /* ---------- header ---------- */
+  .top{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;margin-bottom:18px}
+  .brand{display:flex;align-items:center;gap:14px}
+  .mark{display:grid;grid-template-columns:repeat(3,9px);grid-template-rows:repeat(3,9px);gap:3px;flex:none}
+  .mark i{width:9px;height:9px;border-radius:2px;background:#212b3b}
+  .mark i.on{background:var(--amber);box-shadow:0 0 9px rgba(255,180,84,.55)}
+  h1{
+    font-family:var(--mono);font-size:22px;font-weight:700;letter-spacing:.26em;
+    text-transform:uppercase;color:#f2f5fa;line-height:1.1;
+  }
+  h1 em{font-style:normal;color:var(--amber)}
+  .sub{font-size:12px;color:var(--muted);letter-spacing:.04em;margin-top:5px}
+
+  .hud{display:flex;gap:26px;align-items:flex-end}
+  .stat{text-align:right}
+  .stat-label{display:block;font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+  .stat-value{font-family:var(--mono);font-size:30px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+  .stat-value.amber{color:var(--amber);text-shadow:0 0 18px rgba(255,180,84,.35)}
+  .stat-value.small{font-size:13px;letter-spacing:.14em;color:var(--muted);padding-bottom:5px}
+  .stat.status{display:flex;flex-direction:column;align-items:flex-end}
+  .led{width:9px;height:9px;border-radius:50%;background:#39445a;margin-bottom:7px;transition:background .2s}
+  .stat.status.on .led{background:var(--green);box-shadow:0 0 10px var(--green);animation:pulse 1.2s ease-in-out infinite}
+  .stat.status.on .stat-value{color:var(--green)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+  /* ---------- stage ---------- */
+  .stage{
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;
+    box-shadow:0 24px 50px -28px rgba(0,0,0,.9), 0 0 34px -14px rgba(255,180,84,.14);
+  }
+  .stagebar{
+    display:flex;justify-content:space-between;align-items:center;
+    font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--muted);padding:0 4px 9px;
+  }
+  .stagebar b{color:#aeb9c9;font-weight:600}
+  #board{
+    display:block;width:100%;height:auto;border-radius:6px;border:1px solid #1f2937;
+    cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none;
+    box-shadow:0 0 0 1px rgba(255,180,84,.05);
+  }
+  .stage.running #board{cursor:default}
+
+  /* ---------- controls ---------- */
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px}
+  .btn-group{display:flex;gap:8px;flex-wrap:wrap}
+  .btn{
+    font-family:var(--sans);font-size:13px;font-weight:600;letter-spacing:.03em;
+    color:#cfd8e3;background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+    padding:10px 16px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;
+    transition:transform .12s ease, border-color .15s ease, background .15s ease, box-shadow .15s ease;
+  }
+  .btn:hover{transform:translateY(-1px);border-color:#35507a;background:#1a2331;box-shadow:0 6px 16px -8px rgba(0,0,0,.8)}
+  .btn:active{transform:translateY(0) scale(.98)}
+  .btn.primary{
+    background:linear-gradient(180deg,#ffc06a,#ff9f3a);color:#221302;border-color:var(--amber);
+    box-shadow:0 6px 18px -6px rgba(255,159,58,.45);
+  }
+  .btn.primary:hover{background:linear-gradient(180deg,#ffcd82,#ffa94d)}
+  .btn.primary.running{background:transparent;color:var(--amber);box-shadow:none}
+  .btn.primary.running:hover{background:rgba(255,180,84,.08)}
+  .icon{display:inline-block;width:0;height:0;border-left:9px solid currentColor;border-top:6px solid transparent;border-bottom:6px solid transparent}
+  .btn.running .icon{width:5px;height:12px;border:none;background:currentColor;box-shadow:5px 0 0 currentColor;margin-right:2px}
+
+  .field{
+    display:flex;align-items:center;gap:10px;background:var(--panel2);
+    border:1px solid var(--line);border-radius:8px;padding:8px 12px;
+    transition:border-color .15s ease;
+  }
+  .field:hover{border-color:#35507a}
+  .field.grow{flex:1 1 240px;min-width:230px}
+  .field-label{font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  select{
+    font-family:var(--mono);font-size:13px;color:var(--text);
+    background:#0e131a url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23ffb454' stroke-width='1.6' fill='none'/%3E%3C/svg%3E") no-repeat right 10px center;
+    border:1px solid var(--line);border-radius:6px;padding:7px 30px 7px 10px;
+    appearance:none;-webkit-appearance:none;cursor:pointer;transition:border-color .15s ease;
+  }
+  select:hover{border-color:var(--amber)}
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;flex:1;height:4px;border-radius:2px;
+    background:linear-gradient(90deg,var(--amber) 19%,#263041 19%);cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:var(--amber);border:2px solid #2a1a05;box-shadow:0 0 9px rgba(255,180,84,.55);
+    transition:transform .12s ease;
+  }
+  input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.18)}
+  input[type=range]::-moz-range-thumb{
+    width:14px;height:14px;border-radius:50%;background:var(--amber);
+    border:2px solid #2a1a05;box-shadow:0 0 9px rgba(255,180,84,.55);cursor:pointer;
+  }
+  input[type=range]::-moz-range-track{background:transparent;height:4px}
+  .field-value{font-family:var(--mono);font-size:12px;color:var(--amber);min-width:66px;text-align:right;font-variant-numeric:tabular-nums}
+
+  .hint{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.03em}
+  kbd{
+    font-family:var(--mono);font-size:10px;color:#aeb9c9;background:#1a2230;
+    border:1px solid #2a3648;border-bottom-width:2px;border-radius:4px;padding:1px 5px;
+  }
+  .btn:focus-visible,select:focus-visible,input[type=range]:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+
+  .foot{
+    display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.02em;
+  }
+
+  @media (max-width:720px){
+    .top{flex-direction:column}
+    .hud{width:100%;justify-content:space-between}
+    .stat{text-align:left}
+    .stat.status{align-items:flex-start}
+    .hint{display:none}
+    .stat-value{font-size:24px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">
+        <i></i><i class="on"></i><i></i>
+        <i></i><i></i><i class="on"></i>
+        <i class="on"></i><i class="on"></i><i class="on"></i>
+      </div>
+      <div>
+        <h1>Game <em>of</em> Life</h1>
+        <p class="sub">Conway's cellular automaton &middot; B3/S23 &middot; 72 &times; 48 toroidal field</p>
+      </div>
+    </div>
+    <div class="hud">
+      <div class="stat">
+        <span class="stat-label">Generation</span>
+        <span class="stat-value amber" id="gen">000000</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Population</span>
+        <span class="stat-value" id="pop">00000</span>
+      </div>
+      <div class="stat status" id="statusWrap">
+        <span class="led" id="led"></span>
+        <span class="stat-value small" id="state">PAUSED</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="stage" id="stage">
+    <div class="stagebar">
+      <span>Field <b>72 &times; 48</b> &middot; edges wrap</span>
+      <span id="coords">&mdash;</span>
+    </div>
+    <canvas id="board" width="1008" height="672" aria-label="Game of Life grid"></canvas>
+  </main>
+
+  <section class="controls">
+    <div class="btn-group">
+      <button id="btnToggle" class="btn primary" type="button">
+        <span class="icon"></span><span id="toggleLabel">Start</span>
+      </button>
+      <button id="btnStep" class="btn" type="button">Step</button>
+      <button id="btnRandom" class="btn" type="button">Randomize</button>
+      <button id="btnClear" class="btn" type="button">Clear</button>
+    </div>
+
+    <label class="field">
+      <span class="field-label">Pattern</span>
+      <select id="pattern">
+        <option value="pulsar" selected>Pulsar</option>
+        <option value="glider">Glider</option>
+        <option value="gosper">Gosper Glider Gun</option>
+        <option value="lwss">Lightweight Spaceship</option>
+        <option value="pentomino">R-pentomino</option>
+        <option value="acorn">Acorn</option>
+        <option value="penta">Pentadecathlon</option>
+      </select>
+    </label>
+
+    <label class="field grow">
+      <span class="field-label">Speed</span>
+      <input type="range" id="speed" min="1" max="60" step="1" value="12">
+      <span class="field-value" id="speedVal">12 gen/s</span>
+    </label>
+
+    <div class="hint">click / drag to paint &middot; <kbd>space</kbd> run</div>
+  </section>
+
+  <footer class="foot">
+    <span>Born with exactly 3 neighbours &middot; survives with 2 or 3 &middot; cell colour = age</span>
+    <span><kbd>space</kbd> run/pause &middot; <kbd>S</kbd> step &middot; <kbd>R</kbd> random &middot; <kbd>C</kbd> clear</span>
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  var COLS = 72, ROWS = 48, CELL = 14;
+  var W = COLS * CELL, H = ROWS * CELL, N = COLS * ROWS;
+
+  var canvas = document.getElementById('board');
+  var ctx = canvas.getContext('2d');
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  var genEl = document.getElementById('gen');
+  var popEl = document.getElementById('pop');
+  var stateEl = document.getElementById('state');
+  var ledEl = document.getElementById('led');
+  var statusWrap = document.getElementById('statusWrap');
+  var stage = document.getElementById('stage');
+  var btnToggle = document.getElementById('btnToggle');
+  var toggleLabel = document.getElementById('toggleLabel');
+  var btnStep = document.getElementById('btnStep');
+  var btnRandom = document.getElementById('btnRandom');
+  var btnClear = document.getElementById('btnClear');
+  var patternSel = document.getElementById('pattern');
+  var speedEl = document.getElementById('speed');
+  var speedVal = document.getElementById('speedVal');
+  var coordsEl = document.getElementById('coords');
+
+  var grid = new Uint8Array(N);
+  var next = new Uint8Array(N);
+  var age  = new Uint16Array(N);
+  var heat = new Float32Array(N);
+
+  var gen = 0, pop = 0;
+  var running = false;
+  var speed = +speedEl.value;
+  var lastT = 0, acc = 0;
+
+  var PAL = ['#fff8e1', '#ffe9a3', '#ffd166', '#ffb454', '#ff9840', '#ef7d2b'];
+
+  function updateStats(){
+    genEl.textContent = String(gen).padStart(6, '0');
+    popEl.textContent = String(pop).padStart(5, '0');
+  }
+
+  function recount(){
+    var p = 0;
+    for (var i = 0; i < N; i++) p += grid[i];
+    pop = p;
+  }
+
+  function step(){
+    for (var y = 0; y < ROWS; y++){
+      var yu = ((y - 1 + ROWS) % ROWS) * COLS;
+      var ym = y * COLS;
+      var yd = ((y + 1) % ROWS) * COLS;
+      for (var x = 0; x < COLS; x++){
+        var xl = (x - 1 + COLS) % COLS;
+        var xr = (x + 1) % COLS;
+        var c = grid[yu + xl] + grid[yu + x] + grid[yu + xr] +
+                grid[ym + xl] + grid[ym + xr] +
+                grid[yd + xl] + grid[yd + x] + grid[yd + xr];
+        var a = grid[ym + x];
+        next[ym + x] = (a ? (c === 2 || c === 3) : (c === 3)) ? 1 : 0;
+      }
+    }
+    var tmp = grid; grid = next; next = tmp;
+    for (var i = 0; i < N; i++){
+      age[i] = grid[i] ? (age[i] < 65535 ? age[i] + 1 : 65535) : 0;
+    }
+    gen++;
+    recount();
+    updateStats();
+  }
+
+  function clearBoard(){
+    grid.fill(0); next.fill(0); age.fill(0); heat.fill(0);
+    gen = 0; pop = 0;
+    updateStats();
+  }
+
+  function randomize(){
+    clearBoard();
+    for (var i = 0; i < N; i++){
+      if (Math.random() < 0.26){ grid[i] = 1; age[i] = 1; }
+    }
+    recount();
+    updateStats();
+  }
+
+  function setCell(i, v){
+    if (grid[i] === v) return;
+    grid[i] = v;
+    age[i] = v ? 1 : 0;
+    if (v) heat[i] = 1;
+    pop += v ? 1 : -1;
+    updateStats();
+  }
+
+  var PATTERNS = {
+    glider: { rows: ['.O.', '..O', 'OOO'] },
+    pulsar: { rows: [
+      '..OOO...OOO..', '.............', 'O....O.O....O', 'O....O.O....O', 'O....O.O....O',
+      '..OOO...OOO..', '.............', '..OOO...OOO..', 'O....O.O....O', 'O....O.O....O',
+      'O....O.O....O', '.............', '..OOO...OOO..'
+    ]},
+    gosper: { rows: [
+      '........................O...........',
+      '......................O.O...........',
+      '............OO......OO............OO',
+      '...........O...O....OO............OO',
+      'OO........O.....O...OO..............',
+      'OO........O...O.OO....O.O...........',
+      '..........O.....O.......O...........',
+      '...........O...O....................',
+      '............OO......................'
+    ]},
+    lwss: { rows: ['.O..O..O.', 'O.....O..', 'O....O...', 'OOOO.OO..'] },
+    pentomino: { rows: ['.OO', 'OO.', '.O.'] },
+    acorn: { rows: ['.O......', '..OO.O..', '......OO'] },
+    penta: { rows: [
+      '.O.', '.O.', 'OOO', '.O.', '.O.', 'OO.', 'O.O', 'O.O',
+      'OO.', '.O.', '.O.', 'OOO', '.O.', '.O.', '.O.'
+    ]}
+  };
+
+  function loadPattern(key){
+    var p = PATTERNS[key];
+    if (!p) return;
+    clearBoard();
+    var h = p.rows.length;
+    var w = 0;
+    for (var r = 0; r < h; r++) if (p.rows[r].length > w) w = p.rows[r].length;
+    var ox = Math.max(0, Math.floor((COLS - w) / 2));
+    var oy = Math.max(0, Math.floor((ROWS - h) / 2));
+    for (var y = 0; y < h; y++){
+      var row = p.rows[y];
+      for (var x = 0; x < row.length; x++){
+        if (row.charAt(x) === 'O') setCell((oy + y) * COLS + (ox + x), 1);
+      }
+    }
+  }
+
+  function setRunning(v){
+    running = v;
+    toggleLabel.textContent = v ? 'Pause' : 'Start';
+    btnToggle.classList.toggle('running', v);
+    stage.classList.toggle('running', v);
+    statusWrap.classList.toggle('on', v);
+    stateEl.textContent = v ? 'RUNNING' : 'PAUSED';
+    if (v){ lastT = performance.now(); acc = 0; }
+  }
+
+  /* ---------- painting ---------- */
+  var painting = false, paintVal = 1;
+
+  function cellAt(e){
+    var r = canvas.getBoundingClientRect();
+    var x = Math.floor((e.clientX - r.left) / r.width * COLS);
+    var y = Math.floor((e.clientY - r.top) / r.height * ROWS);
+    if (x < 0 || y < 0 || x >= COLS || y >= ROWS) return null;
+    return { x: x, y: y };
+  }
+
+  canvas.addEventListener('pointerdown', function(e){
+    if (running) return;
+    var c = cellAt(e);
+    if (!c) return;
+    var i = c.y * COLS + c.x;
+    paintVal = grid[i] ? 0 : 1;
+    setCell(i, paintVal);
+    painting = true;
+    canvas.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+
+  canvas.addEventListener('pointermove', function(e){
+    var c = cellAt(e);
+    if (c){
+      coordsEl.textContent = 'x ' + String(c.x).padStart(2, '0') + ' · y ' + String(c.y).padStart(2, '0');
+      if (painting && !running) setCell(c.y * COLS + c.x, paintVal);
+    }
+  });
+
+  function endPaint(){ painting = false; }
+  canvas.addEventListener('pointerup', endPaint);
+  canvas.addEventListener('pointercancel', endPaint);
+  canvas.addEventListener('pointerleave', function(){ coordsEl.textContent = '—'; });
+
+  /* ---------- controls ---------- */
+  btnToggle.addEventListener('click', function(){ setRunning(!running); });
+  btnStep.addEventListener('click', step);
+  btnRandom.addEventListener('click', randomize);
+  btnClear.addEventListener('click', clearBoard);
+  patternSel.addEventListener('change', function(){
+    setRunning(false);
+    loadPattern(patternSel.value);
+  });
+
+  function applySpeed(){
+    speed = +speedEl.value;
+    speedVal.textContent = speed + ' gen/s';
+    var min = +speedEl.min, max = +speedEl.max;
+    var p = (speed - min) / (max - min) * 100;
+    speedEl.style.background = 'linear-gradient(90deg, var(--amber) ' + p + '%, #263041 ' + p + '%)';
+  }
+  speedEl.addEventListener('input', applySpeed);
+
+  window.addEventListener('keydown', function(e){
+    var t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.tagName === 'BUTTON')) return;
+    if (e.code === 'Space'){ e.preventDefault(); setRunning(!running); }
+    else if (e.key === 's' || e.key === 'S'){ step(); }
+    else if (e.key === 'r' || e.key === 'R'){ randomize(); }
+    else if (e.key === 'c' || e.key === 'C'){ clearBoard(); }
+  });
+
+  /* ---------- render ---------- */
+  function render(){
+    ctx.fillStyle = '#0b0f15';
+    ctx.fillRect(0, 0, W, H);
+
+    // phosphor heat trail
+    ctx.fillStyle = '#ff9840';
+    for (var i = 0; i < N; i++){
+      if (grid[i]){
+        heat[i] = 1;
+      } else if (heat[i] > 0.02){
+        ctx.globalAlpha = heat[i] * 0.3;
+        ctx.fillRect((i % COLS) * CELL, ((i / COLS) | 0) * CELL, CELL, CELL);
+      } else {
+        heat[i] = 0;
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    // alive cells, bucketed by age
+    var buckets = [[], [], [], [], [], []];
+    for (var j = 0; j < N; j++){
+      if (grid[j]) buckets[Math.min(age[j] - 1, 5)].push(j);
+    }
+    for (var b = 0; b < 6; b++){
+      var arr = buckets[b];
+      if (!arr.length) continue;
+      ctx.fillStyle = PAL[b];
+      ctx.beginPath();
+      for (var k = 0; k < arr.length; k++){
+        var idx = arr[k];
+        ctx.rect((idx % COLS) * CELL, ((idx / COLS) | 0) * CELL, CELL, CELL);
+      }
+      ctx.fill();
+    }
+
+    // cell borders
+    ctx.strokeStyle = '#1e2836';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (var x = 0; x <= COLS; x++){
+      var px = x * CELL + 0.5;
+      ctx.moveTo(px, 0); ctx.lineTo(px, H);
+    }
+    for (var y = 0; y <= ROWS; y++){
+      var py = y * CELL + 0.5;
+      ctx.moveTo(0, py); ctx.lineTo(W, py);
+    }
+    ctx.stroke();
+
+    ctx.strokeStyle = '#2a3648';
+    ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+  }
+
+  /* ---------- main loop (fixed tick via rAF accumulator) ---------- */
+  function frame(t){
+    requestAnimationFrame(frame);
+    var interval = 1000 / speed;
+    if (running){
+      if (!lastT) lastT = t;
+      acc += t - lastT;
+      lastT = t;
+      var n = 0;
+      while (acc >= interval && n < 10){ step(); acc -= interval; n++; }
+      if (n === 10) acc = 0;
+    } else {
+      lastT = t;
+      acc = 0;
+    }
+    render();
+  }
+
+  applySpeed();
+  loadPattern(patternSel.value);
+  updateStats();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

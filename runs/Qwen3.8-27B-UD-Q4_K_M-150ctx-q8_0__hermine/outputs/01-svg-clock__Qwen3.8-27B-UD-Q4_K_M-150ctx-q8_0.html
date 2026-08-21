@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Local Time — Analog Clock</title>
+<style>
+  :root {
+    --ink: #e9eef6;
+    --ink-dim: #93a5be;
+    --ink-faint: #7f90a9;
+    --accent: #ffb454;
+    --mono: "SFMono-Regular", "SF Mono", ui-monospace, "Cascadia Code", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body { min-height: 100%; }
+
+  body {
+    font-family: var(--sans);
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100svh;
+    overflow-x: hidden;
+    background:
+      radial-gradient(1200px 800px at 50% 30%, rgba(255, 180, 84, 0.06), transparent 62%),
+      radial-gradient(1000px 700px at 85% 100%, rgba(96, 140, 255, 0.055), transparent 60%),
+      radial-gradient(140% 120% at 50% 50%, #111a2c 0%, #0b1220 52%, #070b13 100%);
+  }
+
+  .stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 16px;
+  }
+
+  /* ---------- overline ---------- */
+  .overline {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 34px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.42em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px rgba(255, 180, 84, 0.85);
+    animation: pulse 1s ease-in-out infinite;
+  }
+
+  /* ---------- clock ---------- */
+  .clock-wrap {
+    position: relative;
+    width: clamp(320px, 92vw, 400px);
+  }
+
+  .rings {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 158%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .ring {
+    fill: none;
+    stroke: rgba(233, 238, 246, 0.05);
+    stroke-width: 1;
+  }
+
+  .ring-dash {
+    stroke: rgba(255, 180, 84, 0.14);
+    stroke-width: 2;
+    stroke-dasharray: 1 9;
+  }
+
+  .spin {
+    transform-origin: 320px 320px;
+    animation: spin 90s linear infinite;
+  }
+
+  #clock {
+    position: relative;
+    z-index: 1;
+    display: block;
+    width: 100%;
+    height: auto;
+    filter: drop-shadow(0 24px 48px rgba(0, 0, 0, 0.55));
+    transition: transform 0.5s ease, filter 0.5s ease;
+  }
+
+  .clock-wrap:hover #clock {
+    transform: translateY(-4px) scale(1.012);
+    filter: drop-shadow(0 34px 64px rgba(0, 0, 0, 0.6))
+            drop-shadow(0 0 26px rgba(255, 180, 84, 0.12));
+  }
+
+  /* dial pieces */
+  .bezel {
+    fill: none;
+    stroke: rgba(233, 238, 246, 0.18);
+    stroke-width: 2;
+  }
+
+  .track {
+    fill: none;
+    stroke: rgba(233, 238, 246, 0.08);
+    stroke-width: 1;
+  }
+
+  .tick {
+    stroke: rgba(233, 238, 246, 0.35);
+    stroke-width: 1.5;
+  }
+
+  .tick-hour {
+    stroke: var(--ink);
+    stroke-width: 3;
+  }
+
+  #numerals text {
+    font-family: var(--mono);
+    font-size: 22px;
+    fill: rgba(233, 238, 246, 0.72);
+    text-anchor: middle;
+    dominant-baseline: central;
+  }
+
+  #numerals text.card {
+    font-size: 27px;
+    font-weight: 600;
+    fill: #f4f8fd;
+  }
+
+  .dial-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 4px;
+    fill: rgba(233, 238, 246, 0.32);
+    text-anchor: middle;
+  }
+
+  /* hands */
+  .hand { transform-origin: 200px 200px; }
+
+  .hand-hour line {
+    stroke: #dfe7f3;
+    stroke-width: 8;
+    stroke-linecap: round;
+  }
+
+  .hand-minute line {
+    stroke: #eef3fa;
+    stroke-width: 5;
+    stroke-linecap: round;
+  }
+
+  .hand-second line {
+    stroke: var(--accent);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+  }
+
+  .hand-second circle { fill: var(--accent); }
+
+  .hand-second { transition: transform 0.28s cubic-bezier(0.35, 1.8, 0.4, 1); }
+  .hand-minute, .hand-hour { transition: transform 0.3s linear; }
+
+  .cap-outer { fill: #dfe7f3; }
+  .cap-inner { fill: var(--accent); }
+
+  /* ---------- digital readout ---------- */
+  .digital {
+    margin-top: 30px;
+    display: flex;
+    gap: 0.08em;
+    font-family: var(--mono);
+    font-size: clamp(2.4rem, 9vw, 3.4rem);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    font-variant-numeric: tabular-nums;
+    color: #f2f6fc;
+    text-shadow: 0 0 28px rgba(233, 238, 246, 0.15);
+  }
+
+  .colon {
+    color: var(--accent);
+    animation: pulse 1s ease-in-out infinite;
+  }
+
+  .date {
+    margin-top: 14px;
+    font-size: 0.76rem;
+    font-weight: 500;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.25; }
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hand, .dot, .colon, .spin {
+      animation: none !important;
+      transition: none !important;
+    }
+    #clock { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+  <main class="stage">
+    <header class="overline">
+      <span class="dot" aria-hidden="true"></span>
+      <span id="tz">Local time</span>
+    </header>
+
+    <div class="clock-wrap">
+      <svg class="rings" viewBox="0 0 640 640" aria-hidden="true">
+        <circle class="ring" cx="320" cy="320" r="318"/>
+        <g class="spin">
+          <circle class="ring ring-dash" cx="320" cy="320" r="292"/>
+        </g>
+        <circle class="ring" cx="320" cy="320" r="252"/>
+      </svg>
+
+      <svg id="clock" viewBox="0 0 400 400" role="img"
+           aria-label="Analog clock showing the current local time">
+        <defs>
+          <radialGradient id="dialGrad" cx="50%" cy="42%" r="72%">
+            <stop offset="0%"   stop-color="#182741"/>
+            <stop offset="70%"  stop-color="#101b30"/>
+            <stop offset="100%" stop-color="#0c1524"/>
+          </radialGradient>
+        </defs>
+
+        <circle class="bezel" cx="200" cy="200" r="193"/>
+        <circle cx="200" cy="200" r="184" fill="url(#dialGrad)"/>
+        <circle class="track" cx="200" cy="200" r="175"/>
+
+        <g id="ticks"></g>
+        <g id="numerals"></g>
+
+        <text class="dial-label" x="200" y="150">24H</text>
+        <text class="dial-label" x="200" y="262">LOCAL</text>
+
+        <g id="hand-hour" class="hand hand-hour">
+          <line x1="200" y1="214" x2="200" y2="106"/>
+        </g>
+        <g id="hand-minute" class="hand hand-minute">
+          <line x1="200" y1="218" x2="200" y2="74"/>
+        </g>
+        <g id="hand-second" class="hand hand-second">
+          <line x1="200" y1="234" x2="200" y2="62"/>
+          <circle cx="200" cy="228" r="5.5"/>
+        </g>
+
+        <circle class="cap-outer" cx="200" cy="200" r="8"/>
+        <circle class="cap-inner" cx="200" cy="200" r="3.5"/>
+      </svg>
+    </div>
+
+    <div class="digital" aria-hidden="true">
+      <span id="dh">00</span><span class="colon">:</span><span id="dm">00</span><span class="colon">:</span><span id="ds">00</span>
+    </div>
+
+    <p class="date" id="date"></p>
+  </main>
+
+<script>
+(function () {
+  'use strict';
+
+  var NS = 'http://www.w3.org/2000/svg';
+  var CX = 200, CY = 200;
+
+  /* ---- build tick marks: 60 total, every 5th is an hour tick ---- */
+  var ticks = document.getElementById('ticks');
+  for (var i = 0; i < 60; i++) {
+    var rad = (i * 6 - 90) * Math.PI / 180;
+    var isHour = i % 5 === 0;
+    var r1 = isHour ? 163 : 171;
+    var r2 = 179;
+    var l = document.createElementNS(NS, 'line');
+    l.setAttribute('x1', (CX + r1 * Math.cos(rad)).toFixed(2));
+    l.setAttribute('y1', (CY + r1 * Math.sin(rad)).toFixed(2));
+    l.setAttribute('x2', (CX + r2 * Math.cos(rad)).toFixed(2));
+    l.setAttribute('y2', (CY + r2 * Math.sin(rad)).toFixed(2));
+    l.setAttribute('class', isHour ? 'tick tick-hour' : 'tick');
+    ticks.appendChild(l);
+  }
+
+  /* ---- dial numerals ---- */
+  var nums = document.getElementById('numerals');
+  for (var n = 1; n <= 12; n++) {
+    var rad2 = (n * 30 - 90) * Math.PI / 180;
+    var rr = 142;
+    var t = document.createElementNS(NS, 'text');
+    t.setAttribute('x', (CX + rr * Math.cos(rad2)).toFixed(2));
+    t.setAttribute('y', (CY + rr * Math.sin(rad2)).toFixed(2));
+    if (n % 3 === 0) t.setAttribute('class', 'card');
+    t.textContent = String(n);
+    nums.appendChild(t);
+  }
+
+  /* ---- timezone label ---- */
+  var off = -new Date().getTimezoneOffset();
+  var sign = off < 0 ? '-' : '+';
+  var ah = Math.floor(Math.abs(off) / 60);
+  var am = Math.abs(off) % 60;
+  document.getElementById('tz').textContent =
+    'Local time · UTC' + sign + ah + (am ? ':' + String(am).padStart(2, '0') : '');
+
+  /* ---- elements ---- */
+  var hEl = document.getElementById('hand-hour');
+  var mEl = document.getElementById('hand-minute');
+  var sEl = document.getElementById('hand-second');
+  var dh  = document.getElementById('dh');
+  var dm  = document.getElementById('dm');
+  var ds  = document.getElementById('ds');
+  var dateEl = document.getElementById('date');
+
+  var MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  var DAYS   = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+
+  var aH = 0, aM = 0, aS = 0;
+  var first = true;
+
+  /* advance a hand's cumulative angle to target without ever rotating backwards */
+  function step(current, target) {
+    return current + ((target - (current % 360) + 360) % 360);
+  }
+
+  function tick() {
+    var now = new Date();
+    var h = now.getHours(), m = now.getMinutes(), s = now.getSeconds();
+
+    var tH = h * 30 + m * 0.5 + s / 120;
+    var tM = m * 6 + s * 0.1;
+    var tS = s * 6;
+
+    if (first) {
+      hEl.style.transition = 'none';
+      mEl.style.transition = 'none';
+      sEl.style.transition = 'none';
+      first = false;
+    }
+
+    aH = step(aH, tH);
+    aM = step(aM, tM);
+    aS = step(aS, tS);
+
+    hEl.style.transform = 'rotate(' + aH + 'deg)';
+    mEl.style.transform = 'rotate(' + aM + 'deg)';
+    sEl.style.transform = 'rotate(' + aS + 'deg)';
+
+    dh.textContent = String(h).padStart(2, '0');
+    dm.textContent = String(m).padStart(2, '0');
+    ds.textContent = String(s).padStart(2, '0');
+    dateEl.textContent =
+      DAYS[now.getDay()] + ' · ' + String(now.getDate()).padStart(2, '0') +
+      ' ' + MONTHS[now.getMonth()] + ' ' + now.getFullYear();
+
+    if (!first) {
+      requestAnimationFrame(function () {
+        hEl.style.transition = '';
+        mEl.style.transition = '';
+        sEl.style.transition = '';
+      });
+    }
+  }
+
+  /* re-align to the wall-clock second boundary every tick to avoid drift */
+  function loop() {
+    tick();
+    setTimeout(loop, 1000 - (Date.now() % 1000) + 5);
+  }
+
+  loop();
+})();
+</script>
+</body>
+</html>
