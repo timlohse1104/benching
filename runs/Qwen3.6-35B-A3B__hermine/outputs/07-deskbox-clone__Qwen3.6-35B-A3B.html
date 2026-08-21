@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>desk.box – Die smarte Bürosoftware für die Landwirtschaft</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--primary:#1a6dd4;
+--primary-dark:#1456a8;
+--primary-light:#e8f1fb;
+--accent:#00b894;
+--accent-dark:#009b7d;
+--dark:#1a1a2e;
+--gray-900:#212529;
+--gray-700:#495057;
+--gray-500:#6c757d;
+--gray-300:#dee2e6;
+--gray-100:#f8f9fa;
+--white:#ffffff;
+--radius:8px;
+--shadow:0 2px 16px rgba(0,0,0,.08);
+--shadow-lg:0 8px 32px rgba(0,0,0,.12);
+--transition:all .3s ease;
+}
+html{scroll-behavior:smooth}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;color:var(--gray-700);line-height:1.6;background:var(--white)}
+a{color:var(--primary);text-decoration:none;transition:var(--transition)}
+a:hover{color:var(--primary-dark)}
+img,svg{display:block;max-width:100%}
+.container{max-width:1200px;margin:0 auto;padding:0 24px}
+
+/* HEADER */
+.header{position:sticky;top:0;z-index:1000;background:var(--white);border-bottom:1px solid var(--gray-300);box-shadow:var(--shadow)}
+.header-inner{display:flex;align-items:center;justify-content:space-between;height:72px}
+.logo{display:flex;align-items:center;gap:8px;font-size:1.5rem;font-weight:800;color:var(--primary);letter-spacing:-.5px}
+.logo svg{width:36px;height:36px}
+.nav{display:flex;align-items:center;gap:4px}
+.nav-item{position:relative}
+.nav-link{display:flex;align-items:center;gap:4px;padding:8px 16px;font-size:.95rem;font-weight:500;color:var(--gray-700);border-radius:var(--radius);cursor:pointer;white-space:nowrap}
+.nav-link:hover{color:var(--primary);background:var(--primary-light)}
+.caret{width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-top:5px solid currentColor;transition:var(--transition)}
+.dropdown{position:absolute;top:100%;left:0;min-width:220px;background:var(--white);border:1px solid var(--gray-300);border-radius:var(--radius);box-shadow:var(--shadow-lg);opacity:0;visibility:hidden;transform:translateY(8px);transition:var(--transition);pointer-events:none;z-index:10}
+.nav-item:hover .dropdown,.nav-item.open .dropdown{opacity:1;visibility:visible;transform:translateY(0);pointer-events:auto}
+.dropdown a{display:block;padding:10px 16px;font-size:.9rem;color:var(--gray-700);border-radius:0}
+.dropdown a:hover{background:var(--primary-light);color:var(--primary)}
+.header-actions{display:flex;align-items:center;gap:12px}
+.login-link{padding:8px 16px;font-size:.9rem;font-weight:500;color:var(--gray-700);white-space:nowrap}
+.login-link:hover{color:var(--primary)}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 24px;font-size:.95rem;font-weight:600;border:none;border-radius:var(--radius);cursor:pointer;transition:var(--transition);white-space:nowrap;text-align:center}
+.btn-primary{background:var(--primary);color:var(--white)}
+.btn-primary:hover{background:var(--primary-dark);color:var(--white);transform:translateY(-1px);box-shadow:0 4px 12px rgba(26,109,212,.35)}
+.btn-accent{background:var(--accent);color:var(--white)}
+.btn-accent:hover{background:var(--accent-dark);color:var(--white);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,184,148,.35)}
+.btn-outline{background:transparent;color:var(--primary);border:2px solid var(--primary)}
+.btn-outline:hover{background:var(--primary);color:var(--white)}
+.btn-lg{padding:14px 32px;font-size:1.05rem}
+.hamburger{display:none;flex-direction:column;gap:5px;padding:8px;cursor:pointer;background:none;border:none}
+.hamburger span{display:block;width:24px;height:2px;background:var(--gray-700);transition:var(--transition);border-radius:2px}
+
+/* HERO */
+.hero{background:linear-gradient(135deg,#f0f7ff 0%,#e8f5e9 50%,#f0f7ff 100%);padding:80px 0 60px;overflow:hidden}
+.hero .container{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center}
+.hero-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:var(--white);border:1px solid var(--gray-300);border-radius:50px;font-size:.8rem;font-weight:600;color:var(--primary);margin-bottom:16px}
+.hero-badge svg{width:16px;height:16px}
+.hero h1{font-size:2.8rem;font-weight:800;color:var(--gray-900);line-height:1.15;margin-bottom:16px;letter-spacing:-.5px}
+.hero h1 span{color:var(--primary)}
+.trust-badges{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px}
+.trust-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:var(--white);border:1px solid var(--gray-300);border-radius:50px;font-size:.82rem;font-weight:500;color:var(--gray-700)}
+.trust-badge svg{width:18px;height:18px;color:var(--accent)}
+.hero p{font-size:1.1rem;color:var(--gray-700);margin-bottom:32px;max-width:540px}
+.hero-buttons{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:40px}
+.hero-media{position:relative;display:flex;gap:16px;align-items:center}
+.hero-person-placeholder{width:180px;height:280px;border-radius:16px;background:linear-gradient(135deg,#d4e7ff,#b8d4f0);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;flex-shrink:0;border:2px dashed var(--primary);opacity:.8}
+.hero-person-placeholder span{font-size:.75rem;color:var(--gray-500);font-weight:500}
+.hero-person-placeholder svg{width:64px;height:64px;color:var(--primary);opacity:.5}
+.hero-screenshot{flex:1;position:relative;border-radius:12px;overflow:hidden;box-shadow:var(--shadow-lg);border:1px solid var(--gray-300)}
+.screenshot-placeholder{width:100%;aspect-ratio:16/10;background:linear-gradient(135deg,#e3eaf5,#d1d9e6);display:flex;align-items:center;justify-content:center;position:relative}
+.screenshot-placeholder .inner{text-align:center;color:var(--gray-500)}
+.screenshot-placeholder .inner svg{width:48px;height:48px;margin:0 auto 8px;opacity:.4}
+.screenshot-placeholder .inner span{font-size:.8rem;display:block}
+.play-btn{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:64px;height:64px;background:rgba(255,255,255,.9);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition);box-shadow:0 4px 20px rgba(0,0,0,.15)}
+.play-btn:hover{transform:translate(-50%,-50%) scale(1.1);background:var(--white)}
+.play-btn svg{width:24px;height:24px;color:var(--primary);margin-left:3px}
+.play-btn-label{position:absolute;bottom:-28px;left:50%;transform:translateX(-50%);font-size:.75rem;color:var(--gray-500);white-space:nowrap}
+
+/* FEATURES ROW */
+.features-row{padding:60px 0;background:var(--white)}
+.features-row h2{text-align:center;font-size:1.8rem;font-weight:700;color:var(--gray-900);margin-bottom:40px}
+.features-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:24px}
+.feature-item{display:flex;align-items:flex-start;gap:12px;padding:16px;border-radius:var(--radius);transition:var(--transition)}
+.feature-item:hover{background:var(--gray-100)}
+.feature-icon{width:40px;height:40px;min-width:40px;border-radius:10px;background:var(--primary-light);display:flex;align-items:center;justify-content:center;color:var(--primary)}
+.feature-icon svg{width:22px;height:22px}
+.feature-item h3{font-size:.92rem;font-weight:600;color:var(--gray-900);margin-bottom:4px}
+.feature-item p{font-size:.82rem;color:var(--gray-500);line-height:1.5}
+
+/* DAS BIETET DIR */
+.benefits{padding:80px 0;background:var(--gray-100)}
+.benefits h2{text-align:center;font-size:2rem;font-weight:700;color:var(--gray-900);margin-bottom:48px}
+.benefits-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:20px}
+.benefit-card{background:var(--white);border-radius:12px;padding:32px 20px;text-align:center;border:1px solid var(--gray-300);transition:var(--transition)}
+.benefit-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);border-color:var(--primary)}
+.benefit-icon{width:64px;height:64px;margin:0 auto 16px;border-radius:16px;display:flex;align-items:center;justify-content:center}
+.benefit-icon svg{width:32px;height:32px}
+.benefit-card h3{font-size:1.1rem;font-weight:700;color:var(--gray-900);margin-bottom:8px}
+.benefit-card p{font-size:.88rem;color:var(--gray-500);margin-bottom:16px;line-height:1.6}
+.benefit-card a{font-size:.88rem;font-weight:600;color:var(--primary);display:inline-flex;align-items:center;gap:4px}
+.benefit-card a:hover{gap:8px}
+
+/* TESTIMONIALS */
+.testimonials{padding:80px 0;background:var(--white)}
+.testimonials h2{text-align:center;font-size:2rem;font-weight:700;color:var(--gray-900);margin-bottom:48px}
+.testimonials-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:24px}
+.testimonial-card{background:var(--gray-100);border-radius:12px;padding:28px;border:1px solid var(--gray-300);position:relative}
+.testimonial-card::before{content:"\201C";font-size:3rem;color:var(--primary);opacity:.3;position:absolute;top:12px;left:20px;font-family:Georgia,serif;line-height:1}
+.testimonial-card blockquote{font-size:.95rem;color:var(--gray-700);font-style:italic;margin-bottom:16px;padding-top:20px;line-height:1.7}
+.testimonial-author{display:flex;align-items:center;gap:12px}
+.testimonial-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;color:var(--white);font-weight:700;font-size:.9rem}
+.testimonial-name{font-size:.9rem;font-weight:600;color:var(--gray-900)}
+.testimonial-role{font-size:.8rem;color:var(--gray-500)}
+
+/* BLOG */
+.blog{padding:80px 0;background:var(--gray-100)}
+.blog h2{text-align:center;font-size:2rem;font-weight:700;color:var(--gray-900);margin-bottom:48px}
+.blog-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.blog-card{background:var(--white);border-radius:12px;overflow:hidden;border:1px solid var(--gray-300);transition:var(--transition)}
+.blog-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg)}
+.blog-image{width:100%;aspect-ratio:16/9;background:linear-gradient(135deg,#d4e7ff,#b8d4f0);display:flex;align-items:center;justify-content:center}
+.blog-image svg{width:40px;height:40px;color:var(--primary);opacity:.4}
+.blog-content{padding:20px}
+.blog-meta{font-size:.78rem;color:var(--gray-500);margin-bottom:8px}
+.blog-content h3{font-size:1.05rem;font-weight:700;color:var(--gray-900);margin-bottom:8px;line-height:1.4}
+.blog-content p{font-size:.88rem;color:var(--gray-500);margin-bottom:16px;line-height:1.6}
+.blog-content a{font-size:.88rem;font-weight:600;color:var(--primary);display:inline-flex;align-items:center;gap:4px}
+
+/* CTA BAND */
+.cta-band{padding:80px 0;background:linear-gradient(135deg,var(--primary) 0%,#0d47a1 100%);color:var(--white);text-align:center}
+.cta-band h2{font-size:2.4rem;font-weight:800;margin-bottom:12px}
+.cta-band p{font-size:1.1rem;opacity:.9;margin-bottom:32px}
+.cta-band .btn-accent{padding:16px 40px;font-size:1.1rem}
+
+/* FOOTER */
+.footer{background:var(--dark);color:var(--gray-300);padding:60px 0 0}
+.footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1.5fr;gap:40px;padding-bottom:40px;border-bottom:1px solid rgba(255,255,255,.1)}
+.footer-logo{display:flex;align-items:center;gap:8px;font-size:1.3rem;font-weight:800;color:var(--white);margin-bottom:16px}
+.footer-logo svg{width:32px;height:32px}
+.footer-desc{font-size:.88rem;line-height:1.7;margin-bottom:16px;opacity:.7}
+.cert-badges{display:flex;gap:12px;margin-top:12px}
+.cert-badge{padding:6px 12px;border:1px solid rgba(255,255,255,.2);border-radius:6px;font-size:.72rem;font-weight:600;color:var(--gray-300);display:flex;align-items:center;gap:6px}
+.cert-badge svg{width:16px;height:16px}
+.footer h4{font-size:.95rem;font-weight:700;color:var(--white);margin-bottom:16px}
+.footer ul{list-style:none}
+.footer ul li{margin-bottom:8px}
+.footer ul a{color:var(--gray-300);font-size:.88rem;opacity:.7;transition:var(--transition)}
+.footer ul a:hover{opacity:1;color:var(--white)}
+.footer-contact p{font-size:.88rem;margin-bottom:6px;opacity:.8}
+.footer-contact svg{width:16px;height:16px;vertical-align:middle;margin-right:6px;opacity:.6}
+.social-links{display:flex;gap:12px;margin-top:16px}
+.social-link{width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;color:var(--gray-300);transition:var(--transition)}
+.social-link:hover{background:var(--primary);border-color:var(--primary);color:var(--white)}
+.social-link svg{width:18px;height:18px}
+.footer-bottom{display:flex;justify-content:space-between;align-items:center;padding:20px 0;font-size:.82rem;opacity:.6;flex-wrap:wrap;gap:12px}
+.footer-bottom a{color:var(--gray-300)}
+.footer-bottom a:hover{color:var(--white)}
+
+/* MOBILE NAV */
+.mobile-nav{display:none;position:fixed;top:72px;left:0;right:0;bottom:0;background:var(--white);z-index:999;padding:24px;overflow-y:auto;transform:translateX(100%);transition:var(--transition)}
+.mobile-nav.open{transform:translateX(0)}
+.mobile-nav a,.mobile-nav .nav-link{display:block;padding:12px 0;font-size:1.1rem;color:var(--gray-700);border-bottom:1px solid var(--gray-300)}
+.mobile-nav .nav-link{display:flex;justify-content:space-between;align-items:center}
+.mobile-nav .dropdown{position:static;box-shadow:none;border:none;opacity:1;visibility:visible;transform:none;display:none}
+.mobile-nav .dropdown.open{display:block}
+.mobile-nav .dropdown a{padding:8px 0 8px 16px;font-size:.95rem}
+.mobile-nav .btn{width:100%;margin-top:16px}
+
+/* RESPONSIVE */
+@media(max-width:1024px){
+.features-grid{grid-template-columns:repeat(2,1fr)}
+.benefits-grid{grid-template-columns:repeat(3,1fr)}
+.footer-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:768px){
+.hamburger{display:flex}
+.nav,.header-actions .login-link,.header-actions .btn-primary{display:none}
+.mobile-nav.show{display:block}
+.hero .container{grid-template-columns:1fr;text-align:center}
+.hero h1{font-size:2rem}
+.hero p{margin-left:auto;margin-right:auto}
+.hero-buttons{justify-content:center}
+.hero-media{justify-content:center}
+.hero-person-placeholder{width:140px;height:200px}
+.features-grid{grid-template-columns:1fr}
+.benefits-grid{grid-template-columns:repeat(2,1fr)}
+.testimonials-grid{grid-template-columns:1fr}
+.blog-grid{grid-template-columns:1fr}
+.cta-band h2{font-size:1.8rem}
+.footer-grid{grid-template-columns:1fr}
+}
+@media(max-width:480px){
+.benefits-grid{grid-template-columns:1fr}
+.hero h1{font-size:1.6rem}
+.hero-buttons{flex-direction:column}
+.hero-buttons .btn{width:100%}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+<div class="container header-inner">
+<a href="#" class="logo">
+<svg viewBox="0 0 36 36" fill="none"><rect x="2" y="2" width="32" height="32" rx="8" fill="#1a6dd4"/><rect x="8" y="12" width="20" height="3" rx="1.5" fill="#fff" opacity=".9"/><rect x="8" y="18" width="14" height="3" rx="1.5" fill="#fff" opacity=".6"/><rect x="8" y="24" width="18" height="3" rx="1.5" fill="#fff" opacity=".4"/></svg>
+desk.box
+</a>
+<nav class="nav" id="mainNav">
+<div class="nav-item" onmouseenter="this.classList.add('open')" onmouseleave="this.classList.remove('open')">
+<span class="nav-link">Funktionen <span class="caret"></span></span>
+<div class="dropdown">
+<a href="#">Faktura &amp; Buchhaltung</a>
+<a href="#">Banking &amp; Zahlungsverkehr</a>
+<a href="#">Dokumentenmanagement</a>
+<a href="#">Adressbuch &amp; Kontakte</a>
+<a href="#">Berichte &amp; Auswertungen</a>
+</div>
+</div>
+<div class="nav-item" onmouseenter="this.classList.add('open')" onmouseleave="this.classList.remove('open')">
+<span class="nav-link">Preise <span class="caret"></span></span>
+<div class="dropdown">
+<a href="#">Starter-Paket</a>
+<a href="#">Business-Paket</a>
+<a href="#">Enterprise-Paket</a>
+<a href="#">Feature-Vergleich</a>
+</div>
+</div>
+<div class="nav-item" onmouseenter="this.classList.add('open')" onmouseleave="this.classList.remove('open')">
+<span class="nav-link">Service <span class="caret"></span></span>
+<div class="dropdown">
+<a href="#">Hilfe-Center</a>
+<a href="#">Schulungen</a>
+<a href="#">Einarbeitung</a>
+<a href="#">Kontakt</a>
+</div>
+</div>
+</nav>
+<div class="header-actions">
+<a href="#" class="login-link">Login</a>
+<button class="btn btn-primary">Jetzt testen</button>
+<button class="hamburger" id="hamburger" aria-label="Menü öffnen" onclick="toggleMobileNav()">
+<span></span><span></span><span></span>
+</button>
+</div>
+</div>
+</header>
+
+<!-- MOBILE NAV -->
+<div class="mobile-nav" id="mobileNav">
+<a href="#">Funktionen</a>
+<div style="padding:4px 0">
+<a href="#" class="nav-link" onclick="toggleMobileDropdown(event)">Faktura & Buchhaltung <span class="caret"></span></a>
+<div class="dropdown open">
+<a href="#">Banking & Zahlungsverkehr</a>
+<a href="#">Dokumentenmanagement</a>
+<a href="#">Adressbuch &amp; Kontakte</a>
+</div>
+</div>
+<a href="#">Preise</a>
+<a href="#">Service</a>
+<a href="#" class="login-link" style="border:none">Login</a>
+<button class="btn btn-primary" style="width:100%;margin-top:16px">Jetzt testen</button>
+</div>
+
+<!-- HERO -->
+<section class="hero">
+<div class="container">
+<div class="hero-content">
+<div class="hero-badge">
+<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0l2 5h5l-4 3.5 1.5 5L8 10.5 3.5 13.5 5 8.5 1 5h5z"/></svg>
+Nr. 1 in der Landwirtschaft
+</div>
+<h1>desk.box – <span>Die smarte Bürosoftware</span> für die Landwirtschaft</h1>
+<div class="trust-badges">
+<span class="trust-badge">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+GoBD zertifiziert
+</span>
+<span class="trust-badge">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+Server in Deutschland
+</span>
+<span class="trust-badge">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="M9 15l3-3 3 3"/></svg>
+E-Rechnung
+</span>
+</div>
+<p>desk.box ist die komplette Bürosoftware für landwirtschaftliche Betriebe. Verwalten Sie Ihre Buchhaltung, Faktura, Banking und Dokumente – alles an einem sicheren Ort, direkt im Browser.</p>
+<div class="hero-buttons">
+<button class="btn btn-primary btn-lg">Kostenlos beraten lassen</button>
+<button class="btn btn-accent btn-lg">Jetzt kostenlos testen</button>
+</div>
+</div>
+<div class="hero-media">
+<div class="hero-person-placeholder">
+<svg viewBox="0 0 64 64" fill="currentColor"><circle cx="32" cy="22" r="12"/><path d="M8 60c0-13.3 10.7-24 24-24s24 10.7 24 24"/></svg>
+<span>Person</span>
+</div>
+<div class="hero-screenshot">
+<div class="screenshot-placeholder">
+<div class="inner">
+<svg viewBox="0 0 48 48" fill="currentColor"><rect x="4" y="4" width="40" height="40" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><rect x="12" y="14" width="24" height="3" rx="1.5"/><rect x="12" y="22" width="18" height="3" rx="1.5"/><rect x="12" y="30" width="20" height="3" rx="1.5"/></svg>
+<span>Produkt-Screenshot</span>
+</div>
+<div class="play-btn" title="Video abspielen">
+<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+</div>
+<span class="play-btn-label">Video abspielen</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- FEATURES ROW -->
+<section class="features-row">
+<div class="container">
+<h2>Alles was Ihr braucht – in einer Software</h2>
+<div class="features-grid">
+<div class="feature-item">
+<div class="feature-icon">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6"/><path d="M23 11h-6"/></svg>
+</div>
+<div>
+<h3>Direkte Schnittstelle zu deinem Steuerbüro</h3>
+<p>Nahtloser Datenaustausch mit Ihrem Steuerberater</p>
+</div>
+</div>
+<div class="feature-item">
+<div class="feature-icon">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
+</div>
+<div>
+<h3>E-Rechnung inklusive</h3>
+<p>Empfangen und versenden Sie E-Rechnungen direkt</p>
+</div>
+</div>
+<div class="feature-item">
+<div class="feature-icon">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 10h20"/><path d="M12 4v16"/></svg>
+</div>
+<div>
+<h3>Vollständiges Banking</h3>
+<p>Bankverbindungen, SEPA-Lastschriften und mehr</p>
+</div>
+</div>
+<div class="feature-item">
+<div class="feature-icon">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+</div>
+<div>
+<h3>Intelligente Volltextsuche durch alle Dokumente</h3>
+<p>Finden Sie sofort jedes Dokument</p>
+</div>
+</div>
+<div class="feature-item">
+<div class="feature-icon">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+</div>
+<div>
+<h3>Alle deine Betriebe auf einen Blick</h3>
+<p>Mandantenfähig und übersichtlich</p>
+</div>
+</div>
+<div class="feature-item">
+<div class="feature-icon">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+</div>
+<div>
+<h3>Einfacher Workflow</h3>
+<p>Automatisierte Prozesse sparen Zeit</p>
+</div>
+</div>
+<div class="feature-item">
+<div class="feature-icon">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+</div>
+<div>
+<h3>Alle Dokumente in deiner Hosentasche</h3>
+<p>Mobiles Arbeiten von überall</p>
+</div>
+</div>
+<div class="feature-item">
+<div class="feature-icon">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+</div>
+<div>
+<h3>Sichere und gesetzeskonforme Archivierung</h3>
+<p>GoBD-konform und DSGVO-konform</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- DAS BIETET DIR -->
+<section class="benefits">
+<div class="container">
+<h2>Das bietet dir desk.box</h2>
+<div class="benefits-grid">
+<div class="benefit-card">
+<div class="benefit-icon" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)">
+<svg viewBox="0 0 32 32" fill="none" stroke="#1a6dd4" stroke-width="2"><rect x="4" y="6" width="24" height="18" rx="2"/><path d="M4 12h24"/><path d="M10 18h4"/><path d="M10 22h6"/></svg>
+</div>
+<h3>Schreibtisch</h3>
+<p>Ihr zentraler Arbeitsbereich mit allen wichtigen Funktionen und schnellen Zugriffen auf Ihre täglichen Aufgaben.</p>
+<a href="#">Mehr erfahren <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+</div>
+<div class="benefit-card">
+<div class="benefit-icon" style="background:linear-gradient(135deg,#e8f5e9,#c8e6c9)">
+<svg viewBox="0 0 32 32" fill="none" stroke="#00b894" stroke-width="2"><rect x="3" y="6" width="26" height="20" rx="2"/><path d="M3 12h26"/><circle cx="10" cy="18" r="1.5" fill="#00b894"/><circle cx="16" cy="18" r="1.5" fill="#00b894"/><circle cx="22" cy="18" r="1.5" fill="#00b894"/><circle cx="10" cy="22" r="1.5" fill="#00b894"/><circle cx="16" cy="22" r="1.5" fill="#00b894"/></svg>
+</div>
+<h3>Banking</h3>
+<p>Sichere Bankverbindungen, SEPA-Lastschriften, Abbuchungs- und Überweisungen – alles direkt in der Software.</p>
+<a href="#">Mehr erfahren <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+</div>
+<div class="benefit-card">
+<div class="benefit-icon" style="background:linear-gradient(135deg,#fff3e0,#ffe0b2)">
+<svg viewBox="0 0 32 32" fill="none" stroke="#f57c00" stroke-width="2"><path d="M6 4h10l4 4h6v20H6z"/><path d="M16 4v8h8"/></svg>
+</div>
+<h3>Aktenschrank</h3>
+<p>Strukturierte Dokumentenarchivierung mit Volltextsuche, Scan-Funktion und GoBD-konformer Speicherung.</p>
+<a href="#">Mehr erfahren <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+</div>
+<div class="benefit-card">
+<div class="benefit-icon" style="background:linear-gradient(135deg,#f3e5f5,#e1bee7)">
+<svg viewBox="0 0 32 32" fill="none" stroke="#7b1fa2" stroke-width="2"><rect x="4" y="4" width="24" height="24" rx="2"/><path d="M4 10h24"/><path d="M10 16h12"/><path d="M10 20h8"/></svg>
+</div>
+<h3>Faktura</h3>
+<p>Erstellen, versenden und verfolgen Sie Ihre Rechnungen – inklusive E-Rechnung und automatischer Mahnwesen.</p>
+<a href="#">Mehr erfahren <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+</div>
+<div class="benefit-card">
+<div class="benefit-icon" style="background:linear-gradient(135deg,#e0f7fa,#b2ebf2)">
+<svg viewBox="0 0 32 32" fill="none" stroke="#00838f" stroke-width="2"><circle cx="16" cy="12" r="6"/><path d="M6 28c0-5.5 4.5-10 10-10s10 4.5 10 10"/><path d="M22 8l4 4"/><path d="M24 12h6"/></svg>
+</div>
+<h3>Adressbuch</h3>
+<p>Alle Kontakte, Lieferanten und Kunden zentral verwaltet – mit Suchfunktion und Zuordnung zu Rechnungen.</p>
+<a href="#">Mehr erfahren <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+</div>
+</div>
+</div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="testimonials">
+<div class="container">
+<h2>Was unsere Kunden sagen</h2>
+<div class="testimonials-grid">
+<div class="testimonial-card">
+<blockquote>Desk.box hat unsere Büroprozesse komplett verändert. Alles ist übersichtlich und wir sparen jeden Tag wertvolle Zeit bei der Buchhaltung.</blockquote>
+<div class="testimonial-author">
+<div class="testimonial-avatar">NA</div>
+<div>
+<div class="testimonial-name">Nico Ahlmann</div>
+<div class="testimonial-role">Hof Ahlmann, Groß Tessin</div>
+</div>
+</div>
+</div>
+<div class="testimonial-card">
+<blockquote>Dank der direkten Schnittstelle zum Steuerbüro entfällt der ganze Papierkram. Die E-Rechnung funktioniert einwandfrei und spart uns enorm viel Arbeit.</blockquote>
+<div class="testimonial-author">
+<div class="testimonial-avatar">MK</div>
+<div>
+<div class="testimonial-name">Maria Kretschmann</div>
+<div class="testimonial-role">Landgut Kretschmann, Schleswig-Holstein</div>
+</div>
+</div>
+</div>
+<div class="testimonial-card">
+<blockquote>Die mobile Nutzung ist genial – ich kann von der Baustelle aus Rechnungen freigebe und das Banking erledigen. Desk.box ist aus unserem Alltag nicht mehr wegzudenken.</blockquote>
+<div class="testimonial-author">
+<div class="testimonial-avatar">TW</div>
+<div>
+<div class="testimonial-name">Thomas Wiese</div>
+<div class="testimonial-role">Gutsbetrieb Wiese, Mecklenburg</div>
+</div>
+</div>
+</div>
+<div class="testimonial-card">
+<blockquote>Der Support ist erstklassig und die Software ist extrem benutzerfreundlich. Auch meine Mitarbeiter ohne IT-Kenntnisse kommen sofort zurecht.</blockquote>
+<div class="testimonial-author">
+<div class="testimonial-avatar">SB</div>
+<div>
+<div class="testimonial-name">Stefan Braun</div>
+<div class="testimonial-role">Landwirtschaft Braun, Bayern</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- BLOG -->
+<section class="blog">
+<div class="container">
+<h2>Aktuelles &amp; Wissenswertes</h2>
+<div class="blog-grid">
+<div class="blog-card">
+<div class="blog-image">
+<svg viewBox="0 0 48 48" fill="currentColor"><rect x="4" y="4" width="40" height="40" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><rect x="12" y="14" width="24" height="3" rx="1.5"/><rect x="12" y="22" width="18" height="3" rx="1.5"/><rect x="12" y="30" width="20" height="3" rx="1.5"/></svg>
+</div>
+<div class="blog-content">
+<div class="blog-meta">15. März 2026 · E-Rechnung</div>
+<h3>E-Rechnung ab Juli 2025: Was landwirtschaftliche Betriebe jetzt wissen müssen</h3>
+<p>Die Pflicht zur E-Rechnung im B2B-Bereich tritt in die nächste Phase ein. Wir erklären, was Sie tun müssen.</p>
+<a href="#">Weiterlesen <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+</div>
+</div>
+<div class="blog-card">
+<div class="blog-image" style="background:linear-gradient(135deg,#c8e6c9,#a5d6a7)">
+<svg viewBox="0 0 48 48" fill="currentColor"><rect x="4" y="4" width="40" height="40" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><rect x="12" y="14" width="24" height="3" rx="1.5"/><rect x="12" y="22" width="18" height="3" rx="1.5"/><rect x="12" y="30" width="20" height="3" rx="1.5"/></svg>
+</div>
+<div class="blog-content">
+<div class="blog-meta">28. Februar 2026 · Tipps</div>
+<h3>5 Tipps für eine digitale Dokumentenarchivierung auf dem Bauernhof</h3>
+<p>So organisieren Sie Ihre Papiere und Dateien effizient – mit oder ohne Scanner.</p>
+<a href="#">Weiterlesen <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+</div>
+</div>
+<div class="blog-card">
+<div class="blog-image" style="background:linear-gradient(135deg,#e1bee7,#ce93d8)">
+<svg viewBox="0 0 48 48" fill="currentColor"><rect x="4" y="4" width="40" height="40" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><rect x="12" y="14" width="24" height="3" rx="1.5"/><rect x="12" y="22" width="18" height="3" rx="1.5"/><rect x="12" y="30" width="20" height="3" rx="1.5"/></svg>
+</div>
+<div class="blog-content">
+<div class="blog-meta">10. Januar 2026 · Neuerungen</div>
+<h3>Neu in desk.box: Volltextsuche durch alle eingescannten Dokumente</h3>
+<p>Unsere neue Suchfunktion durchsucht auch gescannte PDFs – dank integrierter OCR-Technologie.</p>
+<a href="#">Weiterlesen <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- CTA BAND -->
+<section class="cta-band">
+<div class="container">
+<h2>60 Tage kostenlos testen</h2>
+<p>Überzeugen Sie sich selbst – ohne Verpflichtung und ohne Kreditkarte.</p>
+<button class="btn btn-accent">Jetzt registrieren</button>
+</div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+<div class="container">
+<div class="footer-grid">
+<div>
+<div class="footer-logo">
+<svg viewBox="0 0 36 36" fill="none"><rect x="2" y="2" width="32" height="32" rx="8" fill="#1a6dd4"/><rect x="8" y="12" width="20" height="3" rx="1.5" fill="#fff" opacity=".9"/><rect x="8" y="18" width="14" height="3" rx="1.5" fill="#fff" opacity=".6"/><rect x="8" y="24" width="18" height="3" rx="1.5" fill="#fff" opacity=".4"/></svg>
+desk.box
+</div>
+<p class="footer-desc">Die smarte Bürosoftware für die Landwirtschaft. GoBD-zertifiziert, Server in Deutschland, E-Rechnung inklusive.</p>
+<div class="cert-badges">
+<span class="cert-badge">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+GoBD
+</span>
+<span class="cert-badge">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+DSGVO
+</span>
+</div>
+</div>
+<div>
+<h4>Produkt</h4>
+<ul>
+<li><a href="#">Funktionen</a></li>
+<li><a href="#">Preise</a></li>
+<li><a href="#">E-Rechnung</a></li>
+<li><a href="#">Banking</a></li>
+<li><a href="#">Dokumentenmanagement</a></li>
+<li><a href="#">Integrations</a></li>
+</ul>
+</div>
+<div>
+<h4>Unternehmen</h4>
+<ul>
+<li><a href="#">Über uns</a></li>
+<li><a href="#">Karriere</a></li>
+<li><a href="#">Partner werden</a></li>
+<li><a href="#">Presse</a></li>
+<li><a href="#">Datenschutz</a></li>
+<li><a href="#">AGB</a></li>
+</ul>
+</div>
+<div>
+<h4>Kontakt</h4>
+<div class="footer-contact">
+<p>
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
++49(0)431 / 530 154 18
+</p>
+<p>
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M22 6l-10 7L2 6"/></svg>
+support(at)deskbox-office.de
+</p>
+<p>
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+Supportzeiten: Mo bis Fr: 08:00 - 16:00 Uhr
+</p>
+</div>
+<div class="social-links">
+<a href="#" class="social-link" aria-label="LinkedIn">
+<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+</a>
+<a href="#" class="social-link" aria-label="Instagram">
+<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+</a>
+<a href="#" class="social-link" aria-label="YouTube">
+<svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+</a>
+<a href="#" class="social-link" aria-label="Facebook">
+<svg viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+</a>
+<a href="#" class="social-link" aria-label="WhatsApp">
+<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.885 9.888-9.885 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.885-9.885 9.885m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+</a>
+</div>
+</div>
+</div>
+<div class="footer-bottom">
+<span>© 2026 stadt.werk konzeption.text.gestaltung GmbH</span>
+<div style="display:flex;gap:16px">
+<a href="#">Impressum</a>
+<a href="#">Datenschutz</a>
+<a href="#">AGB</a>
+<a href="#">Cookie-Einstellungen</a>
+</div>
+</div>
+</div>
+</footer>
+
+<script>
+function toggleMobileNav(){
+var nav=document.getElementById('mobileNav');
+var btn=document.getElementById('hamburger');
+nav.classList.toggle('show');
+var spans=btn.querySelectorAll('span');
+if(nav.classList.contains('show')){
+spans[0].style.transform='rotate(45deg) translate(5px,5px)';
+spans[1].style.opacity='0';
+spans[2].style.transform='rotate(-45deg) translate(5px,-5px)';
+document.body.style.overflow='hidden';
+}else{
+spans[0].style.transform='';
+spans[1].style.opacity='';
+spans[2].style.transform='';
+document.body.style.overflow='';
+}
+}
+function toggleMobileDropdown(e){
+e.preventDefault();
+var dropdown=e.target.parentElement.querySelector('.dropdown');
+if(dropdown){
+dropdown.classList.toggle('open');
+}
+}
+document.addEventListener('click',function(e){
+var navItems=document.querySelectorAll('.nav-item');
+navItems.forEach(function(item){
+if(!item.contains(e.target)){
+item.classList.remove('open');
+}
+});
+});
+</script>
+</body>
+</html>

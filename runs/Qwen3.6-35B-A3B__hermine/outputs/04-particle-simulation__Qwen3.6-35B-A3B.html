@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Particle Simulation</title>
+<style>
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #06060e;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: #c8cdd5;
+}
+
+canvas {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+}
+
+#fps-counter {
+    position: fixed;
+    top: 12px;
+    right: 14px;
+    background: rgba(10, 10, 25, 0.75);
+    backdrop-filter: blur(8px);
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    color: #7ecfff;
+    border: 1px solid rgba(126, 207, 255, 0.15);
+    z-index: 10;
+    user-select: none;
+}
+
+#control-panel {
+    position: fixed;
+    top: 12px;
+    left: 14px;
+    background: rgba(10, 10, 25, 0.8);
+    backdrop-filter: blur(12px);
+    padding: 16px 20px;
+    border-radius: 10px;
+    border: 1px solid rgba(126, 207, 255, 0.12);
+    z-index: 10;
+    min-width: 220px;
+    user-select: none;
+}
+
+#control-panel h2 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #a0b4cc;
+    margin-bottom: 14px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.control-row {
+    margin-bottom: 12px;
+}
+
+.control-row label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: #8a9bb0;
+    margin-bottom: 5px;
+}
+
+.control-row label span.value {
+    color: #7ecfff;
+    font-variant-numeric: tabular-nums;
+    min-width: 36px;
+    text-align: right;
+}
+
+input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(126, 207, 255, 0.15);
+    outline: none;
+    cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #7ecfff;
+    border: 2px solid #0a0a19;
+    cursor: pointer;
+    box-shadow: 0 0 6px rgba(126, 207, 255, 0.4);
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #7ecfff;
+    border: 2px solid #0a0a19;
+    cursor: pointer;
+    box-shadow: 0 0 6px rgba(126, 207, 255, 0.4);
+}
+
+.mode-toggle {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.mode-btn {
+    flex: 1;
+    padding: 5px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid rgba(126, 207, 255, 0.2);
+    border-radius: 5px;
+    background: rgba(126, 207, 255, 0.05);
+    color: #6a8aaa;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.mode-btn.active {
+    background: rgba(126, 207, 255, 0.2);
+    color: #7ecfff;
+    border-color: rgba(126, 207, 255, 0.5);
+    box-shadow: 0 0 8px rgba(126, 207, 255, 0.15);
+}
+
+.mode-btn:hover:not(.active) {
+    background: rgba(126, 207, 255, 0.1);
+    color: #a0b4cc;
+}
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div id="fps-counter">FPS: --</div>
+
+<div id="control-panel">
+    <h2>Particles</h2>
+    <div class="control-row">
+        <label>Count <span class="value" id="count-val">400</span></label>
+        <input type="range" id="count-slider" min="50" max="1500" step="10" value="400">
+    </div>
+    <div class="control-row">
+        <label>Gravity <span class="value" id="gravity-val">0.15</span></label>
+        <input type="range" id="gravity-slider" min="0" max="0.5" step="0.01" value="0.15">
+    </div>
+    <div class="control-row">
+        <label>Attraction <span class="value" id="attraction-val">1.0</span></label>
+        <input type="range" id="attraction-slider" min="0" max="5" step="0.1" value="1.0">
+    </div>
+    <div class="control-row">
+        <label>Friction <span class="value" id="friction-val">0.98</span></label>
+        <input type="range" id="friction-slider" min="0.9" max="1.0" step="0.005" value="0.98">
+    </div>
+    <div class="control-row">
+        <label>Mode</label>
+        <div class="mode-toggle">
+            <button class="mode-btn active" data-mode="attract">Attract</button>
+            <button class="mode-btn" data-mode="repel">Repel</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+
+    var canvas = document.getElementById('canvas');
+    var ctx = canvas.getContext('2d');
+
+    var fpsEl = document.getElementById('fps-counter');
+    var countSlider = document.getElementById('count-slider');
+    var gravitySlider = document.getElementById('gravity-slider');
+    var attractionSlider = document.getElementById('attraction-slider');
+    var frictionSlider = document.getElementById('friction-slider');
+    var countVal = document.getElementById('count-val');
+    var gravityVal = document.getElementById('gravity-val');
+    var attractionVal = document.getElementById('attraction-val');
+    var frictionVal = document.getElementById('friction-val');
+    var modeBtns = document.querySelectorAll('.mode-btn');
+
+    var W, H;
+    var particles = [];
+    var mouseX = -9999, mouseY = -9999;
+    var mouseOnCanvas = false;
+    var targetCount = 400;
+    var gravity = 0.15;
+    var attractionStrength = 1.0;
+    var friction = 0.98;
+    var interactMode = 'attract';
+
+    var colorPalettes = [
+        { r: 100, g: 180, b: 255 },
+        { r: 160, g: 120, b: 255 },
+        { r: 80, g: 220, b: 200 },
+        { r: 200, g: 140, b: 255 },
+        { r: 100, g: 200, b: 255 },
+        { r: 140, g: 100, b: 220 },
+        { r: 80, g: 240, b: 180 },
+        { r: 220, g: 160, b: 200 },
+    ];
+
+    function resize() {
+        W = window.innerWidth;
+        H = window.innerHeight;
+        canvas.width = W;
+        canvas.height = H;
+    }
+
+    function createParticle() {
+        var palette = colorPalettes[Math.floor(Math.random() * colorPalettes.length)];
+        var speed = 0.5 + Math.random() * 1.5;
+        var angle = Math.random() * Math.PI * 2;
+        return {
+            x: Math.random() * W,
+            y: Math.random() * H,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            radius: 1.5 + Math.random() * 2.5,
+            color: {
+                r: palette.r + Math.floor((Math.random() - 0.5) * 40),
+                g: palette.g + Math.floor((Math.random() - 0.5) * 40),
+                b: palette.b + Math.floor((Math.random() - 0.5) * 40)
+            },
+            alpha: 0.5 + Math.random() * 0.5
+        };
+    }
+
+    function initParticles() {
+        particles = [];
+        for (var i = 0; i < targetCount; i++) {
+            particles.push(createParticle());
+        }
+    }
+
+    function adjustParticleCount() {
+        while (particles.length < targetCount) {
+            particles.push(createParticle());
+        }
+        while (particles.length > targetCount) {
+            particles.pop();
+        }
+    }
+
+    function updateParticles() {
+        for (var i = 0; i < particles.length; i++) {
+            var p = particles[i];
+
+            // Gravity
+            p.vy += gravity;
+
+            // Mouse interaction
+            if (mouseOnCanvas) {
+                var dx = mouseX - p.x;
+                var dy = mouseY - p.y;
+                var distSq = dx * dx + dy * dy;
+                var dist = Math.sqrt(distSq);
+                if (dist > 5 && dist < 400) {
+                    var force = attractionStrength * 80 / (distSq + 500);
+                    if (interactMode === 'repel') force = -force;
+                    p.vx += (dx / dist) * force;
+                    p.vy += (dy / dist) * force;
+                }
+            }
+
+            // Friction
+            p.vx *= friction;
+            p.vy *= friction;
+
+            // Speed limit
+            var speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+            if (speed > 12) {
+                p.vx = (p.vx / speed) * 12;
+                p.vy = (p.vy / speed) * 12;
+            }
+
+            // Position
+            p.x += p.vx;
+            p.y += p.vy;
+
+            // Bounce off edges with slight energy loss
+            var bounce = 0.6;
+            if (p.x < p.radius) {
+                p.x = p.radius;
+                p.vx = Math.abs(p.vx) * bounce;
+            } else if (p.x > W - p.radius) {
+                p.x = W - p.radius;
+                p.vx = -Math.abs(p.vx) * bounce;
+            }
+
+            if (p.y < p.radius) {
+                p.y = p.radius;
+                p.vy = Math.abs(p.vy) * bounce;
+            } else if (p.y > H - p.radius) {
+                p.y = H - p.radius;
+                p.vy = -Math.abs(p.vy) * bounce;
+            }
+        }
+    }
+
+    function drawParticles() {
+        ctx.clearRect(0, 0, W, H);
+
+        // Subtle background gradient
+        var grad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.7);
+        grad.addColorStop(0, '#0c0c1e');
+        grad.addColorStop(1, '#06060e');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+
+        // Draw mouse influence radius
+        if (mouseOnCanvas) {
+            ctx.beginPath();
+            ctx.arc(mouseX, mouseY, 120, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(126, 207, 255, 0.1)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(mouseX, mouseY, 60, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(126, 207, 255, 0.06)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        // Draw particles
+        for (var i = 0; i < particles.length; i++) {
+            var p = particles[i];
+            var c = p.color;
+            var alpha = p.alpha;
+
+            // Glow
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.radius * 2.5, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',' + (alpha * 0.08) + ')';
+            ctx.fill();
+
+            // Core
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',' + alpha + ')';
+            ctx.fill();
+        }
+
+        // Draw faint connecting lines between nearby particles
+        ctx.lineWidth = 0.5;
+        for (var i = 0; i < particles.length; i++) {
+            var a = particles[i];
+            for (var j = i + 1; j < particles.length; j++) {
+                var b = particles[j];
+                var dx = a.x - b.x;
+                var dy = a.y - b.y;
+                var distSq = dx * dx + dy * dy;
+                if (distSq < 4000) {
+                    var alpha = (1 - distSq / 4000) * 0.12;
+                    var mr = (a.color.r + b.color.r) >> 1;
+                    var mg = (a.color.g + b.color.g) >> 1;
+                    var mb = (a.color.b + b.color.b) >> 1;
+                    ctx.beginPath();
+                    ctx.moveTo(a.x, a.y);
+                    ctx.lineTo(b.x, b.y);
+                    ctx.strokeStyle = 'rgba(' + mr + ',' + mg + ',' + mb + ',' + alpha + ')';
+                    ctx.stroke();
+                }
+            }
+        }
+    }
+
+    // FPS tracking
+    var frameCount = 0;
+    var lastFpsTime = performance.now();
+    var displayFps = 0;
+
+    function loop() {
+        adjustParticleCount();
+        updateParticles();
+        drawParticles();
+
+        frameCount++;
+        var now = performance.now();
+        if (now - lastFpsTime >= 500) {
+            displayFps = Math.round(frameCount / ((now - lastFpsTime) / 1000));
+            fpsEl.textContent = 'FPS: ' + displayFps;
+            frameCount = 0;
+            lastFpsTime = now;
+        }
+
+        requestAnimationFrame(loop);
+    }
+
+    // Event listeners
+    window.addEventListener('resize', function() {
+        resize();
+    });
+
+    canvas.addEventListener('mousemove', function(e) {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+        mouseOnCanvas = true;
+    });
+
+    canvas.addEventListener('mouseleave', function() {
+        mouseOnCanvas = false;
+    });
+
+    canvas.addEventListener('touchmove', function(e) {
+        e.preventDefault();
+        var touch = e.touches[0];
+        mouseX = touch.clientX;
+        mouseY = touch.clientY;
+        mouseOnCanvas = true;
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', function() {
+        mouseOnCanvas = false;
+    });
+
+    // Control panel events
+    countSlider.addEventListener('input', function() {
+        targetCount = parseInt(this.value);
+        countVal.textContent = targetCount;
+    });
+
+    gravitySlider.addEventListener('input', function() {
+        gravity = parseFloat(this.value);
+        gravityVal.textContent = gravity.toFixed(2);
+    });
+
+    attractionSlider.addEventListener('input', function() {
+        attractionStrength = parseFloat(this.value);
+        attractionVal.textContent = attractionStrength.toFixed(1);
+    });
+
+    frictionSlider.addEventListener('input', function() {
+        friction = parseFloat(this.value);
+        frictionVal.textContent = friction.toFixed(3);
+    });
+
+    modeBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            modeBtns.forEach(function(b) { b.classList.remove('active'); });
+            this.classList.add('active');
+            interactMode = this.getAttribute('data-mode');
+        });
+    });
+
+    // Initialize
+    resize();
+    initParticles();
+    requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

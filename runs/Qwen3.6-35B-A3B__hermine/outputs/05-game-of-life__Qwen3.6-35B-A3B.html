@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conway's Game of Life</title>
+<style>
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: #0d1117;
+    color: #c9d1d9;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+h1 {
+    color: #58a6ff;
+    margin-bottom: 12px;
+    font-size: 1.6rem;
+    letter-spacing: 1px;
+}
+
+#stats {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 10px;
+    font-size: 0.95rem;
+}
+
+#stats span {
+    background: #161b22;
+    padding: 6px 16px;
+    border-radius: 6px;
+    border: 1px solid #30363d;
+}
+
+#stats .label {
+    color: #8b949e;
+}
+
+#stats .value {
+    color: #58a6ff;
+    font-weight: bold;
+    margin-left: 4px;
+}
+
+canvas {
+    border: 2px solid #30363d;
+    border-radius: 4px;
+    cursor: crosshair;
+    display: block;
+    margin-bottom: 12px;
+}
+
+#controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    align-items: center;
+    max-width: 960px;
+}
+
+button {
+    background: #21262d;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+    padding: 8px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+button:hover {
+    background: #30363d;
+    border-color: #58a6ff;
+}
+
+button.active {
+    background: #1f6feb;
+    border-color: #58a6ff;
+    color: #fff;
+}
+
+select {
+    background: #21262d;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+select:focus, button:focus {
+    outline: 2px solid #58a6ff;
+    outline-offset: 1px;
+}
+
+#speedControl {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 12px;
+}
+
+#speedControl label {
+    font-size: 0.85rem;
+    color: #8b949e;
+}
+
+#speedSlider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 120px;
+    height: 6px;
+    border-radius: 3px;
+    background: #30363d;
+    outline: none;
+}
+
+#speedSlider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #58a6ff;
+    cursor: pointer;
+}
+
+#speedSlider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #58a6ff;
+    cursor: pointer;
+    border: none;
+}
+
+#speedValue {
+    font-size: 0.85rem;
+    color: #58a6ff;
+    min-width: 36px;
+}
+
+#instructions {
+    margin-top: 12px;
+    font-size: 0.8rem;
+    color: #484f58;
+    text-align: center;
+}
+</style>
+</head>
+<body>
+
+<h1>Conway's Game of Life</h1>
+
+<div id="stats">
+    <span><span class="label">Generation:</span><span class="value" id="genCount">0</span></span>
+    <span><span class="label">Population:</span><span class="value" id="popCount">0</span></span>
+</div>
+
+<canvas id="grid"></canvas>
+
+<div id="controls">
+    <button id="btnStartPause">Start</button>
+    <button id="btnStep">Step</button>
+    <button id="btnClear">Clear</button>
+    <button id="btnRandom">Randomize</button>
+    <select id="patternSelect">
+        <option value="">-- Load Pattern --</option>
+        <option value="glider">Glider</option>
+        <option value="largeGlider">Large Glider</option>
+        <option value="lwss">Lightweight Spaceship (LWSS)</option>
+        <option value="pulsar">Pulsar</option>
+        <option value="pentadecathlon">Pentadecathlon</option>
+        <option value="gliderGun">Gosper Glider Gun</option>
+        <option value="rPentomino">R-Pentomino</option>
+        <option value="acorn">Acorn</option>
+        <option value="diehard">Diehard</option>
+    </select>
+    <div id="speedControl">
+        <label for="speedSlider">Speed:</label>
+        <input type="range" id="speedSlider" min="1" max="60" value="15">
+        <span id="speedValue">15 t/s</span>
+    </div>
+</div>
+
+<div id="instructions">Click or drag on the grid to toggle cells (while paused). Use Start to run the simulation.</div>
+
+<script>
+(function() {
+    "use strict";
+
+    var COLS = 60;
+    var ROWS = 40;
+    var CELL_SIZE = 15;
+    var BORDER_WIDTH = 1;
+    var CANVAS_W = COLS * CELL_SIZE;
+    var CANVAS_H = ROWS * CELL_SIZE;
+
+    var canvas = document.getElementById("grid");
+    var ctx = canvas.getContext("2d");
+    canvas.width = CANVAS_W;
+    canvas.height = CANVAS_H;
+
+    var genCountEl = document.getElementById("genCount");
+    var popCountEl = document.getElementById("popCount");
+    var btnStartPause = document.getElementById("btnStartPause");
+    var btnStep = document.getElementById("btnStep");
+    var btnClear = document.getElementById("btnClear");
+    var btnRandom = document.getElementById("btnRandom");
+    var patternSelect = document.getElementById("patternSelect");
+    var speedSlider = document.getElementById("speedSlider");
+    var speedValueEl = document.getElementById("speedValue");
+
+    var grid = [];
+    var nextGrid = [];
+    var generation = 0;
+    var running = false;
+    var lastTick = 0;
+    var fps = 15;
+    var animFrameId = null;
+    var isMouseDown = false;
+    var mouseCell = null;
+
+    function initGrid() {
+        grid = new Array(ROWS);
+        nextGrid = new Array(ROWS);
+        for (var r = 0; r < ROWS; r++) {
+            grid[r] = new Uint8Array(COLS);
+            nextGrid[r] = new Uint8Array(COLS);
+        }
+    }
+
+    function countNeighbors(r, c) {
+        var count = 0;
+        for (var dr = -1; dr <= 1; dr++) {
+            for (var dc = -1; dc <= 1; dc++) {
+                if (dr === 0 && dc === 0) continue;
+                var nr = (r + dr + ROWS) % ROWS;
+                var nc = (c + dc + COLS) % COLS;
+                count += grid[nr][nc];
+            }
+        }
+        return count;
+    }
+
+    function computeNext() {
+        for (var r = 0; r < ROWS; r++) {
+            for (var c = 0; c < COLS; c++) {
+                var n = countNeighbors(r, c);
+                if (grid[r][c]) {
+                    nextGrid[r][c] = (n === 2 || n === 3) ? 1 : 0;
+                } else {
+                    nextGrid[r][c] = (n === 3) ? 1 : 0;
+                }
+            }
+        }
+        var tmp = grid;
+        grid = nextGrid;
+        nextGrid = tmp;
+        generation++;
+    }
+
+    function countPopulation() {
+        var pop = 0;
+        for (var r = 0; r < ROWS; r++) {
+            for (var c = 0; c < COLS; c++) {
+                pop += grid[r][c];
+            }
+        }
+        return pop;
+    }
+
+    function drawGrid() {
+        ctx.fillStyle = "#0d1117";
+        ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+        for (var r = 0; r < ROWS; r++) {
+            for (var c = 0; c < COLS; c++) {
+                if (grid[r][c]) {
+                    ctx.fillStyle = "#39d353";
+                    ctx.fillRect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                    ctx.fillStyle = "#1a5c2a";
+                    ctx.fillRect(c * CELL_SIZE + 2, r * CELL_SIZE + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+                }
+                ctx.strokeStyle = "#21262d";
+                ctx.lineWidth = BORDER_WIDTH;
+                ctx.strokeRect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+            }
+        }
+    }
+
+    function updateStats() {
+        genCountEl.textContent = generation;
+        popCountEl.textContent = countPopulation();
+    }
+
+    function gameLoop(timestamp) {
+        if (!running) return;
+        if (timestamp - lastTick >= 1000 / fps) {
+            computeNext();
+            drawGrid();
+            updateStats();
+            lastTick = timestamp;
+        }
+        animFrameId = requestAnimationFrame(gameLoop);
+    }
+
+    function start() {
+        if (running) return;
+        running = true;
+        btnStartPause.textContent = "Pause";
+        btnStartPause.classList.add("active");
+        lastTick = performance.now();
+        animFrameId = requestAnimationFrame(gameLoop);
+    }
+
+    function pause() {
+        running = false;
+        btnStartPause.textContent = "Start";
+        btnStartPause.classList.remove("active");
+        if (animFrameId) {
+            cancelAnimationFrame(animFrameId);
+            animFrameId = null;
+        }
+    }
+
+    function step() {
+        computeNext();
+        drawGrid();
+        updateStats();
+    }
+
+    function clearGrid() {
+        pause();
+        for (var r = 0; r < ROWS; r++) {
+            grid[r].fill(0);
+        }
+        generation = 0;
+        drawGrid();
+        updateStats();
+    }
+
+    function randomize() {
+        for (var r = 0; r < ROWS; r++) {
+            for (var c = 0; c < COLS; c++) {
+                grid[r][c] = Math.random() < 0.25 ? 1 : 0;
+            }
+        }
+        generation = 0;
+        drawGrid();
+        updateStats();
+    }
+
+    function getCellFromMouse(e) {
+        var rect = canvas.getBoundingClientRect();
+        var scaleX = CANVAS_W / rect.width;
+        var scaleY = CANVAS_H / rect.height;
+        var x = (e.clientX - rect.left) * scaleX;
+        var y = (e.clientY - rect.top) * scaleY;
+        var c = Math.floor(x / CELL_SIZE);
+        var r = Math.floor(y / CELL_SIZE);
+        if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+            return { r: r, c: c };
+        }
+        return null;
+    }
+
+    function toggleCell(r, c) {
+        if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+            grid[r][c] = grid[r][c] ? 0 : 1;
+            drawGrid();
+            updateStats();
+        }
+    }
+
+    canvas.addEventListener("mousedown", function(e) {
+        e.preventDefault();
+        isMouseDown = true;
+        var cell = getCellFromMouse(e);
+        if (cell) {
+            mouseCell = cell;
+            toggleCell(cell.r, cell.c);
+        }
+    });
+
+    canvas.addEventListener("mousemove", function(e) {
+        if (!isMouseDown) return;
+        var cell = getCellFromMouse(e);
+        if (cell) {
+            if (!mouseCell || cell.r !== mouseCell.r || cell.c !== mouseCell.c) {
+                mouseCell = cell;
+                toggleCell(cell.r, cell.c);
+            }
+        }
+    });
+
+    window.addEventListener("mouseup", function() {
+        isMouseDown = false;
+        mouseCell = null;
+    });
+
+    canvas.addEventListener("mouseleave", function() {
+        isMouseDown = false;
+        mouseCell = null;
+    });
+
+    btnStartPause.addEventListener("click", function() {
+        if (running) {
+            pause();
+        } else {
+            start();
+        }
+    });
+
+    btnStep.addEventListener("click", function() {
+        if (running) pause();
+        step();
+    });
+
+    btnClear.addEventListener("click", function() {
+        clearGrid();
+    });
+
+    btnRandom.addEventListener("click", function() {
+        randomize();
+    });
+
+    speedSlider.addEventListener("input", function() {
+        fps = parseInt(speedSlider.value, 10);
+        speedValueEl.textContent = fps + " t/s";
+    });
+
+    var patterns = {
+        glider: [
+            [0, 1],
+            [1, 2],
+            [2, 0], [2, 1], [2, 2]
+        ],
+        largeGlider: [
+            [0, 2],
+            [1, 3],
+            [2, 1], [2, 2], [2, 3], [2, 4],
+            [3, 1], [3, 2], [3, 3], [3, 4],
+            [4, 1], [4, 4],
+            [5, 2], [5, 3]
+        ],
+        lwss: [
+            [0, 1], [0, 4],
+            [1, 0],
+            [2, 0], [2, 4],
+            [3, 0], [3, 1], [3, 2], [3, 3]
+        ],
+        pulsar: (function() {
+            var cells = [];
+            var offsets = [
+                [0,2],[0,3],[0,4],[0,8],[0,9],[0,10],
+                [2,0],[3,0],[4,0],[2,5],[3,5],[4,5],
+                [2,7],[3,7],[4,7],[2,12],[3,12],[4,12],
+                [5,0],[5,5],[5,7],[5,12],
+                [7,0],[7,5],[7,7],[7,12],
+                [8,2],[8,3],[8,4],[8,8],[8,9],[8,10],
+                [10,2],[11,2],[12,2],[10,3],[11,3],[12,3],
+                [10,4],[11,4],[12,4],[10,8],[11,8],[12,8],
+                [10,9],[11,9],[12,9],[10,10],[11,10],[12,10]
+            ];
+            return offsets;
+        })(),
+        pentadecathlon: [
+            [0,1],[1,1],[2,0],[2,2],[3,1],[4,1],[5,1],[6,1],[7,0],[7,2],[8,1],[9,1]
+        ],
+        gliderGun: [
+            [0,24],[1,22],[1,26],[2,22],[2,26],[3,12],[3,13],[3,20],[3,24],[3,32],[3,36],[3,37],
+            [4,11],[4,15],[4,20],[4,24],[4,32],[4,36],[4,37],[4,48],[4,49],[5,12],[5,13],[5,20],
+            [5,24],[5,32],[5,36],[5,37],[6,13],[6,14],[6,20],[6,21],[6,34],[6,35],[7,20],[7,21],
+            [8,14],[8,15],[8,20],[8,21],[9,15],[10,12],[10,13],[10,14],[10,15],[10,22],[10,32],
+            [11,22],[12,22],[13,12],[13,13],[13,20],[13,24],[13,32],[13,36],[14,11],[14,15],
+            [14,20],[14,24],[14,32],[14,36],[15,12],[15,13],[15,20],[15,24],[16,24],[17,12],[17,13],
+            [17,20],[17,24],[18,14],[18,15],[18,20],[18,21],[19,15],[20,12],[20,13],[20,14],[20,15],
+            [20,22],[20,32],[21,22],[22,22]
+        ],
+        rPentomino: [
+            [1,1],[1,2],[2,0],[2,1],[3,1]
+        ],
+        acorn: [
+            [0,1],[1,3],[2,0],[2,1],[2,4],[2,5],[2,6]
+        ],
+        diehard: [
+            [0,1],[0,2],[1,6],[2,0],[2,1],[2,5],[2,6]
+        ]
+    };
+
+    patternSelect.addEventListener("change", function() {
+        var name = patternSelect.value;
+        if (!name) return;
+        var cells = patterns[name];
+        if (!cells) return;
+
+        clearGrid();
+
+        var minR = Infinity, minC = Infinity;
+        cells.forEach(function(cell) {
+            if (cell[0] < minR) minR = cell[0];
+            if (cell[1] < minC) minC = cell[1];
+        });
+
+        cells.forEach(function(cell) {
+            var r = cell[0] - minR;
+            var c = cell[1] - minC;
+            var gr = r;
+            var gc = c;
+            if (gr >= 0 && gr < ROWS && gc >= 0 && gc < COLS) {
+                grid[gr][gc] = 1;
+            }
+        });
+
+        drawGrid();
+        updateStats();
+        patternSelect.value = "";
+    });
+
+    // Initialize
+    initGrid();
+    drawGrid();
+    updateStats();
+
+})();
+</script>
+
+</body>
+</html>

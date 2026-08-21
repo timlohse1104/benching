@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analog Clock</title>
+<style>
+    body {
+        background-color: #121212;
+        color: #e0e0e0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        user-select: none;
+    }
+    svg {
+        filter: drop-shadow(0 8px 16px rgba(0,0,0,0.6));
+    }
+    #digital {
+        margin-top: 32px;
+        font-size: 1.75rem;
+        font-family: "Courier New", Courier, monospace;
+        letter-spacing: 3px;
+        color: #4fc3f7;
+        font-weight: bold;
+        text-shadow: 0 0 8px rgba(79, 195, 247, 0.4);
+    }
+</style>
+</head>
+<body>
+<svg id="clock" viewBox="0 0 400 400" width="340" height="340">
+    <defs>
+        <radialGradient id="faceGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#2a2a2a"/>
+            <stop offset="100%" stop-color="#1a1a1a"/>
+        </radialGradient>
+    </defs>
+    
+    <circle cx="200" cy="200" r="190" fill="url(#faceGrad)" stroke="#333" stroke-width="8"/>
+    <circle cx="200" cy="200" r="185" fill="none" stroke="#222" stroke-width="4"/>
+    
+    <g id="ticks"></g>
+    
+    <g id="hands">
+        <line id="hour" x1="200" y1="200" x2="200" y2="115" stroke="#ffffff" stroke-width="8" stroke-linecap="round"/>
+        <line id="minute" x1="200" y1="200" x2="200" y2="65" stroke="#e0e0e0" stroke-width="4" stroke-linecap="round"/>
+        <line id="second" x1="200" y1="225" x2="200" y2="50" stroke="#ff5252" stroke-width="2" stroke-linecap="round"/>
+    </g>
+    
+    <circle cx="200" cy="200" r="12" fill="#ff5252"/>
+    <circle cx="200" cy="200" r="5" fill="#121212"/>
+</svg>
+
+<div id="digital"></div>
+
+<script>
+(function() {
+    const cx = 200, cy = 200;
+    const ticksGroup = document.getElementById('ticks');
+    let ticksHTML = '';
+    
+    for (let i = 0; i < 60; i++) {
+        const angle = i * 6;
+        const rad = angle * Math.PI / 180;
+        const isHour = i % 5 === 0;
+        const r1 = isHour ? 160 : 172;
+        const r2 = 182;
+        const w = isHour ? 5 : 2;
+        
+        const x1 = cx + r1 * Math.sin(rad);
+        const y1 = cy - r1 * Math.cos(rad);
+        const x2 = cx + r2 * Math.sin(rad);
+        const y2 = cy - r2 * Math.cos(rad);
+        
+        ticksHTML += '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + (isHour ? '#ffffff' : '#777') + '" stroke-width="' + w + '" stroke-linecap="round"/>';
+    }
+    ticksGroup.innerHTML = ticksHTML;
+
+    const hourHand = document.getElementById('hour');
+    const minuteHand = document.getElementById('minute');
+    const secondHand = document.getElementById('second');
+    const digital = document.getElementById('digital');
+
+    function update() {
+        const now = new Date();
+        const h = now.getHours() % 12;
+        const m = now.getMinutes();
+        const s = now.getSeconds();
+        
+        const hDeg = (h * 30) + (m * 0.5);
+        const mDeg = (m * 6) + (s * 0.1);
+        const sDeg = s * 6;
+        
+        hourHand.setAttribute('transform', 'rotate(' + hDeg + ', ' + cx + ', ' + cy + ')');
+        minuteHand.setAttribute('transform', 'rotate(' + mDeg + ', ' + cx + ', ' + cy + ')');
+        secondHand.setAttribute('transform', 'rotate(' + sDeg + ', ' + cx + ', ' + cy + ')');
+        
+        const pad = function(n) { return String(n).padStart(2, '0'); };
+        digital.textContent = pad(now.getHours()) + ':' + pad(m) + ':' + pad(s);
+    }
+
+    update();
+    setInterval(update, 1000);
+})();
+</script>
+</body>
+</html>

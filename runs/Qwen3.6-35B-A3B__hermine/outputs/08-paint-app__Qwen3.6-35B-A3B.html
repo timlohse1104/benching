@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paint Application</title>
+<style>
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #e8e8e8;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 16px;
+    color: #222;
+}
+
+h1 {
+    font-size: 1.4rem;
+    margin-bottom: 12px;
+    color: #333;
+    font-weight: 600;
+}
+
+.toolbar {
+    background: #f5f5f5;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 10px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    max-width: 860px;
+    width: 100%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.toolbar-group label {
+    font-size: 0.75rem;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.tool-btn {
+    background: #fff;
+    border: 1px solid #bbb;
+    border-radius: 4px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #333;
+    transition: background 0.15s, border-color 0.15s;
+    user-select: none;
+}
+
+.tool-btn:hover {
+    background: #e9e9e9;
+}
+
+.tool-btn.active {
+    background: #4a90d9;
+    color: #fff;
+    border-color: #357abd;
+}
+
+.tool-btn.action-btn {
+    font-size: 0.8rem;
+    padding: 5px 10px;
+}
+
+.separator {
+    width: 1px;
+    height: 28px;
+    background: #ccc;
+    margin: 0 4px;
+}
+
+input[type="range"] {
+    width: 100px;
+    cursor: pointer;
+}
+
+.color-picker-wrapper {
+    position: relative;
+    width: 32px;
+    height: 32px;
+}
+
+#colorPicker {
+    width: 32px;
+    height: 32px;
+    border: 1px solid #bbb;
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 0;
+    background: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+#colorPicker::-webkit-color-swatch-wrapper {
+    padding: 2px;
+}
+
+#colorPicker::-webkit-color-swatch {
+    border: none;
+    border-radius: 2px;
+}
+
+#colorPicker::-moz-color-swatch {
+    border: none;
+    border-radius: 2px;
+}
+
+#currentColorLabel {
+    font-size: 0.75rem;
+    color: #555;
+    min-width: 70px;
+}
+
+#brushSizeLabel {
+    font-size: 0.75rem;
+    color: #555;
+    min-width: 36px;
+}
+
+.palette {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.palette-swatch {
+    width: 22px;
+    height: 22px;
+    border-radius: 3px;
+    border: 1px solid #aaa;
+    cursor: pointer;
+    transition: transform 0.1s, border-color 0.15s;
+}
+
+.palette-swatch:hover {
+    transform: scale(1.15);
+}
+
+.palette-swatch.active {
+    border: 2px solid #333;
+    transform: scale(1.15);
+}
+
+.canvas-container {
+    border: 2px solid #555;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    background: #fff;
+    line-height: 0;
+    position: relative;
+}
+
+canvas {
+    display: block;
+    cursor: crosshair;
+}
+
+.status-bar {
+    margin-top: 8px;
+    font-size: 0.75rem;
+    color: #777;
+    display: flex;
+    gap: 16px;
+}
+</style>
+</head>
+<body>
+
+<h1>Paint</h1>
+
+<div class="toolbar">
+    <div class="toolbar-group">
+        <button class="tool-btn active" id="btnBrush" title="Brush (B)">Brush</button>
+        <button class="tool-btn" id="btnEraser" title="Eraser (E)">Eraser</button>
+    </div>
+
+    <div class="separator"></div>
+
+    <div class="toolbar-group">
+        <label for="brushSize">Size</label>
+        <input type="range" id="brushSize" min="1" max="80" value="6">
+        <span id="brushSizeLabel">6px</span>
+    </div>
+
+    <div class="separator"></div>
+
+    <div class="toolbar-group">
+        <label>Color</label>
+        <input type="color" id="colorPicker" value="#000000">
+        <span id="currentColorLabel">Black</span>
+    </div>
+
+    <div class="toolbar-group">
+        <label>Palette</label>
+        <div class="palette" id="palette"></div>
+    </div>
+
+    <div class="separator"></div>
+
+    <div class="toolbar-group">
+        <button class="tool-btn action-btn" id="btnUndo" title="Undo (Ctrl+Z)">Undo</button>
+        <button class="tool-btn action-btn" id="btnRedo" title="Redo (Ctrl+Y)">Redo</button>
+    </div>
+
+    <div class="separator"></div>
+
+    <div class="toolbar-group">
+        <button class="tool-btn action-btn" id="btnClear" title="Clear Canvas">Clear</button>
+        <button class="tool-btn action-btn" id="btnSave" title="Save as PNG">Save PNG</button>
+    </div>
+</div>
+
+<div class="canvas-container">
+    <canvas id="canvas" width="860" height="560"></canvas>
+</div>
+
+<div class="status-bar">
+    <span id="statusCoords">0, 0</span>
+    <span id="statusBrush">Brush: 6px</span>
+    <span id="statusColor">Color: #000000</span>
+</div>
+
+<script>
+(function() {
+    "use strict";
+
+    var canvas = document.getElementById("canvas");
+    var ctx = canvas.getContext("2d");
+    var btnBrush = document.getElementById("btnBrush");
+    var btnEraser = document.getElementById("btnEraser");
+    var brushSizeInput = document.getElementById("brushSize");
+    var brushSizeLabel = document.getElementById("brushSizeLabel");
+    var colorPicker = document.getElementById("colorPicker");
+    var currentColorLabel = document.getElementById("currentColorLabel");
+    var palette = document.getElementById("palette");
+    var btnUndo = document.getElementById("btnUndo");
+    var btnRedo = document.getElementById("btnRedo");
+    var btnClear = document.getElementById("btnClear");
+    var btnSave = document.getElementById("btnSave");
+    var statusCoords = document.getElementById("statusCoords");
+    var statusBrush = document.getElementById("statusBrush");
+    var statusColor = document.getElementById("statusColor");
+
+    var PALETTE_COLORS = [
+        "#000000", "#444444", "#888888", "#cccccc", "#ffffff",
+        "#ff0000", "#ff8800", "#ffff00", "#88cc00", "#00cc00",
+        "#00cc88", "#0088cc", "#0000ff", "#8800ff", "#cc00ff",
+        "#ff0088", "#ff6644", "#ffaa44", "#aadd44", "#44aaff"
+    ];
+
+    var isDrawing = false;
+    var currentTool = "brush";
+    var currentColor = "#000000";
+    var brushSize = 6;
+    var lastX = -1;
+    var lastY = -1;
+
+    var history = [];
+    var historyIndex = -1;
+    var MAX_HISTORY = 50;
+
+    // Initialize canvas white
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Save initial state
+    saveState();
+
+    // Build palette
+    PALETTE_COLORS.forEach(function(color) {
+        var swatch = document.createElement("div");
+        swatch.className = "palette-swatch";
+        swatch.style.backgroundColor = color;
+        swatch.setAttribute("data-color", color);
+        if (color === currentColor) {
+            swatch.classList.add("active");
+        }
+        swatch.addEventListener("click", function() {
+            setColor(color);
+        });
+        palette.appendChild(swatch);
+    });
+
+    function setColor(color) {
+        currentColor = color;
+        colorPicker.value = color;
+        currentColorLabel.textContent = color;
+        statusColor.textContent = "Color: " + color;
+
+        // Update palette active state
+        var swatches = palette.querySelectorAll(".palette-swatch");
+        swatches.forEach(function(s) {
+            s.classList.toggle("active", s.getAttribute("data-color") === color);
+        });
+
+        if (currentTool === "eraser") {
+            setTool("brush");
+        }
+    }
+
+    function setTool(tool) {
+        currentTool = tool;
+        btnBrush.classList.toggle("active", tool === "brush");
+        btnEraser.classList.toggle("active", tool === "eraser");
+        canvas.style.cursor = tool === "eraser" ? "cell" : "crosshair";
+    }
+
+    function saveState() {
+        // Remove any redo states
+        if (historyIndex < history.length - 1) {
+            history = history.slice(0, historyIndex + 1);
+        }
+        var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        history.push(imageData);
+        if (history.length > MAX_HISTORY) {
+            history.shift();
+        } else {
+            historyIndex++;
+        }
+    }
+
+    function undo() {
+        if (historyIndex > 0) {
+            historyIndex--;
+            var imageData = history[historyIndex];
+            ctx.putImageData(imageData, 0, 0);
+        }
+    }
+
+    function redo() {
+        if (historyIndex < history.length - 1) {
+            historyIndex++;
+            var imageData = history[historyIndex];
+            ctx.putImageData(imageData, 0, 0);
+        }
+    }
+
+    function getPos(e) {
+        var rect = canvas.getBoundingClientRect();
+        var scaleX = canvas.width / rect.width;
+        var scaleY = canvas.height / rect.height;
+        if (e.touches && e.touches.length > 0) {
+            return {
+                x: (e.touches[0].clientX - rect.left) * scaleX,
+                y: (e.touches[0].clientY - rect.top) * scaleY
+            };
+        }
+        return {
+            x: (e.clientX - rect.left) * scaleX,
+            y: (e.clientY - rect.top) * scaleY
+        };
+    }
+
+    function startDraw(e) {
+        e.preventDefault();
+        isDrawing = true;
+        var pos = getPos(e);
+        lastX = pos.x;
+        lastY = pos.y;
+        // Draw a dot for single clicks
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, brushSize / 2, 0, Math.PI * 2);
+        ctx.fillStyle = currentTool === "eraser" ? "#ffffff" : currentColor;
+        ctx.fill();
+    }
+
+    function draw(e) {
+        e.preventDefault();
+        var pos = getPos(e);
+        statusCoords.textContent = Math.round(pos.x) + ", " + Math.round(pos.y);
+
+        if (!isDrawing) return;
+
+        ctx.beginPath();
+        ctx.moveTo(lastX, lastY);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.strokeStyle = currentTool === "eraser" ? "#ffffff" : currentColor;
+        ctx.lineWidth = brushSize;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.stroke();
+
+        lastX = pos.x;
+        lastY = pos.y;
+    }
+
+    function endDraw(e) {
+        if (isDrawing) {
+            isDrawing = false;
+            saveState();
+        }
+    }
+
+    // Mouse events
+    canvas.addEventListener("mousedown", startDraw);
+    canvas.addEventListener("mousemove", draw);
+    canvas.addEventListener("mouseup", endDraw);
+    canvas.addEventListener("mouseleave", endDraw);
+
+    // Touch events
+    canvas.addEventListener("touchstart", startDraw, { passive: false });
+    canvas.addEventListener("touchmove", draw, { passive: false });
+    canvas.addEventListener("touchend", endDraw);
+    canvas.addEventListener("touchcancel", endDraw);
+
+    // Tool buttons
+    btnBrush.addEventListener("click", function() { setTool("brush"); });
+    btnEraser.addEventListener("click", function() { setTool("eraser"); });
+
+    // Brush size
+    brushSizeInput.addEventListener("input", function() {
+        brushSize = parseInt(this.value, 10);
+        brushSizeLabel.textContent = brushSize + "px";
+        statusBrush.textContent = "Brush: " + brushSize + "px";
+    });
+
+    // Color picker
+    colorPicker.addEventListener("input", function() {
+        setColor(this.value);
+    });
+
+    // Undo
+    btnUndo.addEventListener("click", function() {
+        undo();
+    });
+
+    // Redo
+    btnRedo.addEventListener("click", function() {
+        redo();
+    });
+
+    // Clear
+    btnClear.addEventListener("click", function() {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        saveState();
+    });
+
+    // Save PNG
+    btnSave.addEventListener("click", function() {
+        var link = document.createElement("a");
+        link.download = "drawing.png";
+        link.href = canvas.toDataURL("image/png");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener("keydown", function(e) {
+        if (e.key === "b" || e.key === "B") {
+            setTool("brush");
+        } else if (e.key === "e" || e.key === "E") {
+            setTool("eraser");
+        } else if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+            e.preventDefault();
+            undo();
+        } else if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.shiftKey && e.key === "Z"))) {
+            e.preventDefault();
+            redo();
+        }
+    });
+
+    // Initialize status
+    brushSizeLabel.textContent = brushSize + "px";
+    statusBrush.textContent = "Brush: " + brushSize + "px";
+    statusColor.textContent = "Color: " + currentColor;
+
+})();
+</script>
+
+</body>
+</html>

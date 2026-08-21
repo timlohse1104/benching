@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Playable Violin</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; overflow: hidden; font-family: 'Georgia', serif; }
+canvas { display: block; cursor: grab; }
+canvas:active { cursor: grabbing; }
+#hint {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,0.7); color: #e8d5b7; padding: 12px 24px;
+  border-radius: 8px; font-size: 14px; pointer-events: none;
+  border: 1px solid rgba(232,213,183,0.3); text-align: center;
+  line-height: 1.6; backdrop-filter: blur(4px);
+}
+#hint span { color: #f0c040; font-weight: bold; }
+#title {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  color: #e8d5b7; font-size: 24px; letter-spacing: 4px;
+  text-transform: uppercase; pointer-events: none;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+}
+#noteDisplay {
+  position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+  color: #f0c040; font-size: 18px; pointer-events: none;
+  opacity: 0; transition: opacity 0.3s;
+  text-shadow: 0 0 10px rgba(240,192,64,0.5);
+}
+</style>
+</head>
+<body>
+<div id="title">Violin</div>
+<div id="noteDisplay"></div>
+<div id="hint">
+  <span>Drag</span> to orbit · <span>Scroll</span> to zoom · 
+  <span>Click strings</span> to play · Keys <span>G D A E</span> for open strings
+</div>
+<canvas id="gl"></canvas>
+<script>
+const canvas = document.getElementById('gl');
+const gl = canvas.getContext('webgl', { antialias: true, alpha: false });
+if (!gl) { alert('WebGL not supported'); }
+
+let W, H;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  gl.viewport(0, 0, W, H);
+}
+resize();
+window.addEventListener('resize', resize);
+
+// Shaders
+const vsSource = `
+attribute vec3 aPos;
+attribute vec3 aNorm;
+attribute vec3 aColor;
+uniform mat4 uMVP;
+uniform mat4 uModel;
+uniform mat3 uNormMat;
+varying vec3 vColor;
+varying vec3 vNorm;
+varying vec3 vWorldPos;
+varying float vFog;
+void main() {
+  vec4 worldPos = uModel * vec4(aPos, 1.0);
+  vWorldPos = worldPos.xyz;
+  vNorm = normalize(uNormMat * aNorm);
+  vColor = aColor;
+  gl_Position = uMVP * vec4(aPos, 1.0);
+  vFog = clamp(length(worldPos.xyz) / 8.0, 0.0, 1.0);
+}`;
+
+const fsSource = `
+precision mediump float;
+varying vec3 vColor;
+varying vec3 vNorm;
+varying vec3 vWorldPos;
+varying float vFog;
+uniform vec3 uLightDir;
+uniform vec3 uLightColor;
+uniform vec3 uAmbient;
+uniform float uVibrate;
+uniform vec3 uVibrateColor;
+void main() {
+  vec3 N = normalize(vNorm);
+  float diff = max(dot(N, normalize(uLightDir)), 0.0);
+  vec3 viewDir = normalize(-vWorldPos);
+  vec3 halfDir = normalize(normalize(uLightDir) + viewDir);
+  float spec = pow(max(dot(N, halfDir), 0.0), 64.0);
+  vec3 color = vColor;
+  // Wood grain effect
+  float grain = sin(vWorldPos.y * 40.0 + vWorldPos.x * 20.0) * 0.03;
+  color += grain;
+  // Rim lighting
+  float rim = 1.0 - max(dot(N, viewDir), 0.0);
+  rim = pow(rim, 3.0);
+  vec3 rimColor = vec3(0.8, 0.6, 0.3) * rim * 0.4;
+  vec3 finalColor = color * (uAmbient + uLightColor * diff) + uLightColor * spec * 0.3 + rimColor;
+  // Vibration highlight
+  if (uVibrate > 0.01) {
+    finalColor = mix(finalColor, uVibrateColor, uVibrate * 0.6);
+  }
+  // Fog
+  vec3 fogColor = vec3(0.1, 0.1, 0.18);
+  finalColor = mix(finalColor, fogColor, vFog * 0.5);
+  gl_FragColor = vec4(finalColor, 1.0);
+}`;
+
+// String vibration shader
+const vsString = `
+attribute vec3 aPos;
+attribute vec3 aColor;
+uniform mat4 uMVP;
+uniform float uTime;
+uniform float uVibrate;
+uniform float uStringIndex;
+varying vec3 vColor;
+varying float vVibrate;
+void main() {
+  vec3 pos = aPos;
+  float t = uTime;
+  float freq = 8.0 + uStringIndex * 2.0;
+  float amp = uVibrate * 0.03 * sin(t * freq * 3.14159);
+  float envelope = exp(-t * 2.0) * (1.0 - exp(-t * 50.0));
+  pos.x += amp * envelope * sin(pos.y * 20.0 + t * freq * 6.28);
+  pos.z += amp * envelope * cos(pos.y * 15.0 + t * freq * 6.28) * 0.5;
+  vColor = aColor;
+  vVibrate = uVibrate * envelope;
+  gl_Position = uMVP * vec4(pos, 1.0);
+}`;
+
+const fsString = `
+precision mediump float;
+varying vec3 vColor;
+varying float vVibrate;
+void main() {
+  vec3 c = vColor + vec3(1.0, 0.8, 0.3) * vVibrate * 0.5;
+  gl_FragColor = vec4(c, 0.9);
+}`;
+
+function compileShader(src, type) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    console.error(gl.getShaderInfoLog(s));
+  }
+  return s;
+}
+
+function createProgram(vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compileShader(vs, gl.VERTEX_SHADER));
+  gl.attachShader(p, compileShader(fs, gl.FRAGMENT_SHADER));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+    console.error(gl.getProgramInfoLog(p));
+  }
+  return p;
+}
+
+const prog = createProgram(vsSource, fsSource);
+const progString = createProgram(vsString, fsString);
+
+const uMVP = gl.getUniformLocation(prog, 'uMVP');
+const uModel = gl.getUniformLocation(prog, 'uModel');
+const uNormMat = gl.getUniformLocation(prog, 'uNormMat');
+const uLightDir = gl.getUniformLocation(prog, 'uLightDir');
+const uLightColor = gl.getUniformLocation(prog, 'uLightColor');
+const uAmbient = gl.getUniformLocation(prog, 'uAmbient');
+const uVibrate = gl.getUniformLocation(prog, 'uVibrate');
+const uVibrateColor = gl.getUniformLocation(prog, 'uVibrateColor');
+
+const uSMVP = gl.getUniformLocation(progString, 'uMVP');
+const uSTime = gl.getUniformLocation(progString, 'uTime');
+const SUVibrate = gl.getUniformLocation(progString, 'uVibrate');
+const SUStringIndex = gl.getUniformLocation(progString, 'uStringIndex');
+const SAPos = gl.getAttribLocation(progString, 'aPos');
+const SAColor = gl.getAttribLocation(progString, 'aColor');
+
+// Matrix utilities
+function mat4Perspective(fov, aspect, near, far) {
+  const f = 1 / Math.tan(fov / 2);
+  const nf = 1 / (near - far);
+  return new Float32Array([
+    f/aspect,0,0,0, 0,f,0,0, 0,0,(far+near)*nf,-1, 0,0,2*far*near*nf,0
+  ]);
+}
+
+function mat4LookAt(eye, center, up) {
+  let zx=eye[0]-center[0], zy=eye[1]-center[1], zz=eye[2]-center[2];
+  let l=Math.sqrt(zx*zx+zy*zy+zz*zz); zx/=l; zy/=l; zz/=l;
+  let xx=up[1]*zz-up[2]*zy, xy=up[2]*zx-up[0]*zz, xz=up[0]*zy-up[1]*zx;
+  l=Math.sqrt(xx*xx+xy*xy+xz*xz); xx/=l; xy/=l; xz/=l;
+  let yx=zy*xz-zz*xy, yy=zz*xx-zx*xz, yz=zx*xy-zy*xx;
+  return new Float32Array([
+    xx,yx,zx,0, xy,yy,zy,0, xz,yz,zz,0,
+    -(xx*eye[0]+xy*eye[1]+xz*eye[2]),
+    -(yx*eye[0]+yy*eye[1]+yz*eye[2]),
+    -(zx*eye[0]+zy*eye[1]+zz*eye[2]),1
+  ]);
+}
+
+function mat4Multiply(a, b) {
+  const r = new Float32Array(16);
+  for(let i=0;i<4;i++) for(let j=0;j<4;j++) {
+    r[j*4+i] = a[i]*b[j*4]+a[4+i]*b[j*4+1]+a[8+i]*b[j*4+2]+a[12+i]*b[j*4+3];
+  }
+  return r;
+}
+
+function mat4Translate(x,y,z) {
+  return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]);
+}
+
+function mat4Scale(x,y,z) {
+  return new Float32Array([x,0,0,0, 0,y,0,0, 0,0,z,0, 0,0,0,1]);
+}
+
+function mat4RotX(a) {
+  const c=Math.cos(a),s=Math.sin(a);
+  return new Float32Array([1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1]);
+}
+
+function mat4RotY(a) {
+  const c=Math.cos(a),s=Math.sin(a);
+  return new Float32Array([c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1]);
+}
+
+function mat3NormalFromMat4(m) {
+  // Extract upper-left 3x3 and compute inverse transpose (simplified for rotation+scale)
+  return new Float32Array([m[0],m[1],m[2], m[4],m[5],m[6], m[8],m[9],m[10]]);
+}
+
+// Geometry builders
+function createBox(w,h,d, cx,cy,cz, rx,ry,rz) {
+  const verts = [];
+  const faces = [
+    {n:[0,0,1], verts:[[w,h,d],[w,-h,d],[-w,-h,d],[-w,h,d]]},
+    {n:[0,0,-1], verts:[[-w,-h,-d],[-w,h,-d],[w,h,-d],[w,-h,-d]]},
+    {n:[1,0,0], verts:[[w,h,-d],[w,h,d],[w,-h,d],[w,-h,-d]]},
+    {n:[-1,0,0], verts:[[-w,-h,-d],[-w,-h,d],[-w,h,d],[-w,h,-d]]},
+    {n:[0,1,0], verts:[[-w,h,d],[w,h,d],[w,h,-d],[-w,h,-d]]},
+    {n:[0,-1,0], verts:[[-w,-h,-d],[w,-h,-d],[w,-h,d],[-w,-h,d]]}
+  ];
+  const positions = [];
+  const normals = [];
+  const colors = [];
+  
+  faces.forEach(f => {
+    for(let i=0;i<4;i++) {
+      positions.push(f.verts[i][0]+(cx||0), f.verts[i][1]+(cy||0), f.verts[i][2]+(cz||0));
+      normals.push(f.n[0],f.n[1],f.n[2]);
+    }
+  });
+  
+  // Build index for triangles
+  const indices = [];
+  for(let i=0;i<faces.length;i++) {
+    const base = i*4;
+    indices.push(base,base+1,base+2, base,base+2,base+3);
+  }
+  
+  return { positions: new Float32Array(positions), normals: new Float32Array(normals), indices: new Uint16Array(indices) };
+}
+
+function createCylinder(rBottom, rTop, height, segments, cx,cy,cz, rx,ry,rz) {
+  const positions = [];
+  const normals = [];
+  const indices = [];
+  const h = height / 2;
+  
+  for(let i=0;i<=segments;i++) {
+    const a = (i/segments) * Math.PI * 2;
+    const cos = Math.cos(a), sin = Math.sin(a);
+    // Bottom ring
+    positions.push(rBottom*cos+cx, -h+cy, rBottom*sin+cz);
+    normals.push(cos, 0, sin);
+    // Top ring
+    positions.push(rTop*cos+cx, h+cy, rTop*sin+cz);
+    normals.push(cos, 0, sin);
+  }
+  
+  for(let i=0;i<segments;i++) {
+    const a = i*2, b = i*2+1, c2 = i*2+2, d = i*2+3;
+    indices.push(a,b,c2, b,d,c2);
+  }
+  
+  return { positions: new Float32Array(positions), normals: new Float32Array(normals), indices: new Uint16Array(indices) };
+}
+
+function createViolinBody(scale) {
+  const positions = [];
+  const normals = [];
+  const indices = [];
+  
+  const segments = 40;
+  const rings = 12;
+  const depth = 0.12 * scale;
+  
+  // Violin body profile - top view ellipse with waist
+  function getProfile(yNorm) {
+    // yNorm goes from -1 (bottom) to 1 (top)
+    const y = yNorm * 1.4 * scale;
+    // Width varies along the body
+    let width;
+    if (yNorm < -0.3) {
+      // Lower bout - wide
+      const t = (yNorm + 1) / 0.7;
+      width = (0.35 + 0.15 * Math.sin(t * Math.PI)) * scale;
+    } else if (yNorm < 0.3) {
+      // Waist - narrow
+      const t = (yNorm + 0.3) / 0.6;
+      width = (0.2 - 0.08 * Math.sin(t * Math.PI)) * scale;
+    } else {
+      // Upper bout
+      const t = (yNorm - 0.3) / 0.7;
+      width = (0.12 + 0.15 * Math.sin(t * Math.PI)) * scale;
+    }
+    return { y, width };
+  }
+  
+  // Side profile
+  function getSideProfile(yNorm) {
+    const y = yNorm * 1.4 * scale;
+    let z;
+    if (yNorm < -0.5) {
+      const t = (yNorm + 1) / 0.5;
+      z = (0.06 + 0.04 * t) * scale;
+    } else if (yNorm < 0) {
+      const t = (yNorm + 0.5) / 0.5;
+      z = (0.1 - 0.03 * t) * scale;
+    } else {
+      const t = yNorm / 1;
+      z = (0.07 - 0.02 * t) * scale;
+    }
+    return { y, z };
+  }
+  
+  // Generate side surface
+  for (let j = 0; j <= rings; j++) {
+    const yNorm = -1 + (j / rings) * 2;
+    const prof = getSideProfile(yNorm);
+    const prof2 = getProfile(yNorm);
+    const r = prof2.width;
+    
+    for (let i = 0; i <= segments; i++) {
+      const a = (i / segments) * Math.PI * 2;
+      const cos = Math.cos(a), sin = Math.sin(a);
+      positions.push(r * cos, prof.y, r * sin + prof.z);
+      
+      // Normal approximation
+      const nextProf = getSideProfile(Math.min(yNorm + 0.01, 1));
+      const dx = 0, dy = prof.y - nextProf.y;
+      let dz = prof.z - nextProf.z;
+      const dl = Math.sqrt(dx*dx + dy*dy + dz*dz) || 1;
+      const nx = cos, ny = dy/dl * 0.3, nz = sin;
+      normals.push(nx, ny, nz);
+    }
+  }
+  
+  for (let j = 0; j < rings; j++) {
+    for (let i = 0; i < segments; i++) {
+      const a = j * (segments+1) + i;
+      const b = a + 1;
+      const c = a + segments + 1;
+      const d = c + 1;
+      indices.push(a, b, c, b, d, c);
+    }
+  }
+  
+  return { positions: new Float32Array(positions), normals: new Float32Array(normals), indices: new Uint16Array(indices) };
+}
+
+// Create violin body mesh
+const bodyGeo = createViolinBody(1.0);
+const bodyBufPos = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, bodyBufPos);
+gl.bufferData(gl.ARRAY_BUFFER, bodyGeo.positions, gl.STATIC_DRAW);
+const bodyBufNorm = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, bodyBufNorm);
+gl.bufferData(gl.ARRAY_BUFFER, bodyGeo.normals, gl.STATIC_DRAW);
+const bodyBufIdx = gl.createBuffer();
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bodyBufIdx);
+gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, bodyGeo.indices, gl.STATIC_DRAW);
+const bodyVertCount = bodyGeo.indices.length;
+
+// F-holes and decorative lines
+function createFLine(x, y, side, scale) {
+  const points = [];
+  const segments = 20;
+  const len = 0.25 * scale;
+  const sway = 0.04 * scale;
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const angle = Math.sin(t * Math.PI * 2) * sway;
+    points.push(x + angle, y + (t - 0.5) * len * side, 0.13 * scale + (t - 0.5) * 0.01);
+  }
+  return points;
+}
+
+// Create string buffers
+const stringColors = [
+  [0.9, 0.85, 0.7],  // G string - thicker, warmer
+  [0.85, 0.8, 0.65], // D string
+  [0.8, 0.75, 0.6],  // A string
+  [0.75, 0.7, 0.55]  // E string
+];
+
+const stringFreqs = [196.0, 293.66, 440.0, 659.25]; // G3, D4, A4, E5
+const stringNames = ['G3', 'D4', 'A4', 'E5'];
+const stringPositions3D = [
+  { x: -0.035, z: 0.13 },
+  { x: -0.015, z: 0.13 },
+  { x: 0.015, z: 0.13 },
+  { x: 0.035, z: 0.13 }
+];
+
+// Create string line geometry
+function createStringLine(x, z, length, colorIdx) {
+  const segs = 50;
+  const positions = [];
+  const colors = [];
+  const indices = [];
+  
+  for (let i = 0; i <= segs; i++) {
+    const t = i / segs;
+    const y = -0.5 + t * length;
+    positions.push(x, y, z);
+    colors.push(stringColors[colorIdx][0], stringColors[colorIdx][1], stringColors[colorIdx][2]);
+  }
+  
+  const indicesArr = [];
+  for (let i = 0; i < segs; i++) {
+    indicesArr.push(i, i+1);
+  }
+  
+  const bufPos = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, bufPos);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+  const bufCol = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, bufCol);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+  const bufIdx = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bufIdx);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indicesArr), gl.STATIC_DRAW);
+  
+  return { bufPos, bufCol, bufIdx, count: segs * 2, x, z };
+}
+
+const stringBuffers = [];
+for (let i = 0; i < 4; i++) {
+  stringBuffers.push(createStringLine(stringPositions3D[i].x, stringPositions3D[i].z, 1.8, i));
+}
+
+// Build violin parts
+function buildViolin() {
+  const parts = [];
+  const sc = 1.0;
+  
+  // Body - back plate
+  const bodyBack = createBox(0.38*sc, 0.35*sc, 0.02*sc, 0, 0, -0.08*sc, 0, 0, 0);
+  parts.push({ geo: bodyBack, color: [0.45, 0.25, 0.12], pos: [0,0,0], rot: [0,0,0] });
+  
+  // Body - front plate
+  const bodyFront = createBox(0.38*sc, 0.35*sc, 0.02*sc, 0, 0, 0.08*sc, 0, 0, 0);
+  parts.push({ geo: bodyFront, color: [0.55, 0.35, 0.15], pos: [0,0,0], rot: [0,0,0] });
+  
+  // Body sides
+  const bodySideL = createBox(0.02*sc, 0.35*sc, 0.16*sc, -0.38*sc, 0, 0, 0, 0, 0);
+  parts.push({ geo: bodySideL, color: [0.4, 0.22, 0.1], pos: [0,0,0], rot: [0,0,0] });
+  const bodySideR = createBox(0.02*sc, 0.35*sc, 0.16*sc, 0.38*sc, 0, 0, 0, 0, 0);
+  parts.push({ geo: bodySideR, color: [0.4, 0.22, 0.1], pos: [0,0,0], rot: [0,0,0] });
+  
+  // Upper bout sides
+  const sideUpperL = createBox(0.02*sc, 0.2*sc, 0.12*sc, -0.22*sc, 0.45*sc, 0, 0, 0, 0);
+  parts.push({ geo: sideUpperL, color: [0.4, 0.22, 0.1], pos: [0,0,0], rot: [0,0,0] });
+  const sideUpperR = createBox(0.02*sc, 0.2*sc, 0.12*sc, 0.22*sc, 0.45*sc, 0, 0, 0, 0);
+  parts.push({ geo: sideUpperR, color: [0.4, 0.22, 0.1], pos: [0,0,0], rot: [0,0,0] });
+  
+  // Lower bout sides
+  const sideLowerL = createBox(0.02*sc, 0.4*sc, 0.2*sc, -0.38*sc, -0.2*sc, 0, 0, 0, 0);
+  parts.push({ geo: sideLowerL, color: [0.4, 0.22, 0.1], pos: [0,0,0], rot: [0,0,0] });
+  const sideLowerR = createBox(0.02*sc, 0.4*sc, 0.2*sc, 0.38*sc, -0.2*sc, 0, 0, 0, 0);
+  parts.push({ geo: sideLowerR, color: [0.4, 0.22, 0.1], pos: [0,0,0], rot: [0,0,0] });
+  
+  // Neck
+  const neck = createBox(0.04*sc, 0.04*sc, 0.5*sc, 0, 0.55*sc, -0.2*sc, 0, 0, 0);
+  parts.push({ geo: neck, color: [0.35, 0.2, 0.08], pos: [0,0,0], rot: [0,0,0] });
+  
+  // Fingerboard
+  const fingerboard = createBox(0.05*sc, 0.015*sc, 0.6*sc, 0, 0.58*sc, -0.3*sc, 0, 0, 0);
+  parts.push({ geo: fingerboard, color: [0.15, 0.1, 0.05], pos: [0,0,0], rot: [0,0,0] });
+  
+  // Scroll
+  const scroll = createCylinder(0.03*sc, 0.025*sc, 0.15*sc, 12, 0, 0.85*sc, -0.45*sc, 0, 0, 0);
+  parts.push({ geo: scroll, color: [0.35, 0.2, 0.08], pos: [0,0,0], rot: [0,0,0] });
+  
+  // Scroll head (spiral)
+  const scrollHead = createCylinder(0.04*sc, 0.04*sc, 0.06*sc, 12, 0, 0.93*sc, -0.45*sc, 0, 0, 0);
+  parts.push({ geo: scrollHead, color: [0.35, 0.2, 0.08], pos: [0,0,0], rot: [0,0,0] });
+  
+  // Pegbox
+  const pegbox = createBox(0.08*sc, 0.06*sc, 0.1*sc, 0, 0.78*sc, -0.42*sc, 0, 0, 0);
+  parts.push({ geo: pegbox, color: [0.35, 0.2, 0.08], pos: [0,0,0], rot: [0,0,0] });
+  
+  // Pegs
+  for (let i = 0; i < 4; i++) {
+    const peg = createCylinder(0.008*sc, 0.008*sc, 0.08*sc, 8, 0, 0, 0, 0, 0, 0);
+    const angle = (i < 2) ? -0.3 : 0.3;
+    const yOff = (i % 2 === 0) ? 0.02 : -0.02;
+    const xOff = (i < 2) ? -0.05 : 0.05;
+    parts.push({ geo: peg, color: [0.15, 0.1, 0.05], pos: [xOff*sc, (0.78+yOff)*sc, (-0.42+0.06)*sc], rot: [0,0,0] });
+    parts.push({ geo: peg, color: [0.15, 0.1, 0.05], pos: [xOff*sc, (0.78+yOff)*sc, (-0.42-0.06)*sc], rot: [Math.PI/2,0,0] });
+  }
+  
+  // Bridge
+  const bridge = createBox(0.06*sc, 0.03*sc, 0.04*sc, 0, 0.25*sc, 0.1*sc, 0, 0, 0);
+  parts.push({ geo: bridge, color: [0.5, 0.35, 0.15], pos: [0,0,0], rot: [0,0,0] });
+  // Bridge feet
+  const bridgeFoot1 = createBox(0.015*sc, 0.03*sc, 0.04*sc, -0.025*sc, 0.25*sc, 0.1*sc, 0, 0, 0);
+  parts.push({ geo: bridgeFoot1, color: [0.5, 0.35, 0.15], pos: [0,0,0], rot: [0,0,0] });
+  const bridgeFoot2 = createBox(0.015*sc, 0.03*sc, 0.04*sc, 0.025*sc, 0.25*sc, 0.1*sc, 0, 0, 0);
+  parts.push({ geo: bridgeFoot2, color: [0.5, 0.35, 0.15], pos: [0,0,0], rot: [0,0,0] });
+  
+  // Tailpiece
+  const tailpiece = createBox(0.06*sc, 0.02*sc, 0.12*sc, 0, 0.1*sc, 0.18*sc, 0, 0, 0);
+  parts.push({ geo: tailpiece, color: [0.15, 0.1, 0.05], pos: [0,0,0], rot: [0,0,0] });
+  
+  // Chin rest
+  const chinRest = createBox(0.04*sc, 0.02*sc, 0.08*sc, 0.05*sc, -0.25*sc, 0.05*sc, 0, 0, 0);
+  parts.push({ geo: chinRest, color: [0.12, 0.08, 0.04], pos: [0,0,0], rot: [0,0,0] });
+  
+  // Endpin
+  const endpin = createCylinder(0.008*sc, 0.012*sc, 0.15*sc, 8, 0, -0.5*sc, 0.05*sc, 0, 0, 0);
+  parts.push({ geo: endpin, color: [0.15, 0.1, 0.05], pos: [0,0,0], rot: [0,0,0] });
+  
+  // F-holes (decorative - thin boxes)
+  const fholeL = createBox(0.005*sc, 0.15*sc, 0.005*sc, -0.06*sc, 0.0*sc, 0.1*sc, 0, 0, 0);
+  parts.push({ geo: fholeL, color: [0.1, 0.06, 0.03], pos: [0,0,0], rot: [0,0,0] });
+  const fholeR = createBox(0.005*sc, 0.15*sc, 0.005*sc, 0.06*sc, 0.0*sc, 0.1*sc, 0, 0, 0);
+  parts.push({ geo: fholeR, color: [0.1, 0.06, 0.03], pos: [0,0,0], rot: [0,0,0] });
+  
+  // Bass bar (internal, visible as dark line)
+  const bassBar = createBox(0.01*sc, 0.005*sc, 0.4*sc, -0.1*sc, 0.0*sc, 0.09*sc, 0, 0, 0);
+  parts.push({ geo: bassBar, color: [0.2, 0.12, 0.06], pos: [0,0,0], rot: [0,0,0] });
+  
+  return parts;
+}
+
+const violinParts = buildViolin();
+
+// Create buffers for each part
+function createPartBuffers(part) {
+  const { geo, color, pos, rot } = part;
+  const bufPos = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, bufPos);
+  gl.bufferData(gl.ARRAY_BUFFER, geo.positions, gl.STATIC_DRAW);
+  const bufNorm = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, bufNorm);
+  gl.bufferData(gl.ARRAY_BUFFER, geo.normals, gl.STATIC_DRAW);
+  const bufIdx = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bufIdx);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, geo.indices, gl.STATIC_DRAW);
+  return { bufPos, bufNorm, bufIdx, count: geo.indices.length, color, pos, rot };
+}
+
+const violinBuffers = violinParts.map(p => createPartBuffers(p));
+
+// Audio context
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+// Violin synthesis
+function playViolinNote(stringIdx) {
+  const ctx = getAudioCtx();
+  const baseFreq = stringFreqs[stringIdx];
+  const now = ctx.currentTime;
+  
+  // Create a more realistic violin sound using multiple harmonics
+  const masterGain = ctx.createGain();
+  masterGain.gain.setValueAtTime(0, now);
+  masterGain.gain.linearRampToValueAtTime(0.3, now + 0.05);
+  masterGain.gain.exponentialRampToValueAtTime(0.15, now + 0.3);
+  masterGain.gain.exponentialRampToValueAtTime(0.01, now + 2.0);
+  masterGain.connect(ctx.destination);
+  
+  // Create a "bow" noise source for attack
+  const noiseLen = 0.15;
+  const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * noiseLen, ctx.sampleRate);
+  const noiseData = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < noiseData.length; i++) {
+    noiseData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.02));
+  }
+  const noiseSource = ctx.createBufferSource();
+  noiseSource.buffer = noiseBuffer;
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(0.15, now);
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+  const noiseFilter = ctx.createBiquadFilter();
+  noiseFilter.type = 'bandpass';
+  noiseFilter.frequency.value = baseFreq * 4;
+  noiseFilter.Q.value = 2;
+  noiseSource.connect(noiseFilter);
+  noiseFilter.connect(noiseGain);
+  noiseGain.connect(masterGain);
+  
+  // Main oscillator with harmonics (sawtooth for richness)
+  const numHarmonics = 8;
+  const oscillators = [];
+  
+  // Fundamental
+  const osc1 = ctx.createOscillator();
+  osc1.type = 'sawtooth';
+  osc1.frequency.value = baseFreq;
+  
+  // Harmonics with violin-like spectrum
+  const harmonicGains = [1.0, 0.6, 0.4, 0.3, 0.2, 0.15, 0.1, 0.05];
+  
+  for (let h = 0; h < numHarmonics; h++) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+    
+    osc.type = h === 0 ? 'sawtooth' : 'triangle';
+    osc.frequency.value = baseFreq * (h + 1);
+    
+    // Slight detuning for warmth
+    osc.detune.value = (Math.random() - 0.5) * 4;
+    
+    const hGain = harmonicGains[h] * 0.15;
+    gain.gain.setValueAtTime(h === 0 ? 0 : hGain, now);
+    
+    // Formant filter to simulate violin body resonance
+    filter.type = 'peaking';
+    filter.frequency.value = baseFreq * (h + 1);
+    filter.Q.value = h === 0 ? 1 : 3;
+    filter.gain.value = h < 3 ? 3 : -2;
+    
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(masterGain);
+    
+    osc.start(now);
+    oscillators.push(osc);
+    
+    // Harmonic amplitude decay
+    gain.gain.setValueAtTime(hGain, now + 0.05);
+    gain.gain.exponentialRampToValueAtTime(hGain * 0.3, now + 1.5);
+  }
+  
+  // Vibrato LFO
+  const lfo = ctx.createOscillator();
+  lfo.frequency.value = 5.5;
+  const lfoGain = ctx.createGain();
+  lfoGain.gain.value = baseFreq * 0.015;
+  lfoGain.gain.setValueAtTime(0, now);
+  lfoGain.gain.linearRampToValueAtTime(baseFreq * 0.015, now + 0.3);
+  lfo.connect(lfoGain);
+  oscillators.forEach(osc => lfoGain.connect(osc.frequency));
+  lfo.start(now);
+  
+  // Trigger string vibration visual
+  triggerStringVibration(stringIdx);
+}
+
+// String vibration state
+let stringVibrations = [0, 0, 0, 0];
+let vibrationTimes = [0, 0, 0, 0];
+
+function triggerStringVibration(idx) {
+  stringVibrations[idx] = 1.0;
+  vibrationTimes[idx] = 0;
+}
+
+// Camera
+let camTheta = 0.5;
+let camPhi = 0.8;
+let camDist = 4.0;
+let camTarget = [0, 0, 0];
+
+// Mouse interaction
+let isDragging = false;
+let lastMouse = [0, 0];
+
+canvas.addEventListener('mousedown', e => {
+  isDragging = true;
+  lastMouse = [e.clientX, e.clientY];
+});
+
+window.addEventListener('mouseup', () => { isDragging = false; });
+
+window.addEventListener('mousemove', e => {
+  if (!isDragging) {
+    // Hover detection for strings
+    checkStringHover(e);
+    return;
+  }
+  const dx = e.clientX - lastMouse[0];
+  const dy = e.clientY - lastMouse[1];
+  camTheta -= dx * 0.01;
+  camPhi = Math.max(0.1, Math.min(Math.PI - 0.1, camPhi - dy * 0.01));
+  lastMouse = [e.clientX, e.clientY];
+});
+
+canvas.addEventListener('wheel', e => {
+  camDist = Math.max(1.5, Math.min(10, camDist + e.deltaY * 0.005));
+  e.preventDefault();
+}, { passive: false });
+
+// Touch support
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    lastMouse = [e.touches[0].clientX, e.touches[0].clientY];
+  }
+  e.preventDefault();
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+  if (isDragging && e.touches.length === 1) {
+    const dx = e.touches[0].clientX - lastMouse[0];
+    const dy = e.touches[0].clientY - lastMouse[1];
+    camTheta -= dx * 0.01;
+    camPhi = Math.max(0.1, Math.min(Math.PI - 0.1, camPhi - dy * 0.01));
+    lastMouse = [e.touches[0].clientX, e.touches[0].clientY];
+  }
+  e.preventDefault();
+}, { passive: false });
+
+canvas.addEventListener('touchend', () => { isDragging = false; });
+
+// Keyboard
+window.addEventListener('keydown', e => {
+  const keyMap = { 'g': 0, 'd': 1, 'a': 2, 'f': 3 };
+  const idx = keyMap[e.key.toLowerCase()];
+  if (idx !== undefined) {
+    playViolinNote(idx);
+  }
+});
+
+// Click/hover on canvas - raycast for strings
+function checkStringHover(e) {
+  // Convert mouse to normalized device coordinates
+  const mx = (e.clientX / W) * 2 - 1;
+  const my = -((e.clientY / H) * 2 - 1);
+  
+  // Simple screen-space check against string positions
+  const projMat = mat4Perspective(Math.PI / 4, W / H, 0.1, 100);
+  const eyeX = camTarget[0] + camDist * Math.sin(camPhi) * Math.sin(camTheta);
+  const eyeY = camTarget[1] + camDist * Math.cos(camPhi);
+  const eyeZ = camTarget[2] + camDist * Math.sin(camPhi) * Math.cos(camTheta);
+  const viewMat = mat4LookAt([eyeX, eyeY, eyeZ], camTarget, [0, 1, 0]);
+  const mvp = mat4Multiply(projMat, viewMat);
+  
+  // Check each string
+  for (let i = 0; i < 4; i++) {
+    // Project string midpoint to screen
+    const sx = stringPositions3D[i].x;
+    const sy = 0;
+    const sz = stringPositions3D[i].z + 0.2;
+    
+    const vx = mvp[0]*sx + mvp[4]*sy + mvp[8]*sz + mvp[12];
+    const vy = mvp[1]*sx + mvp[5]*sy + mvp[9]*sz + mvp[13];
+    const vw = mvp[3]*sx + mvp[7]*sy + mvp[11]*sz + mvp[15];
+    
+    if (vw === 0) continue;
+    const ndcX = vx / vw;
+    const ndcY = vy / vw;
+    
+    const screenX = (ndcX + 1) * W / 2;
+    const screenY = (-ndcY + 1) * H / 2;
+    
+    const dist = Math.sqrt((e.clientX - screenX) ** 2 + (e.clientY - screenY) ** 2);
+    if (dist < 20) {
+      canvas.style.cursor = 'pointer';
+      return;
+    }
+  }
+  canvas.style.cursor = isDragging ? 'grabbing' : 'grab';
+}
+
+canvas.addEventListener('click', e => {
+  const mx = (e.clientX / W) * 2 - 1;
+  const my = -((e.clientY / H) * 2 - 1);
+  
+  const projMat = mat4Perspective(Math.PI / 4, W / H, 0.1, 100);
+  const eyeX = camTarget[0] + camDist * Math.sin(camPhi) * Math.sin(camTheta);
+  const eyeY = camTarget[1] + camDist * Math.cos(camPhi);
+  const eyeZ = camTarget[2] + camDist * Math.sin(camPhi) * Math.cos(camTheta);
+  const viewMat = mat4LookAt([eyeX, eyeY, eyeZ], camTarget, [0, 1, 0]);
+  const mvp = mat4Multiply(projMat, viewMat);
+  
+  let hit = false;
+  for (let i = 0; i < 4; i++) {
+    const sx = stringPositions3D[i].x;
+    const sy = 0;
+    const sz = stringPositions3D[i].z + 0.2;
+    
+    const vx = mvp[0]*sx + mvp[4]*sy + mvp[8]*sz + mvp[12];
+    const vy = mvp[1]*sx + mvp[5]*sy + mvp[9]*sz + mvp[13];
+    const vw = mvp[3]*sx + mvp[7]*sy + mvp[11]*sz + mvp[15];
+    
+    if (vw === 0) continue;
+    const ndcX = vx / vw;
+    const ndcY = vy / vw;
+    
+    const screenX = (ndcX + 1) * W / 2;
+    const screenY = (-ndcY + 1) * H / 2;
+    
+    const dist = Math.sqrt((e.clientX - screenX) ** 2 + (e.clientY - screenY) ** 2);
+    if (dist < 25) {
+      playViolinNote(i);
+      hit = true;
+      const noteDisplay = document.getElementById('noteDisplay');
+      noteDisplay.textContent = stringNames[i] + ' string';
+      noteDisplay.style.opacity = '1';
+      setTimeout(() => { noteDisplay.style.opacity = '0'; }, 1500);
+      break;
+    }
+  }
+});
+
+// Animation
+let time = 0;
+
+function render() {
+  time += 0.016;
+  
+  // Update vibrations
+  for (let i = 0; i < 4; i++) {
+    if (stringVibrations[i] > 0.01) {
+      vibrationTimes[i] += 0.016;
+      stringVibrations[i] *= 0.97;
+    } else {
+      stringVibrations[i] = 0;
+    }
+  }
+  
+  gl.clearColor(0.1, 0.1, 0.18, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.DEPTH_TEST);
+  gl.enable(gl.CULL_FACE);
+  gl.cullFace(gl.BACK);
+  
+  const aspect = W / H;
+  const projMat = mat4Perspective(Math.PI / 4, aspect, 0.1, 100);
+  
+  const eyeX = camTarget[0] + camDist * Math.sin(camPhi) * Math.sin(camTheta);
+  const eyeY = camTarget[1] + camDist * Math.cos(camPhi);
+  const eyeZ = camTarget[2] + camDist * Math.sin(camPhi) * Math.cos(camTheta);
+  const viewMat = mat4LookAt([eyeX, eyeY, eyeZ], camTarget, [0, 1, 0]);
+  const vp = mat4Multiply(projMat, viewMat);
+  
+  // Draw violin body (the lathe-generated mesh)
+  gl.useProgram(prog);
+  gl.uniformMatrix4fv(uMVP, false, vp);
+  gl.uniformMatrix4fv(uModel, false, new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]));
+  gl.uniformMatrix3fv(uNormMat, false, mat3NormalFromMat4(new Float32Array([1,0,0, 0,1,0, 0,0,1])));
+  gl.uniform3f(uLightDir, 0.5, 1.0, 0.8);
+  gl.uniform3f(uLightColor, 1.0, 0.95, 0.85);
+  gl.uniform3f(uAmbient, 0.15, 0.12, 0.1);
+  gl.uniform1f(uVibrate, 0);
+  gl.uniform3f(uVibrateColor, 1, 0.8, 0.3);
+  
+  gl.bindBuffer(gl.ARRAY_BUFFER, bodyBufPos);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, bodyBufNorm);
+  gl.enableVertexAttribArray(1);
+  gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+  
+  // Color attribute for body - we'll use a uniform for the violin body color
+  // Actually let's add a color attribute. For simplicity, use a default color.
+  const bodyColor = [0.55, 0.35, 0.15];
+  const bodyColorData = new Float32Array(bodyVertCount * 3).fill(0);
+  for (let i = 0; i < bodyVertCount; i++) {
+    bodyColorData[i * 3] = bodyColor[0];
+    bodyColorData[i * 3 + 1] = bodyColor[1];
+    bodyColorData[i * 3 + 2] = bodyColor[2];
+  }
+  const bodyColorBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, bodyColorBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, bodyColorData, gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(2);
+  gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 0, 0);
+  
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bodyBufIdx);
+  gl.drawElements(gl.TRIANGLES, bodyVertCount, gl.UNSIGNED_SHORT, 0);
+  gl.disableVertexAttribArray(2);
+  
+  // Draw violin parts
+  violinBuffers.forEach(part => {
+    gl.uniformMatrix4fv(uModel, false, new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]));
+    
+    const colorData = new Float32Array(part.count * 3);
+    for (let i = 0; i < part.count / 3; i++) {
+      colorData[i * 3] = part.color[0];
+      colorData[i * 3 + 1] = part.color[1];
+      colorData[i * 3 + 2] = part.color[2];
+    }
+    const cBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, cBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, colorData, gl.STATIC_DRAW);
+    
+    gl.bindBuffer(gl.ARRAY_BUFFER, part.bufPos);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, part.bufNorm);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 0, 0);
+    
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, part.bufIdx);
+    gl.drawElements(gl.TRIANGLES, part.count, gl.UNSIGNED_SHORT, 0);
+    
+    gl.deleteBuffer(cBuf);
+  });
+  
+  // Draw strings
+  gl.useProgram(progString);
+  gl.uniformMatrix4fv(uSMVP, false, vp);
+  gl.uniform1f(uSTime, time);
+  
+  for (let i = 0; i < 4; i++) {
+    const sb = stringBuffers[i];
+    gl.uniform1f(SUVibrate, stringVibrations[i]);
+    gl.uniform1f(SUStringIndex, i);
+    
+    gl.bindBuffer(gl.ARRAY_BUFFER, sb.bufPos);
+    gl.enableVertexAttribArray(SAPos);
+    gl.vertexAttribPointer(SAPos, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, sb.bufCol);
+    gl.enableVertexAttribArray(SAColor);
+    gl.vertexAttribPointer(SAColor, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, sb.bufIdx);
+    gl.lineWidth(2);
+    gl.drawElements(gl.LINES, sb.count, gl.UNSIGNED_SHORT, 0);
+  }
+  
+  requestAnimationFrame(render);
+}
+
+render();
+</script>
+</body>
+</html>

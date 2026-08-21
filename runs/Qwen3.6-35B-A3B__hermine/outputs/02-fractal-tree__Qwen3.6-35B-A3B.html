@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fractal Tree — L-System Garden</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a1a;
+    overflow: hidden;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: #e0d8f0;
+  }
+  canvas { display: block; }
+  #controls {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    background: rgba(15, 10, 35, 0.88);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(180, 140, 255, 0.15);
+    border-radius: 14px;
+    padding: 20px 22px;
+    width: 260px;
+    z-index: 10;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  #controls h2 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: #c8b0f0;
+    letter-spacing: 0.5px;
+    text-align: center;
+  }
+  .ctrl-group {
+    margin-bottom: 14px;
+  }
+  .ctrl-group label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    margin-bottom: 5px;
+    color: #a89cc0;
+  }
+  .ctrl-group label span {
+    color: #d4c0f8;
+    font-weight: 600;
+    min-width: 32px;
+    text-align: right;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(180, 140, 255, 0.15);
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #c8a0f0, #f0a0c8);
+    border: 2px solid rgba(255,255,255,0.3);
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(200,160,240,0.4);
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #c8a0f0, #f0a0c8);
+    border: 2px solid rgba(255,255,255,0.3);
+    cursor: pointer;
+  }
+  button {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid rgba(180, 140, 255, 0.3);
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(100,60,160,0.5), rgba(160,60,120,0.5));
+    color: #e8d8f8;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+  }
+  button:hover {
+    background: linear-gradient(135deg, rgba(130,80,200,0.7), rgba(200,80,150,0.7));
+    border-color: rgba(200,160,255,0.5);
+    box-shadow: 0 0 16px rgba(180,140,255,0.25);
+  }
+  button:active { transform: scale(0.97); }
+  #info {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: rgba(180,160,210,0.5);
+    pointer-events: none;
+  }
+  #stats {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    font-size: 11px;
+    color: rgba(180,160,210,0.4);
+    text-align: right;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="controls">
+  <h2>🌸 L-System Tree</h2>
+  <div class="ctrl-group">
+    <label>Depth <span id="vDepth">6</span></label>
+    <input type="range" id="sDepth" min="3" max="9" value="6" step="1">
+  </div>
+  <div class="ctrl-group">
+    <label>Angle <span id="vAngle">25°</span></label>
+    <input type="range" id="sAngle" min="5" max="50" value="25" step="1">
+  </div>
+  <div class="ctrl-group">
+    <label>Length Ratio <span id="vRatio">0.78</span></label>
+    <input type="range" id="sRatio" min="50" max="90" value="78" step="1">
+  </div>
+  <div class="ctrl-group">
+    <label>Jitter <span id="vJitter">0.0</span></label>
+    <input type="range" id="sJitter" min="0" max="50" value="0" step="1">
+  </div>
+  <div class="ctrl-group">
+    <label>Leaves <span id="vLeaves">On</span></label>
+    <input type="range" id="sLeaves" min="0" max="1" value="1" step="1">
+  </div>
+  <div class="ctrl-group">
+    <label>Wind <span id="vWind">0.3</span></label>
+    <input type="range" id="sWind" min="0" max="100" value="30" step="1">
+  </div>
+  <button id="btnRegen">🌱 Regenerate</button>
+</div>
+<div id="stats"></div>
+<div id="info">Drag to pan · Scroll to zoom</div>
+<script>
+(function() {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', () => { resize(); generate(); });
+
+  // Controls
+  const sDepth = document.getElementById('sDepth');
+  const sAngle = document.getElementById('sAngle');
+  const sRatio = document.getElementById('sRatio');
+  const sJitter = document.getElementById('sJitter');
+  const sLeaves = document.getElementById('sLeaves');
+  const sWind = document.getElementById('sWind');
+  const vDepth = document.getElementById('vDepth');
+  const vAngle = document.getElementById('vAngle');
+  const vRatio = document.getElementById('vRatio');
+  const vJitter = document.getElementById('vJitter');
+  const vLeaves = document.getElementById('vLeaves');
+  const vWind = document.getElementById('vWind');
+  const btnRegen = document.getElementById('btnRegen');
+  const statsEl = document.getElementById('stats');
+
+  function updateLabels() {
+    vDepth.textContent = sDepth.value;
+    vAngle.textContent = sAngle.value + '°';
+    vRatio.textContent = (sRatio.value / 100).toFixed(2);
+    vJitter.textContent = (sJitter.value / 100).toFixed(2);
+    vLeaves.textContent = sLeaves.value === '1' ? 'On' : 'Off';
+    vWind.textContent = (sWind.value / 100).toFixed(2);
+  }
+  [sDepth, sAngle, sRatio, sJitter, sLeaves, sWind].forEach(s => {
+    s.addEventListener('input', () => { updateLabels(); generate(); });
+  });
+  btnRegen.addEventListener('click', generate);
+
+  // Seeded PRNG (mulberry32)
+  function mulberry32(a) {
+    return function() {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    }
+  }
+
+  let rng;
+  let seed = Date.now();
+
+  // L-system
+  function axiom() { return 'X'; }
+  function rules() {
+    return { 'X': 'F+[+X-X-X]+[-X+X+X]', 'F': 'FF' };
+  }
+
+  function generateString(depth) {
+    let current = axiom();
+    const r = rules();
+    for (let i = 0; i < depth; i++) {
+      let next = '';
+      for (let j = 0; j < current.length; j++) {
+        const ch = current[j];
+        next += r[ch] !== undefined ? r[ch] : ch;
+      }
+      current = next;
+    }
+    return current;
+  }
+
+  // Parse L-system string into line segments with depth info
+  // We also track the "tree structure" for animation
+  function parseLSystem(str, maxDepth, angle, lengthRatio, jitterAmt, depth) {
+    // We'll parse character by character, maintaining a stack of positions
+    // Each segment: { x1, y1, x2, y2, depth, angle, length }
+    const segments = [];
+    const stack = [];
+    let x = 0, y = 0;
+    let heading = -Math.PI / 2; // Start pointing up
+    let currentLen = 1.0;
+    let currentDepth = 0;
+
+    // For proper depth tracking, we need to track nesting via [ and ]
+    let bracketDepth = 0;
+
+    for (let i = 0; j2 = 0, len2 = str.length; i < len2; i++) {
+      const ch = str[i];
+      if (ch === 'F') {
+        // Draw forward
+        const jx = x + currentLen * Math.cos(heading);
+        const jy = y + currentLen * Math.sin(heading);
+        const jitterX = jitterAmt > 0 ? (Math.random() - 0.5) * jitterAmt * currentLen * 0.3 : 0;
+        const jitterY = jitterAmt > 0 ? (Math.random() - 0.5) * jitterAmt * currentLen * 0.3 : 0;
+        segments.push({
+          x1: x + jitterX, y1: y + jitterY,
+          x2: jx + jitterX, y2: jy + jitterY,
+          depth: currentDepth,
+          length: currentLen,
+          angle: heading
+        });
+        x = jx + jitterX;
+        y = jy + jitterY;
+      } else if (ch === '+') {
+        heading += angle;
+      } else if (ch === '-') {
+        heading -= angle;
+      } else if (ch === '[') {
+        stack.push({ x, y, heading, currentLen, currentDepth, bracketDepth });
+        bracketDepth++;
+      } else if (ch === ']') {
+        const prev = stack.pop();
+        x = prev.x;
+        y = prev.y;
+        heading = prev.heading;
+        currentLen = prev.currentLen;
+        currentDepth = prev.currentDepth;
+        bracketDepth = prev.bracketDepth;
+      }
+    }
+
+    return segments;
+  }
+
+  // Better approach: use a proper recursive interpreter that tracks depth
+  function interpretLSystem(str, maxDepth, angleDeg, lengthRatio, jitterAmt) {
+    const segments = [];
+    let stack = [];
+    let x = 0, y = 0;
+    let heading = -Math.PI / 2;
+    let depth = 0;
+    let baseLen = 1;
+    let segIdx = 0;
+    let len = str.length;
+    let currentLen = baseLen;
+
+    // We need to track depth properly. The depth increases at each '[' level
+    // and we only draw F commands.
+    let bracketLevel = 0;
+
+    for (let i = 0; i < len; i++) {
+      const ch = str[i];
+      if (ch === 'F') {
+        const jx = jitterAmt > 0 ? (Math.random() - 0.5) * jitterAmt * 0.02 : 0;
+        const jy = jitterAmt > 0 ? (Math.random() - 0.5) * jitterAmt * 0.02 : 0;
+        segments.push({
+          x1: x + jx, y1: y + jy,
+          x2: x + currentLen * Math.cos(heading) + jx,
+          y2: y + currentLen * Math.sin(heading) + jy,
+          depth: depth,
+          length: currentLen,
+          angle: heading
+        });
+        x += currentLen * Math.cos(heading);
+        y += currentLen * Math.sin(heading);
+      } else if (ch === '+') {
+        heading += angleDeg * Math.PI / 180;
+      } else if (ch === '-') {
+        heading -= angleDeg * Math.PI / 180;
+      } else if (ch === '[') {
+        stack.push({ x, y, heading, currentLen, depth, bracketLevel });
+        bracketLevel++;
+      } else if (ch === ']') {
+        const prev = stack.pop();
+        x = prev.x; y = prev.y; heading = prev.heading;
+        currentLen = prev.currentLen; depth = prev.depth;
+        bracketLevel = prev.bracketLevel;
+      }
+    }
+
+    return segments;
+  }
+
+  // Collect all unique branch "tips" for leaves
+  function findTips(segments, maxDepth) {
+    const tips = [];
+    // A tip is the end of a segment at the deepest level
+    for (const seg of segments) {
+      if (seg.depth === maxDepth || seg.depth === maxDepth - 1) {
+        tips.push({ x: seg.x2, y: seg.y2, depth: seg.depth });
+      }
+    }
+    return tips;
+  }
+
+  // Animation state
+  let animSegments = [];
+  let animTips = [];
+  let animProgress = 0; // 0 to 1 overall
+  let animStartTime = 0;
+  let animDuration = 4000; // ms for full growth
+  let particles = [];
+  let globalTime = 0;
+  let cameraX = 0, cameraY = 0, cameraZoom = 1;
+  let isDragging = false, dragStartX, dragStartY, camStartX, camStartY;
+
+  // Center of tree for camera
+  let treeBounds = { cx: 0, cy: 0, maxLen: 0 };
+
+  function generate() {
+    const depth = parseInt(sDepth.value);
+    const angle = parseFloat(sAngle.value);
+    const ratio = parseFloat(sRatio.value) / 100;
+    const jitter = parseFloat(sJitter.value) / 100;
+    const showLeaves = parseInt(sLeaves.value) === 1;
+    const windAmt = parseFloat(sWind.value) / 100;
+
+    rng = mulberry32(seed);
+    seed = (seed * 1664525 + 1013904223) & 0xFFFFFFFF;
+
+    // Generate L-system string
+    const str = generateString(depth);
+
+    // Interpret
+    animSegments = interpretLSystem(str, depth, angle, ratio, jitter);
+
+    // Compute bounds
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    let maxLen = 0;
+    for (const seg of animSegments) {
+      if (seg.x1 < minX) minX = seg.x1;
+      if (seg.x2 < minX) minX = seg.x2;
+      if (seg.x1 > maxX) maxX = seg.x1;
+      if (seg.x2 > maxX) maxX = seg.x2;
+      if (seg.y1 < minY) minY = seg.y1;
+      if (seg.y2 < minY) minY = seg.y2;
+      if (seg.y1 > maxY) maxY = seg.y1;
+      if (seg.y2 > maxY) maxY = seg.y2;
+      const l = Math.sqrt(seg.x1*seg.x1 + seg.y1*seg.y1);
+      if (l > maxLen) maxLen = l;
+    }
+
+    treeBounds.cx = (minX + maxX) / 2;
+    treeBounds.cy = (minY + maxY) / 2;
+    treeBounds.maxLen = maxLen || 1;
+
+    // Find tips
+    const tips = findTips(animSegments, depth);
+    animTips = tips.map(t => ({ x: t.x, y: t.y, depth: t.depth,
+      size: 2 + rng() * 4,
+      color: rng(),
+      phase: rng() * Math.PI * 2
+    }));
+
+    // Reset animation
+    animProgress = 0;
+    animStartTime = performance.now();
+    particles = [];
+
+    // Calculate max segment length for scale
+    let maxSegLen = 0;
+    for (const seg of animSegments) {
+      const d = Math.sqrt((seg.x2-seg.x1)**2 + (seg.y2-seg.y1)**2);
+      if (d > maxSegLen) maxSegLen = d;
+    }
+
+    // Fit tree to canvas
+    const padding = 80;
+    const treeW = maxX - minX + padding * 2;
+    const treeH = maxY - minY + padding * 2;
+    const scaleX = W / treeW;
+    const scaleY = H / treeH;
+    cameraZoom = Math.min(scaleX, scaleY) * 0.9;
+    cameraX = -treeBounds.cx * cameraZoom + W / 2;
+    cameraY = -treeBounds.cy * cameraZoom + H / 2;
+
+    statsEl.innerHTML = `Segments: ${animSegments.length}<br>Depth: ${depth}<br>Seed: ${seed.toString(16).slice(0,6)}`;
+  }
+
+  function getSegmentVisibility(progress) {
+    // Returns the fraction of each segment that should be drawn
+    // Segments are grouped by depth, and within depth by order
+    const segments = animSegments;
+    const n = segments.length;
+    if (n === 0) return [];
+
+    // Each segment gets a fraction based on global progress
+    // Deeper segments start later
+    const maxDepth = Math.max(...segments.map(s => s.depth));
+    const result = [];
+
+    for (let i = 0; i < n; i++) {
+      const seg = segments[i];
+      const segProgress = Math.max(0, Math.min(1,
+        (progress * n - i) * 0.8
+      ));
+      result.push(segProgress);
+    }
+    return result;
+  }
+
+  function getColor(depth, maxDepth) {
+    const t = depth / Math.max(maxDepth, 1);
+    // Trunk: warm brown → branches: teal/green → tips: pink/white
+    const r = Math.round(80 + 175 * t + 75 * Math.sin(t * Math.PI));
+    const g = Math.round(50 + 120 * t + 30 * Math.cos(t * 2));
+    const b = Math.round(30 + 60 * t + 100 * Math.sin(t * Math.PI * 0.5));
+    return `rgb(${Math.min(255,r)},${Math.min(255,g)},${Math.min(255,b)})`;
+  }
+
+  function drawBackground() {
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, '#0a0618');
+    grad.addColorStop(0.4, '#0f0e2a');
+    grad.addColorStop(0.7, '#1a1035');
+    grad.addColorStop(1, '#0d0820');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // Stars
+    ctx.save();
+    for (let i = 0; i < 80; i++) {
+      const sx = ((i * 7919 + 13) % W);
+      const sy = ((i * 6271 + 37) % (H * 0.6));
+      const twinkle = 0.3 + 0.7 * Math.abs(Math.sin(globalTime * 0.001 + i));
+      ctx.fillStyle = `rgba(200,190,255,${0.15 * twinkle})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 0.5 + twinkle, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Ground gradient
+    const groundGrad = ctx.createLinearGradient(0, H * 0.85, 0, H);
+    groundGrad.addColorStop(0, 'rgba(20,15,40,0)');
+    groundGrad.addColorStop(1, 'rgba(15,10,30,0.8)');
+    ctx.fillStyle = groundGrad;
+    ctx.fillRect(0, H * 0.85, W, H * 0.15);
+  }
+
+  function drawSegment(seg, alpha, windAmt, time, depth, maxDepth) {
+    const windOffset = windAmt > 0 ? Math.sin(time * 0.001 + depth * 0.5) * windAmt * depth * 0.008 : 0;
+
+    ctx.beginPath();
+    ctx.moveTo(seg.x1 * cameraZoom + cameraX, seg.y1 * cameraZoom + cameraY);
+
+    const dx = seg.x2 - seg.x1;
+    const dy = seg.y2 - seg.y1;
+    const ex = (seg.x1 + dx * alpha) * cameraZoom + cameraX;
+    const ey = (seg.y1 + dy * alpha) * cameraZoom + cameraY;
+
+    // Apply wind as a perpendicular offset
+    const windX = Math.cos(seg.angle + Math.PI/2) * windOffset * depth;
+    const windY = Math.sin(seg.angle + Math.PI/2) * windOffset * depth;
+
+    ctx.lineTo(ex + windX, ey + windY);
+
+    const maxD = Math.max(maxDepth, 1);
+    const t = depth / maxD;
+    const lineWidth = Math.max(0.5, (1 - t * 0.7) * 4);
+
+    ctx.strokeStyle = getColor(depth, maxD);
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = lineWidth * cameraZoom;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawLeaf(x, y, size, color, phase, alpha, windAmt, time, depth) {
+    const windOffset = windAmt > 0 ? Math.sin(time * 0.002 + phase) * windAmt * 2 : 0;
+    const s = size * cameraZoom;
+
+    const hue = 320 + color * 60; // pink range
+    const sat = 70 + color * 30;
+    const light = 70 + color * 20;
+
+    ctx.save();
+    ctx.translate(x * cameraZoom + cameraX + windOffset, y * cameraZoom + cameraY);
+    ctx.rotate(time * 0.0005 + phase);
+
+    ctx.globalAlpha = alpha * (0.6 + 0.4 * Math.sin(time * 0.003 + phase));
+
+    // Petal shape
+    ctx.fillStyle = `hsl(${hue}, ${sat}%, ${light}%)`;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, s * 0.6, s * 0.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = `hsl(${hue + 20}, ${sat}%, ${light + 15}%)`;
+    ctx.beginPath();
+    ctx.ellipse(s * 0.2, -s * 0.1, s * 0.4, s * 0.25, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Center dot
+    ctx.fillStyle = `hsl(${hue - 20}, 90%, 85%)`;
+    ctx.beginPath();
+    ctx.arc(0, 0, s * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  function drawParticle(p) {
+    const x = p.x * cameraZoom + cameraX;
+    const y = p.y * cameraZoom + cameraY;
+    ctx.globalAlpha = p.alpha;
+    ctx.fillStyle = `hsl(${330 + p.hue}, 80%, ${70 + p.brightness}%)`;
+    ctx.beginPath();
+    ctx.arc(x, y, p.size * cameraZoom, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  function updateParticles(time, dt) {
+    // Spawn new particles from tips
+    if (animTips.length > 0 && Math.random() < 0.3) {
+      const tip = animTips[Math.floor(Math.random() * animTips.length)];
+      const windAmt = parseFloat(sWind.value) / 100;
+      particles.push({
+        x: tip.x + (Math.random() - 0.5) * 20,
+        y: tip.y + (Math.random() - 0.5) * 10,
+        vx: (Math.random() * 0.3 + 0.1) * (windAmt > 0 ? 1 : 0.3) + (Math.random() - 0.5) * 0.2,
+        vy: Math.random() * 0.5 + 0.2,
+        size: 1 + Math.random() * 2,
+        alpha: 0.6 + Math.random() * 0.4,
+        hue: Math.random() * 60,
+        brightness: Math.random() * 20,
+        life: 1.0,
+        decay: 0.002 + Math.random() * 0.003
+      });
+    }
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx + Math.sin(time * 0.002 + p.x * 0.01) * 0.3;
+      p.y += p.vy;
+      p.life -= p.decay;
+      p.alpha = p.life * 0.5;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+
+    // Limit particles
+    if (particles.length > 200) {
+      particles.splice(0, particles.length - 200);
+    }
+  }
+
+  function render(time) {
+    globalTime = time;
+
+    // Update animation progress
+    const elapsed = time - animStartTime;
+    const windAmt = parseFloat(sWind.value) / 100;
+    const showLeaves = parseInt(sLeaves.value) === 1;
+
+    // Growth animation: full growth takes animDuration ms
+    const growTime = Math.min(1, elapsed / animDuration);
+    // Ease out cubic
+    const easedGrow = 1 - Math.pow(1 - growTime, 3);
+
+    drawBackground();
+
+    const maxDepth = Math.max(...animSegments.map(s => s.depth), 0);
+
+    // Draw all segments with their animated alpha
+    for (let i = 0; i < animSegments.length; i++) {
+      const seg = animSegments[i];
+      // Each segment appears sequentially
+      const segDelay = (i / animSegments.length) * 0.6;
+      const segAlpha = Math.max(0, Math.min(1, (easedGrow - segDelay) / (1 - segDelay) * 1.5));
+
+      if (segAlpha > 0) {
+        drawSegment(seg, segAlpha, windAmt, time, seg.depth, maxDepth);
+      }
+    }
+
+    // Draw leaves at tips
+    if (showLeaves && easedGrow > 0.5) {
+      const leafAlpha = Math.min(1, (easedGrow - 0.5) / 0.3);
+      for (const tip of animTips) {
+        drawLeaf(tip.x, tip.y, tip.size, tip.color, tip.phase,
+          leafAlpha, windAmt, time, tip.depth);
+      }
+    }
+
+    // Update and draw particles
+    updateParticles(time, 16);
+    for (const p of particles) {
+      drawParticle(p);
+    }
+
+    requestAnimationFrame(render);
+  }
+
+  // Pan and zoom
+  canvas.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    camStartX = cameraX;
+    camStartY = cameraY;
+  });
+  canvas.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    cameraX = camStartX + (e.clientX - dragStartX);
+    cameraY = camStartY + (e.clientY - dragStartY);
+  });
+  canvas.addEventListener('mouseup', () => { isDragging = false; });
+  canvas.addEventListener('mouseleave', () => { isDragging = false; });
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+    const mx = e.clientX;
+    const my = e.clientY;
+    cameraX = mx - (mx - cameraX) * zoomFactor;
+    cameraY = my - (my - cameraY) * zoomFactor;
+    cameraZoom *= zoomFactor;
+  }, { passive: false });
+
+  // Touch support
+  let lastTouchDist = 0;
+  canvas.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 1) {
+      isDragging = true;
+      dragStartX = e.touches[0].clientX;
+      dragStartY = e.touches[0].clientY;
+      camStartX = cameraX;
+      camStartY = cameraY;
+    } else if (e.touches.length === 2) {
+      isDragging = false;
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      lastTouchDist = Math.sqrt(dx*dx + dy*dy);
+    }
+    e.preventDefault();
+  }, { passive: false });
+  canvas.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 1 && isDragging) {
+      cameraX = camStartX + (e.touches[0].clientX - dragStartX);
+      cameraY = camStartY + (e.touches[0].clientY - dragStartY);
+    } else if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      const scale = dist / lastTouchDist;
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      cameraX = cx - (cx - cameraX) * scale;
+      cameraY = cy - (cy - cameraY) * scale;
+      cameraZoom *= scale;
+      lastTouchDist = dist;
+    }
+    e.preventDefault();
+  }, { passive: false });
+  canvas.addEventListener('touchend', () => { isDragging = false; });
+
+  // Initialize and start
+  updateLabels();
+  generate();
+  requestAnimationFrame(render);
+})();
+</script>
+</body>
+</html>
