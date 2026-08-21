@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEON-STRAT: Rogue TD</title>
+    <style>
+        :root {
+            --bg: #050508;
+            --panel: #10101a;
+            --accent: #00f2ff;
+            --magenta: #ff00ff;
+            --lime: #39ff14;
+            --yellow: #ffff00;
+            --white: #ffffff;
+            --text: #e0e0ff;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text);
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            display: block;
+            box-shadow: 0 0 50px rgba(0, 242, 255, 0.1);
+            cursor: crosshair;
+        }
+
+        /* UI Overlays */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(5, 5, 8, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            transition: opacity 0.3s ease;
+        }
+
+        .hidden {
+            display: none !important;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 2px solid var(--accent);
+            box-shadow: 0 0 20px var(--accent);
+            padding: 2rem;
+            border-radius: 4px;
+            text-align: center;
+            max-width: 600px;
+            width: 90%;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin: 0 0 1rem 0;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            color: var(--accent);
+            text-shadow: 0 0 10px var(--accent);
+        }
+
+        .btn {
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 12px 24px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: 0.2s;
+            margin: 10px;
+            display: inline-block;
+        }
+
+        .btn:hover {
+            background: var(--accent);
+            color: var(--bg);
+            box-shadow: 0 0 15px var(--accent);
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            pointer-events: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            z-index: 10;
+        }
+
+        .stat-box {
+            background: rgba(16, 16, 26, 0.7);
+            border-left: 4px solid var(--accent);
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        #build-menu {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 10;
+            background: rgba(16, 16, 26, 0.8);
+            padding: 15px;
+            border: 1px solid rgba(0, 242, 255, 0.3);
+            border-radius: 8px;
+        }
+
+        .build-item {
+            width: 80px;
+            height: 80px;
+            border: 2px solid #444;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            transition: 0.2s;
+            text-align: center;
+            background: rgba(0,0,0,0.5);
+        }
+
+        .build-item:hover {
+            border-color: var(--accent);
+            background: rgba(0, 242, 255, 0.1);
+        }
+
+        .build-item.active {
+            border-color: var(--accent);
+            background: rgba(0, 242, 255, 0.3);
+            box-shadow: 0 0 10px var(--accent);
+        }
+
+        /* Skill Tree */
+        .skill-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .skill-node {
+            background: #1a1a2e;
+            border: 1px solid #444;
+            padding: 15px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .skill-node:hover {
+            border-color: var(--lime);
+        }
+
+        .skill-node.bought {
+            border-color: var(--lime);
+            background: rgba(57, 255, 20, 0.1);
+        }
+
+        /* Overclock Bar */
+        #overclock-container {
+            position: absolute;
+            right: 20px;
+            top: 100px;
+            width: 30px;
+            height: 200px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--magenta);
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        #overclock-fill {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 0%;
+            background: var(--magenta);
+            box-shadow: 0 0 15px var(--magenta);
+            transition: height 0.3s;
+        }
+
+        #overclock-label {
+            position: absolute;
+            right: 40px;
+            top: 100px;
+            color: var(--magenta);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="hud">
+        <div class="stat-box">
+            <div>Health: <span id="health-val" style="color: var(--magenta)">20</span></div>
+            <div>Credits: <span id="credits-val" style="color: var(--lime)">200</span></div>
+        </div>
+        <div class="stat-box" style="text-align: right;">
+            <div>Wave: <span id="wave-val" style="color: var(--accent)">1</span></div>
+            <div>Score: <span id="score-val">0</span></div>
+        </div>
+    </div>
+
+    <div id="overclock-label">Overclock</div>
+    <div id="overclock-container">
+        <div id="overclock-fill"></div>
+    </div>
+
+    <div id="build-menu">
+        <div class="build-item" onclick="setBuildMode('pulse')" id="btn-pulse">
+            <div style="color: var(--accent); font-weight: bold; margin-bottom: 5px;">PULSE</div>
+            <div>$50</div>
+        </div>
+        <div class="build-item" onclick="setBuildMode('plasma')" id="btn-plasma">
+            <div style="color: var(--yellow); font-weight: bold; margin-bottom: 5px;">PLASMA</div>
+            <div>$120</div>
+        </div>
+        <div class="build-item" onclick="setBuildMode('rail')" id="btn-rail">
+            <div style="color: var(--magenta); font-weight: bold; margin-bottom: 5px;">RAIL</div>
+            <div>$250</div>
+        </div>
+    </div>
+
+    <!-- Main Menu -->
+    <div id="menu-overlay" class="overlay">
+        <div class="panel">
+            <h1>NEON-STRAT</h1>
+            <p>Defend the core against the geometric swarm.</p>
+            <button class="btn" onclick="startGame()">Initiate Run</button>
+            <button class="btn" onclick="showSkillTree()">Neural Upgrades</button>
+        </div>
+    </div>
+
+    <!-- Skill Tree -->
+    <div id="skill-overlay" class="overlay hidden">
+        <div class="panel">
+            <h1>Neural Upgrades</h1>
+            <p>Spend Permanent Data Fragments to evolve.</p>
+            <div style="margin-bottom: 15px;">Fragments: <span id="fragments-val" style="color: var(--lime)">0</span></div>
+            <div class="skill-grid" id="skill-grid">
+                <!-- Generated by JS -->
+            </div>
+            <button class="btn" onclick="hideSkillTree()">Return</button>
+        </div>
+    </div>
+
+    <!-- Game Over -->
+    <div id="death-overlay" class="overlay hidden">
+        <div class="panel">
+            <h1 style="color: var(--magenta); text-shadow: 0 0 10px var(--magenta);">CORE BREACHED</h1>
+            <p>Wave Reached: <span id="final-wave">0</span></p>
+            <p>Data Fragments Recovered: <span id="recovered-fragments">0</span></p>
+            <button class="btn" onclick="showSkillTree()">Upgrade Neural Net</button>
+            <button class="btn" onclick="startGame()">Retry</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    /** GAME CONFIG **/
+    const CONFIG = {
+        gridSize: 40,
+        baseHealth: 20,
+        startCredits: 200,
+        colors: {
+            pulse: '#00f2ff',
+            plasma: '#ffff00',
+            rail: '#ff00ff',
+            enemy1: '#00f2ff',
+            enemy2: '#ff00ff',
+            enemy3: '#39ff14',
+            enemy4: '#ffff00',
+            enemy5: '#ffffff',
+            boss: '#ffffff'
+        }
+    };
+
+    const TURRET_TYPES = {
+        pulse: { cost: 50, range: 120, damage: 10, rate: 600, color: CONFIG.colors.pulse, type: 'single' },
+        plasma: { cost: 120, range: 100, damage: 25, rate: 1200, color: CONFIG.colors.plasma, type: 'aoe' },
+        rail: { cost: 250, range: 250, damage: 60, rate: 2500, color: CONFIG.colors.rail, type: 'pierce' }
+    };
+
+    const ENEMY_TYPES = [
+        { name: 'Scout', hp: 30, speed: 1.2, color: CONFIG.colors.enemy1, reward: 5, size: 12 },
+        { name: 'Sprinter', hp: 20, speed: 2.2, color: CONFIG.colors.enemy2, reward: 7, size: 10 },
+        { name: 'Tank', hp: 150, speed: 0.6, color: CONFIG.colors.enemy3, reward: 12, size: 18 },
+        { name: 'Splitter', hp: 60, speed: 1.0, color: CONFIG.colors.enemy4, reward: 10, size: 14, split: true },
+        { name: 'Ghost', hp: 80, speed: 1.1, color: CONFIG.colors.enemy5, reward: 15, size: 13, shield: true },
+    ];
+
+    /** STATE **/
+    let canvas, ctx;
+    let gameState = 'MENU';
+    let credits = 0;
+    let health = 0;
+    let wave = 0;
+    let score = 0;
+    let fragments = parseInt(localStorage.getItem('neon_fragments')) || 0;
+    let metaUpgrades = JSON.parse(localStorage.getItem('neon_meta')) || {
+        damage: 0,
+        range: 0,
+        startingCredits: 0,
+        health: 0
+    };
+
+    let enemies = [];
+    let turrets = [];
+    let projectiles = [];
+    let particles = [];
+    let buildMode = null;
+    let mousePos = { x: 0, y: 0 };
+    let waveActive = false;
+    let overclockMeter = 0;
+    let isOverclocked = false;
+    let overclockTimer = 0;
+
+    // Path waypoints
+    let path = [];
+
+    const SKILLS = [
+        { id: 'damage', name: 'Overcharge', desc: '+10% Dmg', cost: 5, max: 10 },
+        { id: 'range', name: 'Long Range', desc: '+10% Range', cost: 5, max: 10 },
+        { id: 'credits', name: 'Capitalism', desc: '+50 Start Credits', cost: 5, max: 10 },
+        { id: 'health', name: 'Hardened Core', desc: '+5 Max HP', cost: 5, max: 10 },
+    ];
+
+    /** INITIALIZATION **/
+    window.onload = () => {
+        canvas = document.getElementById('gameCanvas');
+        ctx = canvas.getContext('2d');
+        resize();
+        window.addEventListener('resize', resize);
+        
+        canvas.addEventListener('mousemove', e => {
+            const rect = canvas.getBoundingClientRect();
+            mousePos.x = e.clientX - rect.left;
+            mousePos.y = e.clientY - rect.top;
+        });
+
+        canvas.addEventListener('mousedown', handleCanvasClick);
+
+        initSkillTree();
+        requestAnimationFrame(gameLoop);
+    };
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        generatePath();
+    }
+
+    function generatePath() {
+        path = [];
+        const margin = 100;
+        path.push({ x: -50, y: canvas.height / 2 });
+        path.push({ x: canvas.width * 0.2, y: canvas.height / 2 });
+        path.push({ x: canvas.width * 0.2, y: canvas.height * 0.3 });
+        path.push({ x: canvas.width * 0.5, y: canvas.height * 0.3 });
+        path.push({ x: canvas.width * 0.5, y: canvas.height * 0.7 });
+        path.push({ x: canvas.width * 0.8, y: canvas.height * 0.7 });
+        path.push({ x: canvas.width * 0.8, y: canvas.height / 2 });
+        path.push({ x: canvas.width + 50, y: canvas.height / 2 });
+    }
+
+    /** GAME LOGIC **/
+    function startGame() {
+        gameState = 'PLAYING';
+        health = CONFIG.baseHealth + (metaUpgrades.health * 5);
+        credits = CONFIG.startCredits + (metaUpgrades.startingCredits * 50);
+        wave = 0;
+        score = 0;
+        enemies = [];
+        turrets = [];
+        projectiles = [];
+        particles = [];
+        overclockMeter = 0;
+        isOverclocked = false;
+        
+        document.getElementById('menu-overlay').classList.add('hidden');
+        document.getElementById('death-overlay').classList.add('hidden');
+        startWave();
+    }
+
+    function startWave() {
+        wave++;
+        waveActive = true;
+        
+        // Spawn normal enemies
+        const count = 5 + wave * 3;
+        for (let i = 0; i < count; i++) {
+            setTimeout(() => spawnEnemy(), i * 800);
+        }
+
+        // Spawn Boss at the end
+        setTimeout(() => spawnBoss(), count * 800 + 1000);
+    }
+
+    function spawnEnemy() {
+        if (gameState !== 'PLAYING') return;
+        const type = ENEMY_TYPES[Math.floor(Math.random() * ENEMY_TYPES.length)];
+        const scale = 1 + (wave * 0.15);
+        enemies.push(new Enemy(type, scale));
+    }
+
+    function spawnBoss() {
+        if (gameState !== 'PLAYING') return;
+        const scale = 1 + (wave * 0.2);
+        const boss = new Enemy({
+            name: 'CORE-RAIDER',
+            hp: 500 * scale,
+            speed: 0.5,
+            color: CONFIG.colors.boss,
+            reward: 100,
+            size: 30
+        }, scale, true);
+        enemies.push(boss);
+    }
+
+    function handleCanvasClick() {
+        if (gameState !== 'PLAYING' || !buildMode) return;
+        
+        const typeData = TURRET_TYPES[buildMode];
+        if (credits >= typeData.cost) {
+            // Snap to grid
+            const gx = Math.floor(mousePos.x / CONFIG.gridSize) * CONFIG.gridSize + CONFIG.gridSize/2;
+            const gy = Math.floor(mousePos.y / CONFIG.gridSize) * CONFIG.gridSize + CONFIG.gridSize/2;
+            
+            // Check if on path
+            if (isOnPath(gx, gy)) {
+                createParticle(gx, gy, '#ff0000', 10);
+                return;
+            }
+
+            // Check if already occupied
+            if (turrets.some(t => t.x === gx && t.y === gy)) return;
+
+            credits -= typeData.cost;
+            turrets.push(new Turret(gx, gy, buildMode));
+            createParticle(gx, gy, typeData.color, 15);
+        }
+    }
+
+    function isOnPath(x, y) {
+        for (let i = 0; i < path.length - 1; i++) {
+            const p1 = path[i];
+            const p2 = path[i+1];
+            const dist = distToSegment({x, y}, p1, p2);
+            if (dist < 40) return true;
+        }
+        return false;
+    }
+
+    function distToSegment(p, v, w) {
+        const l2 = Math.pow(v.x - w.x, 2) + Math.pow(v.y - w.y, 2);
+        if (l2 === 0) return Math.hypot(p.x - v.x, p.y - v.y);
+        let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+        t = Math.max(0, Math.min(1, t));
+        return Math.hypot(p.x - (v.x + t * (w.x - v.x)), p.y - (v.y + t * (w.y - v.y)));
+    }
+
+    /** CLASSES **/
+    class Enemy {
+        constructor(type, scale, isBoss = false) {
+            this.type = type;
+            this.maxHp = type.hp * scale;
+            this.hp = this.maxHp;
+            this.speed = type.speed;
+            this.color = type.color;
+            this.reward = type.reward;
+            this.size = type.size;
+            this.isBoss = isBoss;
+            this.pathIndex = 0;
+            this.x = path[0].x;
+            this.y = path[0].y;
+            this.dead = false;
+        }
+
+        update() {
+            const target = path[this.pathIndex + 1];
+            if (!target) {
+                health--;
+                this.dead = true;
+                createParticle(this.x, this.y, '#ff0000', 20);
+                return;
+            }
+
+            const dx = target.x - this.x;
+            const dy = target.y - this.y;
+            const dist = Math.hypot(dx, dy);
+            
+            const moveDist = this.speed * (isOverclocked ? 0.5 : 1);
+            this.x += (dx / dist) * moveDist;
+            this.y += (dy / dist) * moveDist;
+
+            if (dist < moveDist) {
+                this.pathIndex++;
+            }
+        }
+
+        draw() {
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = this.color;
+            ctx.fillStyle = this.color;
+            
+            if (this.isBoss) {
+                ctx.fillRect(this.x - this.size/2, this.y - this.size/2, this.size, this.size);
+            } else {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size/2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // HP bar
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#444';
+            ctx.fillRect(this.x - 15, this.y - 20, 30, 4);
+            ctx.fillStyle = this.color;
+            ctx.fillRect(this.x - 15, this.y - 20, (this.hp / this.maxHp) * 30, 4);
+        }
+
+        takeDamage(dmg) {
+            this.hp -= dmg;
+            if (this.hp <= 0 && !this.dead) {
+                this.dead = true;
+                credits += this.reward;
+                score += this.reward * 10;
+                overclockMeter = Math.min(100, overclockMeter + 2);
+                createParticle(this.x, this.y, this.color, 10);
+                
+                if (this.type.split) {
+                    for(let i=0; i<2; i++) {
+                        const s = new Enemy({...this.type, hp: this.type.hp/2, size: 8}, 1);
+                        s.x = this.x; s.y = this.y;
+                        enemies.push(s);
+                    }
+                }
+            }
+        }
+    }
+
+    class Turret {
+        constructor(x, y, typeKey) {
+            this.x = x;
+            this.y = y;
+            this.typeKey = typeKey;
+            this.data = { ...TURRET_TYPES[typeKey] };
+            this.level = 1;
+            this.lastShot = 0;
+            this.target = null;
+        }
+
+        update(now) {
+            const range = this.data.range * (1 + metaUpgrades.range * 0.1);
+            const fireRate = isOverclocked ? this.data.rate / 2 : this.data.rate;
+
+            if (now - this.lastShot > fireRate) {
+                this.target = enemies.find(e => Math.hypot(e.x - this.x, e.y - this.y) < range);
+                if (this.target) {
+                    this.shoot();
+                    this.lastShot = now;
+                }
+            }
+        }
+
+        shoot() {
+            const dmg = this.data.damage * (1 + metaUpgrades.damage * 0.1);
+            projectiles.push(new Projectile(this.x, this.y, this.target, dmg, this.data.color, this.data.type));
+        }
+
+        draw() {
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = this.data.color;
+            ctx.strokeStyle = this.data.color;
+            ctx.lineWidth = 2;
+            
+            ctx.beginPath();
+            ctx.rect(this.x - 15, this.y - 15, 30, 30);
+            ctx.stroke();
+            
+            ctx.fillStyle = this.data.color;
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('L' + this.level, this.x, this.y + 5);
+            ctx.shadowBlur = 0;
+        }
+
+        upgrade() {
+            const cost = Math.floor(this.data.cost * Math.pow(1.5, this.level));
+            if (credits >= cost) {
+                credits -= cost;
+                this.level++;
+                this.data.damage *= 1.2;
+                this.data.range *= 1.05;
+                return true;
+            }
+            return false;
+        }
+    }
+
+    class Projectile {
+        constructor(x, y, target, dmg, color, type) {
+            this.x = x;
+            this.y = y;
+            this.target = target;
+            this.dmg = dmg;
+            this.color = color;
+            this.type = type;
+            this.speed = 7;
+            this.dead = false;
+        }
+
+        update() {
+            const dx = this.target.x - this.x;
+            const dy = this.target.y - this.y;
+            const dist = Math.hypot(dx, dy);
+            
+            if (dist < this.speed) {
+                this.hit();
+                this.dead = true;
+            } else {
+                this.x += (dx / dist) * this.speed;
+                this.y += (dy / dist) * this.speed;
+            }
+        }
+
+        hit() {
+            if (this.type === 'aoe') {
+                enemies.forEach(e => {
+                    if (Math.hypot(e.x - this.x, e.y - this.y) < 60) e.takeDamage(this.dmg);
+                });
+                createParticle(this.x, this.y, this.color, 20);
+            } else {
+                this.target.takeDamage(this.dmg);
+            }
+        }
+
+        draw() {
+            ctx.shadowBlur = 5;
+            ctx.shadowColor = this.color;
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+    }
+
+    function createParticle(x, y, color, count) {
+        for (let i = 0; i < count; i++) {
+            particles.push({
+                x, y, 
+                vx: (Math.random() - 0.5) * 5,
+                vy: (Math.random() - 0.5) * 5,
+                life: 1.0,
+                color
+            });
+        }
+    }
+
+    /** LOOP **/
+    function gameLoop(now) {
+        ctx.fillStyle = CONFIG.bg;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        if (gameState === 'PLAYING') {
+            update(now);
+            draw();
+        } else {
+            drawScene();
+        }
+        
+        requestAnimationFrame(gameLoop);
+    }
+
+    function update(now) {
+        // Overclock logic
+        if (overclockMeter >= 100 && !isOverclocked) {
+            activateOverclock();
+        }
+        if (isOverclocked) {
+            overclockTimer -= 16; // approx ms
+            if (overclockTimer <= 0) isOverclocked = false;
+        }
+
+        enemies.forEach((e, i) => {
+            e.update();
+            if (e.dead) enemies.splice(i, 1);
+        });
+
+        turrets.forEach(t => t.update(now));
+        projectiles.forEach((p, i) => {
+            p.update();
+            if (p.dead || p.target.dead) projectiles.splice(i, 1);
+        });
+
+        particles.forEach((p, i) => {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life -= 0.02;
+            if (p.life <= 0) particles.splice(i, 1);
+        });
+
+        if (waveActive && enemies.length === 0) {
+            waveActive = false;
+            setTimeout(startWave, 3000);
+        }
+
+        if (health <= 0) {
+            endGame();
+        }
+
+        // Update HUD
+        document.getElementById('health-val').innerText = health;
+        document.getElementById('credits-val').innerText = credits;
+        document.getElementById('wave-val').innerText = wave;
+        document.getElementById('score-val').innerText = score;
+        document.getElementById('overclock-fill').style.height = overclockMeter + '%';
+    }
+
+    function draw() {
+        // Draw Path
+        ctx.strokeStyle = 'rgba(0, 242, 255, 0.1)';
+        ctx.lineWidth = 40;
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        path.forEach((p, i) => {
+            if (i === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+        });
+        ctx.stroke();
+
+        // Draw Grid
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < canvas.width; x += CONFIG.gridSize) {
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+        }
+        for (let y = 0; y < canvas.height; y += CONFIG.gridSize) {
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+        }
+
+        // Draw Entities
+        turrets.forEach(t => t.draw());
+        enemies.forEach(e => e.draw());
+        projectiles.forEach(p => p.draw());
+        
+        particles.forEach(p => {
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.fillRect(p.x, p.y, 3, 3);
+        });
+        ctx.globalAlpha = 1.0;
+
+        // Build Preview
+        if (buildMode) {
+            const gx = Math.floor(mousePos.x / CONFIG.gridSize) * CONFIG.gridSize + CONFIG.gridSize/2;
+            const gy = Math.floor(mousePos.y / CONFIG.gridSize) * CONFIG.gridSize + CONFIG.gridSize/2;
+            ctx.strokeStyle = TURRET_TYPES[buildMode].color;
+            ctx.setLineDash([5, 5]);
+            ctx.strokeRect(gx - 15, gy - 15, 30, 30);
+            ctx.setLineDash([]);
+        }
+    }
+
+    function drawScene() {
+        ctx.fillStyle = CONFIG.bg;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function activateOverclock() {
+        isOverclocked = true;
+        overclockMeter = 0;
+        overclockTimer = 5000; // 5 seconds
+        createParticle(canvas.width/2, canvas.height/2, CONFIG.colors.magenta, 50);
+    }
+
+    function endGame() {
+        gameState = 'GAMEOVER';
+        const recovered = Math.floor(score / 100);
+        fragments += recovered;
+        localStorage.setItem('neon_fragments', fragments);
+        
+        document.getElementById('death-overlay').classList.remove('hidden');
+        document.getElementById('final-wave').innerText = wave;
+        document.getElementById('recovered-fragments').innerText = recovered;
+    }
+
+    /** UI HELPERS **/
+    function setBuildMode(mode) {
+        buildMode = mode;
+        document.querySelectorAll('.build-item').forEach(el => el.classList.remove('active'));
+        document.getElementById('btn-' + mode).classList.add('active');
+    }
+
+    function initSkillTree() {
+        const grid = document.getElementById('skill-grid');
+        grid.innerHTML = '';
+        SKILLS.forEach(skill => {
+            const level = metaUpgrades[skill.id] || 0;
+            const node = document.createElement('div');
+            node.className = `skill-node ${level >= skill.max ? 'bought' : ''}`;
+            node.innerHTML = `
+                <strong>${skill.name}</strong><br>
+                ${skill.desc}<br>
+                Lvl: ${level}/${skill.max} | Cost: ${skill.cost}
+            `;
+            node.onclick = () => buySkill(skill);
+            grid.appendChild(node);
+        });
+        document.getElementById('fragments-val').innerText = fragments;
+    }
+
+    function buySkill(skill) {
+        if (fragments >= skill.cost && (metaUpgrades[skill.id] || 0) < skill.max) {
+            fragments -= skill.cost;
+            metaUpgrades[skill.id] = (metaUpgrades[skill.id] || 0) + 1;
+            localStorage.setItem('neon_fragments', fragments);
+            localStorage.setItem('neon_meta', JSON.stringify(metaUpgrades));
+            initSkillTree();
+        }
+    }
+
+    function showSkillTree() {
+        document.getElementById('skill-overlay').classList.remove('hidden');
+        initSkillTree();
+    }
+
+    function hideSkillTree() {
+        document.getElementById('skill-overlay').classList.add('hidden');
+    }
+
+</script>
+</body>
+</html>

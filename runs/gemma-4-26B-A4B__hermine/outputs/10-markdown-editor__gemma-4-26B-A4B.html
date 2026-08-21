@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Live Editor</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --header-bg: #ffffff;
+            --border-color: #dee2e6;
+            --text-color: #212529;
+            --accent-color: #007bff;
+            --accent-hover: #0056b3;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            height: 60px;
+            background-color: var(--header-bg);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            flex-shrink: 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .logo {
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: var(--accent-color);
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .stats {
+            font-size: 0.85rem;
+            color: #6c757d;
+            font-variant-numeric: tabular-nums;
+        }
+
+        button {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        #editor, #preview {
+            flex: 1;
+            height: 100%;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        #editor {
+            width: 100%;
+            border: none;
+            border-right: 1px solid var(--border-color);
+            resize: none;
+            outline: none;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            background-color: #fff;
+        }
+
+        #preview {
+            background-color: #fff;
+        }
+
+        /* Markdown Styling */
+        #preview h1 { border-bottom: 1px solid var(--border-color); padding-bottom: 0.3em; }
+        #preview h2 { border-bottom: 1px solid var(--border-color); padding-bottom: 0.3em; }
+        #preview code { background-color: rgba(27,31,35,0.05); padding: 0.2em 0.4em; border-radius: 3px; font-family: monospace; }
+        #preview pre { background-color: #f6f8fa; padding: 16px; overflow: auto; border-radius: 6px; }
+        #preview pre code { background-color: transparent; padding: 0; }
+        #preview blockquote { border-left: 4px solid var(--border-color); padding: 0 1em; color: #6a737d; margin-left: 0; }
+        #preview img { max-width: 100%; }
+        #preview hr { height: 0.25em; background-color: var(--border-color); border: 0; margin: 24px 0; }
+        #preview table { border-collapse: collapse; width: 100%; }
+        #preview table th, #preview table td { border: 1px solid var(--border-color); padding: 6px 13px; }
+
+        @media (max-width: 768px) {
+            main {
+                flex-direction: column;
+            }
+            #editor {
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+                height: 50%;
+            }
+            header {
+                height: auto;
+                flex-direction: column;
+                padding: 10px;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">Markdown Live</div>
+        <div class="controls">
+            <div class="stats">
+                <span id="word-count">0 words</span> | 
+                <span id="char-count">0 chars</span>
+            </div>
+            <button id="copy-btn">Copy HTML</button>
+        </div>
+    </header>
+
+    <main>
+        <textarea id="editor" spellcheck="false"></textarea>
+        <div id="preview"></div>
+    </main>
+
+    <script>
+        const editor = document.getElementById('editor');
+        const preview = document.getElementById('preview');
+        const wordCountEl = document.getElementById('word-count');
+        const charCountEl = document.getElementById('char-count');
+        const copyBtn = document.getElementById('copy-btn');
+
+        const sampleMarkdown = `# Welcome to the Editor
+
+This is a **live** Markdown previewer. 
+
+## Features Supported:
+*   **Bold** and *Italic* text
+*   Inline \`code\` snippets
+*   Blockquotes:
+> "Simplicity is the ultimate sophistication." - Leonardo da Vinci
+
+### Code Block Example
+\`\`\`javascript
+function helloWorld() {
+  console.log("Hello, Markdown!");
+}
+helloWorld();
+\`\`\`
+
+### Lists
+1.  First ordered item
+2.  Second ordered item
+
+*   Unordered item A
+*   Unordered item B
+
+### Links and Images
+Check out [Google](https://google.com) or see this image:
+![Sample Image](https://via.placeholder.com/150)
+
+---
+Enjoy writing!`;
+
+        function escapeHTML(str) {
+            return str.replace(/&/g, '&amp;')
+                      .replace(/</g, '&lt;')
+                      .replace(/>/g, '&gt;')
+                      .replace(/"/g, '&quot;')
+                      .replace(/'/g, '&#039;');
+        }
+
+        function parseMarkdown(md) {
+            // 1. Escape raw HTML to prevent XSS
+            let html = escapeHTML(md);
+
+            // 2. Fenced Code Blocks (Placeholder to protect content)
+            const codeBlocks = [];
+            html = html.replace(/```([\s\S]*?)```/g, (match, content) => {
+                const id = `__CODE_BLOCK_${codeBlocks.length}__`;
+                codeBlocks.push(`<pre><code>${content.trim()}</code></pre>`);
+                return id;
+            });
+
+            // 3. Headings
+            html = html.replace(/^###### (.*)$/gm, '<h6>$1</h6>');
+            html = html.replace(/^##### (.*)$/gm, '<h5>$1</h5>');
+            html = html.replace(/^#### (.*)$/gm, '<h4>$1</h4>');
+            html = html.replace(/^### (.*)$/gm, '<h3>$1</h3>');
+            html = html.replace(/^## (.*)$/gm, '<h2>$1</h2>');
+            html = html.replace(/^# (.*)$/gm, '<h1>$1</h1>');
+
+            // 4. Blockquotes
+            html = html.replace(/^> (.*)$/gm, '<blockquote>$1</blockquote>');
+
+            // 5. Unordered Lists
+            html = html.replace(/^[\s]*[*+-][\s]+(.*)$/gm, '<ul><li>$1</li></ul>');
+            // 6. Ordered Lists
+            html = html.replace(/^[\s]*\d+\.[\s]+(.*)$/gm, '<ol><li>$1</li></ol>');
+            
+            // Merge consecutive list items
+            html = html.replace(/<\/ul>\s*<ul>/g, '');
+            html = html.replace(/<\/ol>\s*<ol>/g, '');
+
+            // 7. Horizontal Rule
+            html = html.replace(/^---$|^[*]{3}$/gm, '<hr>');
+
+            // 8. Paragraphs
+            // We split by double newline to identify blocks
+            const blocks = html.split(/\n\n+/);
+            const processedBlocks = blocks.map(block => {
+                const trimmed = block.trim();
+                if (!trimmed) return '';
+                
+                // Check if block already starts with a block-level HTML tag or Markdown marker
+                const isBlock = /^<(h1|h2|h3|h4|h5|h6|ul|ol|li|blockquote|hr|pre|div)/i.test(trimmed) || 
+                                /^#|^>|^[*+-]|^1\.|^---|^```|^__CODE_BLOCK_/.test(trimmed);
+                
+                return isBlock ? trimmed : `<p>${trimmed}</p>`;
+            });
+            html = processedBlocks.join('\n');
+
+            // 9. Inline Elements (Order matters: Code -> Bold -> Italic -> Image -> Link)
+            // Inline Code
+            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+            // Bold
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
+            // Italic
+            html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            html = html.replace(/_(.*?)_/g, '<em>$1</em>');
+            // Images
+            html = html.replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1">');
+            // Links
+            html = html.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>');
+
+            // 10. Restore Code Blocks
+            codeBlocks.forEach((content, i) => {
+                html = html.replace(`__CODE_BLOCK_${i}__`, content);
+            });
+
+            return html;
+        }
+
+        function updateStats(text) {
+            const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+            const chars = text.length;
+            wordCountEl.textContent = `${words} words`;
+            charCountEl.textContent = `${chars} chars`;
+        }
+
+        function render() {
+            const text = editor.value;
+            preview.innerHTML = parseMarkdown(text);
+            updateStats(text);
+        }
+
+        editor.addEventListener('input', render);
+
+        copyBtn.addEventListener('click', () => {
+            const htmlSource = preview.innerHTML;
+            navigator.clipboard.writeText(htmlSource).then(() => {
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                }, 2000);
+            });
+        });
+
+        // Initialize
+        editor.value = sampleMarkdown;
+        render();
+    </script>
+</body>
+</html>

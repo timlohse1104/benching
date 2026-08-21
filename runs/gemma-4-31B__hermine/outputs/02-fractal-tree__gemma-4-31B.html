@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>L-System Fractal Tree</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: rgba(30, 41, 59, 0.8);
+            --accent-color: #38bdf8;
+            --text-color: #f1f5f9;
+            --ui-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text-color);
+        }
+
+        canvas {
+            display: block;
+            cursor: crosshair;
+        }
+
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 300px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--ui-border);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            user-select: none;
+            transition: opacity 0.3s ease;
+        }
+
+        #ui-panel:hover {
+            opacity: 1;
+        }
+
+        h1 {
+            margin: 0 0 15px 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--accent-color);
+            border-bottom: 1px solid var(--ui-border);
+            padding-bottom: 10px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 0.85rem;
+            margin-bottom: 5px;
+            opacity: 0.8;
+        }
+
+        .control-group input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: var(--accent-color);
+        }
+
+        .control-group .value-display {
+            float: right;
+            font-family: monospace;
+            color: var(--accent-color);
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent-color);
+            border: none;
+            border-radius: 8px;
+            color: var(--bg-color);
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        button:hover {
+            filter: brightness(1.1);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(56, 189, 248, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .hint {
+            margin-top: 15px;
+            font-size: 0.75rem;
+            text-align: center;
+            opacity: 0.5;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-panel">
+        <h1>Fractal Garden</h1>
+        
+        <div class="control-group">
+            <label>Recursion Depth <span class="value-display" id="val-depth">5</span></label>
+            <input type="range" id="depth" min="1" max="8" value="5">
+        </div>
+
+        <div class="control-group">
+            <label>Branch Angle <span class="value-display" id="val-angle">25</span>°</label>
+            <input type="range" id="angle" min="0" max="90" value="25">
+        </div>
+
+        <div class="control-group">
+            <label>Length Ratio <span class="value-display" id="val-ratio">0.75</span></label>
+            <input type="range" id="ratio" min="0.4" max="0.85" step="0.01" value="0.75">
+        </div>
+
+        <div class="control-group">
+            <label>Randomness <span class="value-display" id="val-jitter">15</span>°</label>
+            <input type="range" id="jitter" min="0" max="45" value="15">
+        </div>
+
+        <button id="regenerate">Regenerate Tree</button>
+        <div class="hint">L-System: X → F[+X][-X]FX, F → FF</div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // UI Elements
+        const inputs = {
+            depth: document.getElementById('depth'),
+            angle: document.getElementById('angle'),
+            ratio: document.getElementById('ratio'),
+            jitter: document.getElementById('jitter')
+        };
+        const displays = {
+            depth: document.getElementById('val-depth'),
+            angle: document.getElementById('val-angle'),
+            ratio: document.getElementById('val-ratio'),
+            jitter: document.getElementById('val-jitter')
+        };
+        const btnRegen = document.getElementById('regenerate');
+
+        let width, height;
+        let animationFrameId;
+        let growthProgress = 0;
+        let lSystemString = "";
+        let seed = Math.random();
+
+        // L-System Configuration
+        const axiom = "X";
+        const rules = {
+            "X": "F[+X][-X]FX",
+            "F": "FF"
+        };
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            initTree();
+        }
+
+        function generateLSystem(depth) {
+            let current = axiom;
+            for (let i = 0; i < depth; i++) {
+                let next = "";
+                for (let char of current) {
+                    next += rules[char] || char;
+                }
+                current = next;
+            }
+            return current;
+        }
+
+        function initTree() {
+            const depth = parseInt(inputs.depth.value);
+            lSystemString = generateLSystem(depth);
+            growthProgress = 0;
+            seed = Math.random();
+            
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            animate();
+        }
+
+        // Simple pseudo-random generator for consistent tree shape during one growth cycle
+        function seededRandom(s) {
+            const x = Math.sin(s) * 10000;
+            return x - Math.floor(x);
+        }
+
+        function drawTree() {
+            ctx.clearRect(0, 0, width, height);
+            
+            // Background Gradient
+            const grad = ctx.createRadialGradient(width/2, height, 0, width/2, height, width);
+            grad.addColorStop(0, '#1e293b');
+            grad.addColorStop(1, '#0f172a');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, width, height);
+
+            const depth = parseInt(inputs.depth.value);
+            const angleRad = (parseInt(inputs.angle.value) * Math.PI) / 180;
+            const ratio = parseFloat(inputs.ratio.value);
+            const jitterMax = (parseInt(inputs.jitter.value) * Math.PI) / 180;
+            
+            let x = width / 2;
+            let y = height - 50;
+            let currentAngle = -Math.PI / 2;
+            let currentLen = height * 0.22 / Math.pow(2, Math.floor(depth/2)); 
+            
+            // Adjust starting length based on depth to keep it on screen
+            const baseLen = (height * 0.25) / Math.pow(1.5, depth - 5);
+            let length = baseLen;
+
+            const stack = [];
+            let segmentsDrawn = 0;
+            const totalSegments = lSystemString.length;
+            
+            // Growth limit: how many characters of the string to process
+            const limit = Math.floor(growthProgress * totalSegments);
+
+            ctx.lineCap = 'round';
+
+            for (let i = 0; i < lSystemString.length && i < limit; i++) {
+                const char = lSystemString[i];
+
+                if (char === 'F') {
+                    const nextX = x + Math.cos(currentAngle) * length;
+                    const nextY = y + Math.sin(currentAngle) * length;
+
+                    // Color based on stack depth (branch level)
+                    const currentDepth = stack.length;
+                    const colorInterpolation = currentDepth / depth;
+                    
+                    // Trunk: Brownish -> Twigs: Greenish -> Tips: Light Green/Pink
+                    let color;
+                    if (colorInterpolation < 0.4) {
+                        color = `hsl(${20 + colorInterpolation * 20}, 40%, ${20 + colorInterpolation * 30}%)`;
+                    } else {
+                        color = `hsl(${80 + colorInterpolation * 60}, 60%, ${40 + colorInterpolation * 20}%)`;
+                    }
+
+                    ctx.beginPath();
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = Math.max(0.5, (depth - currentDepth) * 1.5);
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(nextX, nextY);
+                    ctx.stroke();
+
+                    x = nextX;
+                    y = nextY;
+                    segmentsDrawn++;
+                } else if (char === '+') {
+                    const jitter = (seededRandom(seed + i) - 0.5) * 2 * jitterMax;
+                    currentAngle += angleRad + jitter;
+                } else if (char === '-') {
+                    const jitter = (seededRandom(seed + i) - 0.5) * 2 * jitterMax;
+                    currentAngle -= angleRad + jitter;
+                } else if (char === '[') {
+                    stack.push({ x, y, angle: currentAngle, len: length });
+                    length *= ratio;
+                } else if (char === ']') {
+                    // Draw a leaf at the tip of the branch
+                    if (stack.length >= depth - 1) {
+                        ctx.beginPath();
+                        ctx.fillStyle = `hsla(${100 + Math.random()*40}, 70%, 60%, 0.6)`;
+                        ctx.arc(x, y, 3, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    const state = stack.pop();
+                    x = state.x;
+                    y = state.y;
+                    currentAngle = state.angle;
+                    length = state.len;
+                }
+            }
+        }
+
+        function animate() {
+            drawTree();
+            
+            // Smoothly increase growth progress
+            if (growthProgress < 1) {
+                growthProgress += 0.015; // Speed of growth
+                animationFrameId = requestAnimationFrame(animate);
+            } else {
+                animationFrameId = requestAnimationFrame(animate);
+            }
+        }
+
+        // UI Event Listeners
+        Object.keys(inputs).forEach(key => {
+            inputs[key].addEventListener('input', (e) => {
+                displays[key].innerText = e.target.value;
+                // For real-time updates without full reset, we just redraw
+                // But for depth changes, we must regenerate the string
+                if (key === 'depth') {
+                    initTree();
+                } else {
+                    // Just redraw the current state with new parameters
+                    drawTree();
+                }
+            });
+        });
+
+        btnRegen.addEventListener('click', initTree);
+        window.addEventListener('resize', resize);
+
+        // Initialize
+        resize();
+    </script>
+</body>
+</html>

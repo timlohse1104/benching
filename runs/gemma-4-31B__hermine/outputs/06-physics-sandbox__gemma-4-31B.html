@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Physics Sandbox</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #121212;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #e0e0e0;
+            user-select: none;
+        }
+
+        canvas {
+            display: block;
+            cursor: crosshair;
+        }
+
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 280px;
+            background: rgba(30, 30, 30, 0.85);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            pointer-events: auto;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 13px;
+            margin-bottom: 5px;
+            color: #bbb;
+        }
+
+        .control-group input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: #4a9eff;
+        }
+
+        .stats {
+            font-size: 14px;
+            margin-bottom: 15px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        button {
+            background: #333;
+            color: white;
+            border: 1px solid #444;
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #444;
+        }
+
+        button.active {
+            background: #4a9eff;
+            border-color: #6abaff;
+        }
+
+        .hint {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 14px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-panel">
+        <div class="stats">
+            <span>Physics Sandbox</span>
+            <span id="ball-count">Balls: 0</span>
+        </div>
+
+        <div class="control-group">
+            <label>Gravity: <span id="val-gravity">0.25</span></label>
+            <input type="range" id="slider-gravity" min="0" max="1" step="0.01" value="0.25">
+        </div>
+
+        <div class="control-group">
+            <label>Restitution (Bounciness): <span id="val-restitution">0.8</span></label>
+            <input type="range" id="slider-restitution" min="0.1" max="1" step="0.01" value="0.8">
+        </div>
+
+        <div class="control-group">
+            <label>Air Friction: <span id="val-friction">0.995</span></label>
+            <input type="range" id="slider-friction" min="0.9" max="1" step="0.001" value="0.995">
+        </div>
+
+        <div class="buttons">
+            <button id="btn-collisions" class="active">Collisions: ON</button>
+            <button id="btn-reset">Reset Scene</button>
+        </div>
+    </div>
+
+    <div class="hint">Click to spawn • Drag to fling</div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const ballCountEl = document.getElementById('ball-count');
+
+        // UI Elements
+        const sliders = {
+            gravity: { el: document.getElementById('slider-gravity'), val: document.getElementById('val-gravity') },
+            restitution: { el: document.getElementById('slider-restitution'), val: document.getElementById('val-restitution') },
+            friction: { el: document.getElementById('slider-friction'), val: document.getElementById('val-friction') }
+        };
+        const btnCollisions = document.getElementById('btn-collisions');
+        const btnReset = document.getElementById('btn-reset');
+
+        let width, height;
+        let balls = [];
+        let isMouseDown = false;
+        let startPos = { x: 0, y: 0 };
+        let currentPos = { x: 0, y: 0 };
+
+        const config = {
+            gravity: 0.25,
+            restitution: 0.8,
+            friction: 0.995,
+            collisionsEnabled: true
+        };
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+
+        window.addEventListener('resize', resize);
+        resize();
+
+        class Ball {
+            constructor(x, y, vx, vy, radius, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.radius = radius;
+                this.color = color;
+                this.mass = radius; // Mass proportional to radius
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.closePath();
+            }
+
+            update() {
+                // Apply gravity
+                this.vy += config.gravity;
+                
+                // Apply friction
+                this.vx *= config.friction;
+                this.vy *= config.friction;
+
+                // Update position
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Wall Collisions
+                if (this.x + this.radius > width) {
+                    this.x = width - this.radius;
+                    this.vx *= -config.restitution;
+                } else if (this.x - this.radius < 0) {
+                    this.x = this.radius;
+                    this.vx *= -config.restitution;
+                }
+
+                if (this.y + this.radius > height) {
+                    this.y = height - this.radius;
+                    this.vy *= -config.restitution;
+                } else if (this.y - this.radius < 0) {
+                    this.y = this.radius;
+                    this.vy *= -config.restitution;
+                }
+            }
+        }
+
+        function resolveCollision(b1, b2) {
+            const dx = b2.x - b1.x;
+            const dy = b2.y - b1.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < b1.radius + b2.radius) {
+                // 1. Static resolution (prevent overlapping/sticking)
+                const overlap = b1.radius + b2.radius - distance;
+                const nx = dx / distance; // Normal X
+                const ny = dy / distance; // Normal Y
+                
+                const moveX = nx * overlap / 2;
+                const moveY = ny * overlap / 2;
+
+                b1.x -= moveX;
+                b1.y -= moveY;
+                b2.x += moveX;
+                b2.y += moveY;
+
+                // 2. Dynamic resolution (Impulse)
+                // Relative velocity
+                const rvx = b2.vx - b1.vx;
+                const rvy = b2.vy - b1.vy;
+
+                // Velocity along the normal
+                const velAlongNormal = rvx * nx + rvy * ny;
+
+                // Do not resolve if velocities are separating
+                if (velAlongNormal > 0) return;
+
+                // Restitution (use the minimum of the two for the collision)
+                const e = config.restitution;
+
+                // Impulse scalar
+                let j = -(1 + e) * velAlongNormal;
+                j /= (1 / b1.mass + 1 / b2.mass);
+
+                // Apply impulse
+                const impulseX = j * nx;
+                const impulseY = j * ny;
+
+                b1.vx -= (1 / b1.mass) * impulseX;
+                b1.vy -= (1 / b1.mass) * impulseY;
+                b2.vx += (1 / b2.mass) * impulseX;
+                b2.vy += (1 / b2.mass) * impulseY;
+            }
+        }
+
+        function spawnBall(x, y, vx, vy) {
+            const radius = 10 + Math.random() * 20;
+            const hue = Math.floor(Math.random() * 360);
+            const color = `hsl(${hue}, 70%, 60%)`;
+            balls.push(new Ball(x, y, vx, vy, radius, color));
+            ballCountEl.innerText = `Balls: ${balls.length}`;
+        }
+
+        // Interaction
+        canvas.addEventListener('mousedown', (e) => {
+            isMouseDown = true;
+            startPos = { x: e.clientX, y: e.clientY };
+            currentPos = { x: e.clientX, y: e.clientY };
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (isMouseDown) {
+                currentPos = { x: e.clientX, y: e.clientY };
+            }
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            if (!isMouseDown) return;
+            isMouseDown = false;
+            
+            const dx = startPos.x - e.clientX;
+            const dy = startPos.y - e.clientY;
+            
+            // Scale velocity to a reasonable range
+            const vx = dx * 0.15;
+            const vy = dy * 0.15;
+            
+            spawnBall(startPos.x, startPos.y, vx, vy);
+        });
+
+        // UI Controls
+        Object.keys(sliders).forEach(key => {
+            sliders[key].el.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                config[key] = val;
+                sliders[key].val.innerText = val;
+            });
+        });
+
+        btnCollisions.addEventListener('click', () => {
+            config.collisionsEnabled = !config.collisionsEnabled;
+            btnCollisions.classList.toggle('active');
+            btnCollisions.innerText = `Collisions: ${config.collisionsEnabled ? 'ON' : 'OFF'}`;
+        });
+
+        btnReset.addEventListener('click', () => {
+            balls = [];
+            ballCountEl.innerText = `Balls: 0`;
+        });
+
+        function loop() {
+            ctx.clearRect(0, 0, width, height);
+
+            // Update and Draw balls
+            for (let i = 0; i < balls.length; i++) {
+                const b = balls[i];
+                b.update();
+                
+                if (config.collisionsEnabled) {
+                    for (let j = i + 1; j < balls.length; j++) {
+                        resolveCollision(b, balls[j]);
+                    }
+                }
+                b.draw();
+            }
+
+            // Draw drag line
+            if (isMouseDown) {
+                ctx.beginPath();
+                ctx.moveTo(startPos.x, startPos.y);
+                ctx.lineTo(currentPos.x, currentPos.y);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.setLineDash([5, 5]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.closePath();
+
+                // Draw preview ball
+                ctx.beginPath();
+                ctx.arc(startPos.x, startPos.y, 15, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.fill();
+                ctx.closePath();
+            }
+
+            requestAnimationFrame(loop);
+        }
+
+        // Start with a few balls
+        for(let i=0; i<5; i++) {
+            spawnBall(
+                width/2 + (Math.random()-0.5)*200, 
+                height/4 + (Math.random()-0.5)*200, 
+                (Math.random()-0.5)*10, 
+                (Math.random()-0.5)*10
+            );
+        }
+
+        loop();
+    </script>
+</body>
+</html>

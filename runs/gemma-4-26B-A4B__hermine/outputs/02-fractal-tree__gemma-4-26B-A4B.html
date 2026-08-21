@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>L-System Fractal Tree</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: rgba(30, 41, 59, 0.7);
+            --accent-color: #38bdf8;
+            --text-color: #f1f5f9;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-color);
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 280px;
+            padding: 20px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            user-select: none;
+        }
+
+        h1 {
+            margin: 0 0 20px 0;
+            font-size: 1.2rem;
+            font-weight: 500;
+            letter-spacing: 1px;
+            text-align: center;
+            color: var(--accent-color);
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            margin-bottom: 5px;
+            opacity: 0.8;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: var(--accent-color);
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border: none;
+            border-radius: 8px;
+            background: var(--accent-color);
+            color: #0f172a;
+            font-weight: bold;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .footer {
+            margin-top: 15px;
+            font-size: 0.7rem;
+            text-align: center;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+
+<div id="ui-panel">
+    <h1>FRACTAL TREE</h1>
+    
+    <div class="control-group">
+        <label>Depth <span id="val-depth">5</span></label>
+        <input type="range" id="depth" min="1" max="7" step="1" value="5">
+    </div>
+
+    <div class="control-group">
+        <label>Angle <span id="val-angle">25°</span></label>
+        <input type="range" id="angle" min="5" max="60" step="1" value="25">
+    </div>
+
+    <div class="control-group">
+        <label>Ratio <span id="val-ratio">0.70</span></label>
+        <input type="range" id="ratio" min="0.5" max="0.85" step="0.01" value="0.7">
+    </div>
+
+    <div class="control-group">
+        <label>Jitter <span id="val-jitter">0.10</span></label>
+        <input type="range" id="jitter" min="0" max="0.5" step="0.01" value="0.1">
+    </div>
+
+    <div class="control-group">
+        <label>Growth Speed <span id="val-speed">50</span></label>
+        <input type="range" id="speed" min="1" max="100" step="1" value="50">
+    </div>
+
+    <button id="regenerate">REGENERATE</button>
+    <div class="footer">L-System: X &rarr; F[+X][-X]FX</div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script>
+    /** @type {HTMLCanvasElement} */
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // UI Elements
+    const inputs = ['depth', 'angle', 'ratio', 'jitter', 'speed'];
+    const ui = {};
+    inputs.forEach(id => {
+        ui[id] = document.getElementById(id);
+        ui[`val-${id}`] = document.getElementById(`val-${id}`);
+    });
+    const btnRegenerate = document.getElementById('regenerate');
+
+    // State
+    let width, height;
+    let states = [];
+    let commands = [];
+    let currentStep = 0;
+    let animationFrameId;
+    let initialLength = 0;
+
+    // L-System Config
+    const AXOM = 'X';
+    const RULES = {
+        'X': 'F[+X][-X]FX',
+        'F': 'FF'
+    };
+
+    function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+        initialLength = Math.min(width, height) * 0.22;
+        generate();
+    }
+
+    function generateLSystem(axiom, rules, depth) {
+        let current = axiom;
+        for (let i = 0; i < depth; i++) {
+            let next = "";
+            for (let char of current) {
+                next += rules[char] || char;
+            }
+            current = next;
+            // Safety break to prevent memory overflow
+            if (current.length > 100000) break;
+        }
+        return current;
+    }
+
+    function parseString(str, angleDeg, ratio, jitter) {
+        const angleRad = angleDeg * Math.PI / 180;
+        const commandsArr = str.split('');
+        const statesArr = [];
+        const stack = [];
+
+        // Initial state
+        let curr = {
+            x: width / 2,
+            y: height - 80,
+            angle: -Math.PI / 2,
+            len: initialLength,
+            depth: 0,
+            color: '#ffffff',
+            thick: 8
+        };
+        statesArr.push({ ...curr });
+
+        for (let i = 0; i < commandsArr.length; i++) {
+            const cmd = commandsArr[i];
+            const s = statesArr[statesArr.length - 1];
+
+            if (cmd === 'F') {
+                const randAngle = s.angle + (Math.random() - 0.5) * jitter;
+                const nextX = s.x + Math.cos(randAngle) * s.len;
+                const nextY = s.y + Math.sin(randAngle) * s.len;
+                const nextDepth = s.depth + 1;
+                const nextLen = initialLength * Math.pow(ratio, nextDepth);
+                
+                // Color: Trunk (Brownish) to Twigs (Greenish/Pinkish)
+                const hue = 100 + (nextDepth * 25); 
+                const light = Math.max(30, 70 - (nextDepth * 5));
+                const color = `hsl(${hue}, 70%, ${light}%)`;
+                const thick = Math.max(0.5, 8 * Math.pow(0.6, nextDepth));
+
+                statesArr.push({
+                    x: nextX,
+                    y: nextY,
+                    angle: randAngle,
+                    len: nextLen,
+                    depth: nextDepth,
+                    color: color,
+                    thick: thick
+                });
+            } else if (cmd === '+') {
+                statesArr.push({ ...s, angle: s.angle + angleRad });
+            } else if (cmd === '-') {
+                statesArr.push({ ...s, angle: s.angle - angleRad });
+            } else if (cmd === '[') {
+                stack.push({ ...s });
+                statesArr.push({ ...s });
+            } else if (cmd === ']') {
+                if (stack.length > 0) {
+                    statesArr.push(stack.pop());
+                } else {
+                    statesArr.push({ ...s });
+                }
+            } else {
+                // Placeholder chars like 'X' don't create segments but move state
+                statesArr.push({ ...s });
+            }
+        }
+        return { commands: commandsArr, states: statesArr };
+    }
+
+    function generate() {
+        cancelAnimationFrame(animationFrameId);
+        
+        const depth = parseInt(ui.depth.value);
+        const angle = parseFloat(ui.angle.value);
+        const ratio = parseFloat(ui.ratio.value);
+        const jitter = parseFloat(ui.jitter.value);
+
+        const lString = generateLSystem(AXOM, RULES, depth);
+        const parsed = parseString(lString, angle, ratio, jitter);
+        
+        commands = parsed.commands;
+        states = parsed.states;
+        currentStep = 0;
+
+        animate();
+    }
+
+    function animate() {
+        const speed = parseFloat(ui.speed.value);
+        currentStep += (speed / 10);
+
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, width, height);
+
+        const limit = Math.min(currentStep, commands.length);
+        const stepInt = Math.floor(limit);
+        const frac = limit - stepInt;
+
+        // Optimization: Draw by depth to minimize stroke calls
+        const maxD = Math.max(...states.map(s => s.depth));
+        
+        for (let d = 0; d <= maxD; d++) {
+            ctx.beginPath();
+            // Use a slightly different color for background/leaves if needed
+            // But here we use the color from the states array
+            
+            let hasSegments = false;
+            for (let i = 0; i < stepInt; i++) {
+                if (commands[i] === 'F' && states[i].depth === d) {
+                    ctx.moveTo(states[i].x, states[i].y);
+                    ctx.lineTo(states[i+1].x, states[i+1].y);
+                    ctx.strokeStyle = states[i].color;
+                    ctx.lineWidth = states[i].thick;
+                    hasSegments = true;
+                }
+            }
+            
+            if (hasSegments) ctx.stroke();
+
+            // Handle fractional segment for smooth growth
+            if (frac > 0 && stepInt < commands.length) {
+                const i = stepInt;
+                if (commands[i] === 'F' && states[i].depth === d) {
+                    ctx.beginPath();
+                    ctx.moveTo(states[i].x, states[i].y);
+                    const dx = states[i+1].x - states[i].x;
+                    const dy = states[i+1].y - states[i].y;
+                    ctx.lineTo(states[i].x + dx * frac, states[i].y + dy * frac);
+                    ctx.strokeStyle = states[i].color;
+                    ctx.lineWidth = states[i].thick;
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // Draw blossoms/leaves at tips if depth is high
+        if (currentStep < commands.length) {
+            const lastIdx = stepInt;
+            if (commands[lastIdx] === 'F') {
+                const s = states[lastIdx];
+                const dx = states[lastIdx+1].x - s.x;
+                const dy = states[lastIdx+1].y - s.y;
+                const lx = s.x + dx * frac;
+                const ly = s.y + dy * frac;
+                
+                ctx.beginPath();
+                ctx.arc(lx, ly, 3, 0, Math.PI * 2);
+                ctx.fillStyle = '#f472b6'; // Pink blossom
+                ctx.fill();
+            }
+        }
+
+        if (currentStep < commands.length) {
+            animationFrameId = requestAnimationFrame(animate);
+        }
+    }
+
+    // UI Listeners
+    inputs.forEach(id => {
+        ui[id].addEventListener('input', () => {
+            let val = ui[id].value;
+            if (id === 'angle') val += '°';
+            if (id === 'ratio' || id === 'jitter') val = parseFloat(ui[id].value).toFixed(2);
+            ui[`val-${id}`].textContent = val;
+            
+            // Real-time update for non-heavy parameters
+            if (id !== 'depth' && id !== 'speed') {
+                // For real-time, we just regenerate. 
+                // If performance drops, we could throttle this.
+                generate();
+            } else if (id === 'depth' || id === 'speed') {
+                // For heavy parameters, we only regenerate on change
+                // But we'll allow it for simplicity unless it's too laggy
+            }
+        });
+        
+        // Re-generate if depth or speed changes (to avoid infinite recursion/lag)
+        ui[id].addEventListener('change', generate);
+    });
+
+    btnRegenerate.addEventListener('click', generate);
+    window.addEventListener('resize', resize);
+
+    // Init
+    resize();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL Interactive Violin</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: radial-gradient(circle, #2c1e14 0%, #000 100%); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #f0e6d2; }
+        canvas { display: block; width: 100vw; height: 100vh; cursor: grab; }
+        canvas:active { cursor: grabbing; }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            max-width: 300px;
+        }
+        h1 { margin: 0 0 10px 0; font-size: 24px; color: #d4a373; }
+        p { margin: 5px 0; font-size: 14px; line-height: 1.4; opacity: 0.9; }
+        .key-hint {
+            display: inline-block;
+            background: rgba(212, 163, 115, 0.3);
+            border: 1px solid #d4a373;
+            border-radius: 3px;
+            padding: 0px 5px;
+            margin: 0 2px;
+            font-weight: bold;
+        }
+        #status {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            font-size: 12px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <h1>Virtual Violin</h1>
+        <p>Drag to rotate the instrument.</p>
+        <p>Click a string or use keys to play:</p>
+        <p><span class="key-hint">1</span> G3 | <span class="key-hint">2</span> D4 | <span class="key-hint">3</span> A4 | <span class="key-hint">4</span> E5</p>
+        <p><i>Pizzicato style synthesis.</i></p>
+    </div>
+    <div id="status">WebGL 1.0 | Web Audio API</div>
+    <canvas id="glCanvas"></canvas>
+
+    <script>
+        /** 
+         * Minimal 4x4 Matrix Library 
+         */
+        const Mat4 = {
+            identity: () => new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]),
+            perspective: (fov, aspect, near, far) => {
+                const f = 1.0 / Math.tan(fov / 2);
+                const nf = 1 / (near - far);
+                return new Float32Array([
+                    f / aspect, 0, 0, 0,
+                    0, f, 0, 0,
+                    0, 0, (far + near) * nf, -1,
+                    0, 0, (2 * far * near) * nf, 0
+                ]);
+            },
+            multiply: (a, b) => {
+                const out = new Float32Array(16);
+                for (let i = 0; i < 4; i++) {
+                    for (let j = 0; j < 4; j++) {
+                        out[i * 4 + j] = a[i * 4 + 0] * b[0 * 4 + j] +
+                                         a[i * 4 + 1] * b[1 * 4 + j] +
+                                         a[i * 4 + 2] * b[2 * 4 + j] +
+                                         a[i * 4 + 3] * b[3 * 4 + j];
+                    }
+                }
+                return out;
+            },
+            rotateX: (m, angle) => {
+                const c = Math.cos(angle), s = Math.sin(angle);
+                const r = new Float32Array([1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1]);
+                return Mat4.multiply(m, r);
+            },
+            rotateY: (m, angle) => {
+                const c = Math.cos(angle), s = Math.sin(angle);
+                const r = new Float32Array([c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1]);
+                return Mat4.multiply(m, r);
+            }
+        };
+
+        /**
+         * Audio Synthesis
+         */
+        class ViolinAudio {
+            constructor() {
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                this.notes = { '1': 196.00, '2': 293.66, '3': 440.00, '4': 659.25 };
+                this.freqs = [196.00, 293.66, 440.00, 659.25];
+            }
+
+            play(index) {
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+                const freq = this.freqs[index];
+                
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                const filter = this.ctx.createBiquadFilter();
+
+                osc.type = 'triangle'; 
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(2000, this.ctx.currentTime);
+                filter.frequency.exponentialRampToValueAtTime(freq * 2, this.ctx.currentTime + 0.1);
+
+                gain.gain.setValueAtTime(0, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.4, this.ctx.currentTime + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 1.5);
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + 1.5);
+            }
+        }
+
+        /**
+         * WebGL Renderer
+         */
+        const canvas = document.getElementById('glCanvas');
+        const gl = canvas.getContext('webgl');
+
+        const vsSource = `
+            attribute vec4 aPosition;
+            attribute vec3 aNormal;
+            uniform mat4 uModelViewMatrix;
+            uniform mat4 uProjectionMatrix;
+            varying vec3 vNormal;
+            varying vec3 vPosition;
+            void main() {
+                gl_Position = uProjectionMatrix * uModelViewMatrix * aPosition;
+                vNormal = aNormal;
+                vPosition = aPosition.xyz;
+            }
+        `;
+
+        const fsSource = `
+            precision mediump float;
+            varying vec3 vNormal;
+            varying vec3 vPosition;
+            uniform vec3 uColor;
+            uniform vec3 uLightDir;
+            void main() {
+                vec3 normal = normalize(vNormal);
+                float diff = max(dot(normal, uLightDir), 0.2);
+                gl_FragColor = vec4(uColor * diff, 1.0);
+            }
+        `;
+
+        function createShader(gl, type, source) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+            return shader;
+        }
+
+        const program = gl.createProgram();
+        gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, vsSource));
+        gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, fsSource));
+        gl.linkProgram(program);
+        gl.useProgram(program);
+
+        const locPos = gl.getAttribLocation(program, 'aPosition');
+        const locNorm = gl.getAttribLocation(program, 'aNormal');
+        const locProj = gl.getUniformLocation(program, 'uProjectionMatrix');
+        const locMV = gl.getUniformLocation(program, 'uModelViewMatrix');
+        const locCol = gl.getUniformLocation(program, 'uColor');
+        const locLight = gl.getUniformLocation(program, 'uLightDir');
+
+        gl.uniform3f(locLight, 0.5, 1.0, 0.5);
+
+        // Geometry helpers
+        function createBox(w, h, d, x, y, z) {
+            const x1 = -w/2, x2 = w/2;
+            const y1 = -h/2, y2 = h/2;
+            const z1 = -d/2, z2 = d/2;
+
+            const pos = [
+                x1+x, y1+y, z1+z, x2+x, y1+y, z1+z, x1+x, y2+y, z1+z, x2+x, y2+y, z1+z,
+                x1+x, y1+y, z2+z, x2+x, y1+y, z2+z, x1+x, y2+y, z2+z, x2+x, y2+y, z2+z,
+                x1+x, y1+y, z1+z, x1+x, y1+y, z2+z, x1+x, y2+y, z1+z, x1+x, y2+y, z2+z,
+                x2+x, y1+y, z1+z, x2+x, y1+y, z2+z, x2+x, y2+y, z1+z, x2+x, y2+y, z2+z,
+                y1+y, z1+z, x1+x, y2+y, z1+z, x1+x, y1+y, z2+z, x1+x, y2+y, z2+z, x1+x,
+                y1+y, z1+z, y2+y, z1+z, x2+x, y1+y, z2+z, x2+x, y2+y, z2+z, x2+x,
+                y1+y, z1+z, y2+y, z1+z, x1+x, y1+y, z2+z, y2+y, z1+z, x2+x, y1+y, z2+z, y2+y, z2+z, x2+x
+            ]; // This is a simplified approach, manually creating a cube
+            
+            // Actual cube vertices for simplicity
+            const vertices = [
+                -1, -1,  1,  1, -1,  1,  1,  1,  1,  -1,  1,  1, // front
+                -1, -1, -1,  -1,  1, -1,  1,  1, -1,  1, -1, -1, // back
+                -1,  1, -1,  -1,  1,  1,  1,  1,  1,  1,  1, -1, // top
+                -1, -1, -1,  1, -1, -1,  1, -1,  1,  -1, -1,  1, // bottom
+                -1, -1, -1,  -1, -1,  1,  -1,  1,  1,  -1,  1, -1, // left
+                 1, -1, -1,  1, -1,  1,  1,  1,  1,  1,  1, -1  // right
+            ];
+            const normals = [
+                0,0,1, 0,0,1, 0,0,1, 0,0,1,
+                0,0,-1, 0,0,-1, 0,0,-1, 0,0,-1,
+                0,1,0, 0,1,0, 0,1,0, 0,1,0,
+                0,-1,0, 0,-1,0, 0,-1,0, 0,-1,0,
+                -1,0,0, -1,0,0, -1,0,0, -1,0,0,
+                1,0,0, 1,0,0, 1,0,0, 1,0,0
+            ];
+
+            const scaledPos = [];
+            vertices.forEach(v => {
+                if (v === 0) scaledPos.push(0);
+                else if (v === 1) scaledPos.push(w/2); else scaledPos.push(-w/2);
+            }); // This logic is wrong, let's just use the raw vertex array and scale in shader or manually.
+        }
+
+        // Correct Geometry Generation
+        function createCube(w, h, d, ox, oy, oz) {
+            const p = [
+                -w/2+ox, -h/2+oy,  d/2+oz,  w/2+ox, -h/2+oy,  d/2+oz,  w/2+ox,  h/2+oy,  d/2+oz, -w/2+ox,  h/2+oy,  d/2+oz,
+                -w/2+ox, -h/2+oy, -d/2+oz, -w/2+ox,  h/2+oy, -d/2+oz,  w/2+ox,  h/2+oy, -d/2+oz,  w/2+ox, -h/2+oy, -d/2+oz,
+                -w/2+ox,  h/2+oy, -d/2+oz, -w/2+ox,  h/2+oy,  d/2+oz,  w/2+ox,  h/2+oy,  d/2+oz,  w/2+ox,  h/2+oy, -d/2+oz,
+                -w/2+ox, -h/2+oy, -d/2+oz,  w/2+ox, -h/2+oy, -d/2+oz,  w/2+ox, -h/2+oy,  d/2+oz, -w/2+ox, -h/2+oy,  d/2+oz,
+                -w/2+ox, -h/2+oy, -d/2+oz, -w/2+ox, -h/2+oy,  d/2+oz, -w/2+ox,  h/2+oy,  d/2+oz, -w/2+ox,  h/2+oy, -d/2+oz,
+                 w/2+ox, -h/2+oy, -d/2+oz,  w/2+ox, -h/2+oy,  d/2+oz,  w/2+ox,  h/2+oy,  d/2+oz,  w/2+ox,  h/2+oy, -d/2+oz
+            ];
+            const n = [
+                0,0,1, 0,0,1, 0,0,1, 0,0,1,
+                0,0,-1, 0,0,-1, 0,0,-1, 0,0,-1,
+                0,1,0, 0,1,0, 0,1,0, 0,1,0,
+                0,-1,0, 0,-1,0, 0,-1,0, 0,-1,0,
+                -1,0,0, -1,0,0, -1,0,0, -1,0,0,
+                1,0,0, 1,0,0, 1,0,0, 1,0,0
+            ];
+            return { p: new Float32Array(p), n: new Float32Array(n) };
+        }
+
+        // Build the violin from parts
+        const parts = [];
+        // Body bouts
+        parts.push({ geom: createCube(0.6, 1.2, 0.2, 0, 0, 0), color: [0.5, 0.3, 0.2] }); // Lower bout
+        parts.push({ geom: createCube(0.4, 0.6, 0.2, 0, 0.6, 0), color: [0.5, 0.3, 0.2] }); // Upper bout
+        parts.push({ geom: createCube(0.3, 0.4, 0.2, 0, 0.3, 0), color: [0.5, 0.3, 0.2] }); // Waist
+        // Neck and Head
+        parts.push({ geom: createCube(0.1, 0.8, 0.05, 0, 1.1, 0), color: [0.3, 0.2, 0.1] }); // Neck
+        parts.push({ geom: createCube(0.12, 0.15, 0.12, 0, 1.5, 0), color: [0.3, 0.2, 0.1] }); // Scroll
+        // Bridge
+        parts.push({ geom: createCube(0.15, 0.1, 0.05, 0, 0, 0.12), color: [0.8, 0.6, 0.4] });
+
+        const stringPositions = [
+            { x: -0.02, color: [0.9, 0.9, 0.9] },
+            { x: -0.005, color: [0.9, 0.9, 0.9] },
+            { x: 0.005, color: [0.9, 0.9, 0.9] },
+            { x: 0.02, color: [0.9, 0.9, 0.9] },
+        ];
+
+        const audio = new ViolinAudio();
+        let rotationX = -0.5;
+        let rotationY = 0.7;
+        let activeString = -1;
+
+        // Interaction
+        let isDragging = false;
+        let lastMouseX = 0, lastMouseY = 0;
+
+        window.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                rotationY += (e.clientX - lastMouseX) * 0.01;
+                rotationX += (e.clientY - lastMouseY) * 0.01;
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+            }
+        });
+
+        window.addEventListener('mouseup', () => isDragging = false);
+
+        window.addEventListener('keydown', (e) => {
+            if (audio.notes[e.key]) {
+                const idx = Object.keys(audio.notes).indexOf(e.key);
+                audio.play(idx);
+                activeString = idx;
+                setTimeout(() => activeString = -1, 100);
+            }
+        });
+
+        canvas.addEventListener('click', (e) => {
+            // Simple ray-to-string detection is hard in raw WebGL without a lib.
+            // We'll use a simple coordinate-based guess for this demo.
+            const rect = canvas.getBoundingClientRect();
+            const mx = (e.clientX - rect.left) / rect.width * 2 - 1;
+            const my = (e.clientY - rect.top) / rect.height * 2 - 1;
+            
+            // We map a small area in the center to the strings
+            if (Math.abs(mx) < 0.2 && my < 0 && my > -0.8) {
+                const stringIdx = Math.floor((mx + 0.1) * 20);
+                const clampedIdx = Math.max(0, Math.min(3, stringIdx));
+                audio.play(clampedIdx);
+                activeString = clampedIdx;
+                setTimeout(() => activeString = -1, 100);
+            }
+        });
+
+        function render() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+            gl.clearColor(0, 0, 0, 0);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            gl.enable(gl.DEPTH_TEST);
+
+            const proj = Mat4.perspective(45 * Math.PI / 180, canvas.width / canvas.height, 0.1, 100);
+            let mv = Mat4.identity();
+            mv = Mat4.multiply(mv, new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,-3,1])); // Move back
+            mv = Mat4.rotateX(mv, rotationX);
+            mv = Mat4.rotateY(mv, rotationY);
+
+            gl.uniformMatrix4fv(locProj, false, proj);
+            gl.uniformMatrix4fv(locMV, false, mv);
+
+            // Draw parts
+            parts.forEach(p => {
+                const posBuf = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+                gl.bufferData(gl.ARRAY_BUFFER, p.geom.p, gl.STATIC_DRAW);
+                gl.vertexAttribPointer(locPos, 3, gl.FLOAT, false, 0, 0);
+                gl.enableVertexAttribArray(locPos);
+
+                const normBuf = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, normBuf);
+                gl.bufferData(gl.ARRAY_BUFFER, p.geom.n, gl.STATIC_DRAW);
+                gl.vertexAttribPointer(locNorm, 3, gl.FLOAT, false, 0, 0);
+                gl.enableVertexAttribArray(locNorm);
+
+                gl.uniform3fv(locCol, p.color);
+                gl.drawArrays(gl.TRIANGLES, 0, 36);
+            });
+
+            // Draw strings
+            stringPositions.forEach((s, i) => {
+                const linePos = new Float32Array([
+                    s.x, -0.5, 0.1,
+                    s.x, 1.5, 0.1
+                ]);
+                const lineBuf = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, lineBuf);
+                gl.bufferData(gl.ARRAY_BUFFER, linePos, gl.STATIC_DRAW);
+                gl.vertexAttribPointer(locPos, 3, gl.FLOAT, false, 0, 0);
+                gl.enableVertexAttribArray(locPos);
+                
+                const dummyNorm = new Float32Array([0,0,0, 0,0,0]);
+                gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+                gl.bufferData(gl.ARRAY_BUFFER, dummyNorm, gl.STATIC_DRAW);
+                gl.vertexAttribPointer(locNorm, 3, gl.FLOAT, false, 0, 0);
+
+                gl.uniform3fv(locCol, activeString === i ? [1, 1, 1] : s.color);
+                gl.drawArrays(gl.LINES, 0, 2);
+            });
+
+            requestAnimationFrame(render);
+        }
+
+        render();
+    </script>
+</body>
+</html>

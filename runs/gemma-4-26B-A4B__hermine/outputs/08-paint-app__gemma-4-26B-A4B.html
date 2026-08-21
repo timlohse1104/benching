@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas Paint Pro</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --toolbar-bg: #ffffff;
+            --border-color: #dee2e6;
+            --accent-color: #007bff;
+            --text-color: #495057;
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: var(--bg-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text-color);
+            user-select: none;
+        }
+
+        .toolbar {
+            background: var(--toolbar-bg);
+            padding: 15px 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+        .tool-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-right: 1px solid var(--border-color);
+            padding-right: 15px;
+        }
+
+        .tool-group:last-child {
+            border-right: none;
+        }
+
+        .tool-group label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #6c757d;
+        }
+
+        button {
+            padding: 8px 14px;
+            border: 1px solid var(--border-color);
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            background: #f1f3f5;
+        }
+
+        button.active {
+            background: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+        }
+
+        input[type="color"] {
+            border: none;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            background: none;
+        }
+
+        input[type="range"] {
+            cursor: pointer;
+        }
+
+        .palette {
+            display: flex;
+            gap: 6px;
+        }
+
+        .swatch {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 1px solid rgba(0,0,0,0.1);
+            transition: transform 0.1s ease;
+        }
+
+        .swatch:hover {
+            transform: scale(1.2);
+        }
+
+        .status-bar {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: #868e96;
+            margin-bottom: 5px;
+            padding: 0 5px;
+        }
+
+        .canvas-container {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border: 1px solid #adb5bd;
+            background: white;
+            line-height: 0;
+        }
+
+        canvas {
+            cursor: crosshair;
+            touch-action: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="toolbar">
+        <!-- Tools -->
+        <div class="tool-group">
+            <button id="brushBtn" class="active">Brush</button>
+            <button id="eraserBtn">Eraser</button>
+        </div>
+
+        <!-- Settings -->
+        <div class="tool-group">
+            <label>Color</label>
+            <input type="color" id="colorPicker" value="#000000">
+            <div class="palette">
+                <div class="swatch" style="background: #000000;" data-color="#000000"></div>
+                <div class="swatch" style="background: #ff4757;" data-color="#ff4757"></div>
+                <div class="swatch" style="background: #2ed573;" data-color="#2ed573"></div>
+                <div class="swatch" style="background: #1e90ff;" data-color="#1e90ff"></div>
+                <div class="swatch" style="background: #ffa502;" data-color="#ffa502"></div>
+            </div>
+        </div>
+
+        <div class="tool-group">
+            <label>Size</label>
+            <input type="range" id="sizeSlider" min="1" max="50" value="5">
+        </div>
+
+        <!-- Actions -->
+        <div class="tool-group">
+            <button id="undoBtn">Undo</button>
+            <button id="redoBtn">Redo</button>
+            <button id="clearBtn">Clear</button>
+            <button id="saveBtn" style="background: #212529; color: white;">Save PNG</button>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <span id="statusColor">Color: #000000</span>
+        <span id="statusSize">Size: 5px</span>
+    </div>
+
+    <div class="canvas-container">
+        <canvas id="paintCanvas" width="800" height="600"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('paintCanvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const brushBtn = document.getElementById('brushBtn');
+        const eraserBtn = document.getElementById('eraserBtn');
+        const colorPicker = document.getElementById('colorPicker');
+        const sizeSlider = document.getElementById('sizeSlider');
+        const clearBtn = document.getElementById('clearBtn');
+        const undoBtn = document.getElementById('undoBtn');
+        const redoBtn = document.getElementById('redoBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        const statusColor = document.getElementById('statusColor');
+        const statusSize = document.getElementById('statusSize');
+        const swatches = document.querySelectorAll('.swatch');
+
+        // State
+        let drawing = false;
+        let mode = 'brush'; // 'brush' or 'eraser'
+        let currentColor = '#000000';
+        let currentSize = 5;
+        let history = [];
+        let historyStep = -1;
+
+        // Initialization
+        function init() {
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            saveState();
+            updateStatus();
+        }
+
+        function updateStatus() {
+            statusColor.textContent = `Color: ${currentColor.toUpperCase()}`;
+            statusSize.textContent = `Size: ${currentSize}px`;
+        }
+
+        // History Management
+        function saveState() {
+            // If we are in the middle of the history and perform a new action, truncate the "future"
+            if (historyStep < history.length - 1) {
+                history = history.slice(0, historyStep + 1);
+            }
+            // Limit history to 50 steps for performance
+            if (history.length > 50) {
+                history.shift();
+                historyStep--;
+            }
+            history.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+            historyStep++;
+        }
+
+        function undo() {
+            if (historyStep > 0) {
+                historyStep--;
+                ctx.putImageData(history[historyStep], 0, 0);
+            }
+        }
+
+        function redo() {
+            if (historyStep < history.length - 1) {
+                historyStep++;
+                ctx.putImageData(history[historyStep], 0, 0);
+            }
+        }
+
+        // Drawing Logic
+        function startDrawing(e) {
+            if (e.type === 'mousedown' || e.type === 'touchstart') {
+                drawing = true;
+                saveState();
+            }
+            draw(e);
+        }
+
+        function stopDrawing() {
+            if (drawing) {
+                drawing = false;
+                ctx.beginPath();
+            }
+        }
+
+        function draw(e) {
+            if (!drawing) return;
+            e.preventDefault();
+
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+
+            ctx.lineWidth = currentSize;
+            
+            if (mode === 'eraser') {
+                ctx.globalCompositeOperation = 'destination-out';
+            } else {
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.strokeStyle = currentColor;
+            }
+
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+        }
+
+        // Event Listeners
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        window.addEventListener('mouseup', stopDrawing);
+
+        canvas.addEventListener('touchstart', startDrawing, { passive: false });
+        canvas.addEventListener('touchmove', draw, { passive: false });
+        canvas.addEventListener('touchend', stopDrawing);
+
+        // Tool Controls
+        brushBtn.addEventListener('click', () => {
+            mode = 'brush';
+            brushBtn.classList.add('active');
+            eraserBtn.classList.remove('active');
+        });
+
+        eraserBtn.addEventListener('click', () => {
+            mode = 'eraser';
+            eraserBtn.classList.add('active');
+            brushBtn.classList.remove('active');
+        });
+
+        colorPicker.addEventListener('input', (e) => {
+            currentColor = e.target.value;
+            mode = 'brush';
+            brushBtn.classList.add('active');
+            eraserBtn.classList.remove('active');
+            updateStatus();
+        });
+
+        sizeSlider.addEventListener('input', (e) => {
+            currentSize = e.target.value;
+            updateStatus();
+        });
+
+        swatches.forEach(swatch => {
+            swatch.addEventListener('click', () => {
+                currentColor = swatch.dataset.color;
+                colorPicker.value = currentColor;
+                mode = 'brush';
+                brushBtn.classList.add('active');
+                eraserBtn.classList.remove('active');
+                updateStatus();
+            });
+        });
+
+        clearBtn.addEventListener('click', () => {
+            if (confirm('Clear the entire canvas?')) {
+                saveState();
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+        });
+
+        undoBtn.addEventListener('click', undo);
+        redoBtn.addEventListener('click', redo);
+
+        saveBtn.addEventListener('click', () => {
+            // Create a temporary canvas to ensure the background is white in the PNG
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            tempCtx.fillStyle = 'white';
+            tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+            tempCtx.drawImage(canvas, 0, 0);
+            
+            const link = document.createElement('a');
+            link.download = 'my-drawing.png';
+            link.href = tempCanvas.toDataURL('image/png');
+            link.click();
+        });
+
+        // Keyboard shortcuts
+        window.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'z') {
+                    e.preventDefault();
+                    undo();
+                }
+                if (e.key === 'y') {
+                    e.preventDefault();
+                    redo();
+                }
+            }
+        });
+
+        init();
+    </script>
+</body>
+</html>

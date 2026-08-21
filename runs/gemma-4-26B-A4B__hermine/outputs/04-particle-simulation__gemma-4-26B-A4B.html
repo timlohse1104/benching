@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Particle Simulation</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050505;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(20, 20, 25, 0.8);
+            padding: 20px;
+            border-radius: 12px;
+            color: #e0e0e0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            user-select: none;
+            width: 220px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            color: #aaa;
+        }
+
+        input[type=range] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: #4f46e5;
+        }
+
+        #fps-counter {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #00ffcc;
+            font-family: monospace;
+            font-size: 14px;
+            text-shadow: 0 0 5px rgba(0, 255, 204, 0.5);
+            pointer-events: none;
+        }
+
+        h1 {
+            margin: 0 0 15px 0;
+            font-size: 1rem;
+            font-weight: 400;
+            color: #fff;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="fps-counter">FPS: 60</div>
+
+    <div id="ui-layer">
+        <h1>Simulation</h1>
+        <div class="control-group">
+            <label for="count">Particle Count</label>
+            <input type="range" id="count" min="50" max="1500" value="500">
+        </div>
+        <div class="control-group">
+            <label for="gravity">Gravity</label>
+            <input type="range" id="gravity" min="-0.5" max="0.5" step="0.01" value="0.05">
+        </div>
+        <div class="control-group">
+            <label for="attraction">Attraction Strength</label>
+            <input type="range" id="attraction" min="-2" max="2" step="0.1" value="0.8">
+        </div>
+        <div class="control-group">
+            <label for="friction">Friction</label>
+            <input type="range" id="friction" min="0.8" max="1.0" step="0.001" value="0.98">
+        </div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const fpsDisplay = document.getElementById('fps-counter');
+        
+        // UI Elements
+        const inputCount = document.getElementById('count');
+        const inputGravity = document.getElementById('gravity');
+        const inputAttraction = document.getElementById('attraction');
+        const inputFriction = document.getElementById('friction');
+
+        let width, height;
+        let particles = [];
+        let lastTime = performance.now();
+        let frameCount = 0;
+        let fps = 0;
+
+        const mouse = {
+            x: -1000,
+            y: -1000,
+            active: false
+        };
+
+        const params = {
+            count: parseInt(inputCount.value),
+            gravity: parseFloat(inputGravity.value),
+            attraction: parseFloat(inputAttraction.value),
+            friction: parseFloat(inputFriction.value)
+        };
+
+        class Particle {
+            constructor() {
+                this.init();
+            }
+
+            init() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.vx = (Math.random() - 0.5) * 4;
+                this.vy = (Math.random() - 0.5) * 4;
+                this.radius = Math.random() * 2 + 1;
+                // Random subtle color (cyan/blue/purple theme)
+                const hue = Math.floor(Math.random() * 60) + 180; 
+                this.color = `hsla(${hue}, 70%, 60%, 0.8)`;
+            }
+
+            update() {
+                // Apply gravity
+                this.vy += params.gravity;
+
+                // Mouse interaction
+                const dx = mouse.x - this.x;
+                const dy = mouse.y - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const maxDist = 250;
+
+                if (distance < maxDist) {
+                    const force = (maxDist - distance) / maxDist;
+                    const strength = params.attraction * 0.5;
+                    this.vx += (dx / distance) * force * strength;
+                    this.vy += (dy / distance) * force * strength;
+                }
+
+                // Apply velocity
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Apply friction
+                this.vx *= params.friction;
+                this.vy *= params.friction;
+
+                // Boundary Bounce
+                if (this.x < 0) {
+                    this.x = 0;
+                    this.vx *= -0.8;
+                } else if (this.x > width) {
+                    this.x = width;
+                    this.vx *= -0.8;
+                }
+
+                if (this.y < 0) {
+                    this.y = 0;
+                    this.vy *= -0.8;
+                } else if (this.y > height) {
+                    this.y = height;
+                    this.vy *= -0.8;
+                }
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+
+        function createParticles() {
+            // Adjust particle count
+            if (particles.length < params.count) {
+                for (let i = 0; i < params.count - particles.length; i++) {
+                    particles.push(new Particle());
+                }
+            } else if (particles.length > params.count) {
+                particles.splice(params.count);
+            }
+        }
+
+        function updateParams() {
+            params.count = parseInt(inputCount.value);
+            params.gravity = parseFloat(inputGravity.value);
+            params.attraction = parseFloat(inputAttraction.value);
+            params.friction = parseFloat(inputFriction.value);
+            createParticles();
+        }
+
+        function animate() {
+            // Semi-transparent clear for motion trails
+            ctx.fillStyle = 'rgba(5, 5, 5, 0.15)';
+            ctx.fillRect(0, 0, width, height);
+
+            // Update FPS
+            const now = performance.now();
+            frameCount++;
+            if (now - lastTime >= 1000) {
+                fps = frameCount;
+                frameCount = 0;
+                lastTime = now;
+                fpsDisplay.innerText = `FPS: ${fps}`;
+            }
+
+            // Update and draw particles
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // Event Listeners
+        window.addEventListener('resize', resize);
+        
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+        });
+
+        window.addEventListener('mousedown', () => { mouse.active = true; });
+        window.addEventListener('mouseup', () => { mouse.active = false; });
+
+        // For touch devices
+        window.addEventListener('touchmove', (e) => {
+            mouse.x = e.touches[0].clientX;
+            mouse.y = e.touches[0].clientY;
+        }, { passive: true });
+
+        [inputCount, inputGravity, inputAttraction, inputFriction].forEach(el => {
+            el.addEventListener('input', updateParams);
+        });
+
+        // Init
+        resize();
+        createParticles();
+        animate();
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D Physics Sandbox</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #121212;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #e0e0e0;
+            user-select: none;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(30, 30, 30, 0.85);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            width: 260px;
+            pointer-events: auto;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            margin-bottom: 8px;
+            color: #bbb;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        label span {
+            color: #00d4ff;
+            font-weight: bold;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: #00d4ff;
+        }
+
+        .button-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        button {
+            background: #333;
+            border: none;
+            color: white;
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #444;
+        }
+
+        button.active {
+            background: #00d4ff;
+            color: #000;
+        }
+
+        #stats {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.5);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+<div id="ui-layer">
+    <div class="control-group">
+        <label>Gravity <span id="grav-val">0.5</span></label>
+        <input type="range" id="grav-slider" min="0" max="2" step="0.05" value="0.5">
+    </div>
+    <div class="control-group">
+        <label>Restitution <span id="rest-val">0.7</span></label>
+        <input type="range" id="rest-slider" min="0.1" max="1" step="0.05" value="0.7">
+    </div>
+    <div class="control-group">
+        <label>Friction (Air) <span id="fric-val">0.01</span></label>
+        <input type="range" id="fric-slider" min="0" max="0.1" step="0.005" value="0.01">
+    </div>
+    <div class="button-row">
+        <button id="reset-btn">Reset</button>
+        <button id="collision-btn" class="active">Collisions: ON</button>
+    </div>
+</div>
+
+<div id="stats">Balls: <span id="ball-count">0</span></div>
+
+<canvas id="canvas"></canvas>
+
+<script>
+/**
+ * Physics Sandbox Engine
+ */
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const ballCountEl = document.getElementById('ball-count');
+
+// UI Elements
+const gravSlider = document.getElementById('grav-slider');
+const restSlider = document.getElementById('rest-slider');
+const fricSlider = document.getElementById('fric-slider');
+const gravVal = document.getElementById('grav-val');
+const restVal = document.getElementById('rest-val');
+const fricVal = document.getElementById('fric-val');
+const resetBtn = document.getElementById('reset-btn');
+const collisionBtn = document.getElementById('collision-btn');
+
+// Simulation State
+let width, height;
+let balls = [];
+let isDragging = false;
+let dragStart = { x: 0, y: 0 };
+let dragCurrent = { x: 0, y: 0 };
+
+// Physics Parameters
+let config = {
+    gravity: 0.5,
+    restitution: 0.7,
+    friction: 0.01,
+    collisionsEnabled: true
+};
+
+class Ball {
+    constructor(x, y, vx, vy, radius, color) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.radius = radius;
+        this.color = color;
+        this.mass = radius; // Mass proportional to radius
+    }
+
+    update() {
+        // Apply gravity
+        this.vy += config.gravity;
+        
+        // Apply air friction
+        this.vx *= (1 - config.friction);
+        this.vy *= (1 - config.friction);
+
+        // Update position
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // Wall Collisions
+        if (this.x + this.radius > width) {
+            this.x = width - this.radius;
+            this.vx *= -config.restitution;
+        } else if (this.x - this.radius < 0) {
+            this.x = this.radius;
+            this.vx *= -config.restitution;
+        }
+
+        if (this.y + this.radius > height) {
+            this.y = height - this.radius;
+            this.vy *= -config.restitution;
+            // Add a bit of extra friction when sliding on floor
+            this.vx *= 0.99; 
+        } else if (this.y - this.radius < 0) {
+            this.y = this.radius;
+            this.vy *= -config.restitution;
+        }
+    }
+
+    draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        // Shine effect
+        ctx.beginPath();
+        ctx.arc(this.x - this.radius * 0.3, this.y - this.radius * 0.3, this.radius * 0.2, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.fill();
+    }
+}
+
+function resolveCollision(b1, b2) {
+    const dx = b2.x - b1.x;
+    const dy = b2.y - b1.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance < b1.radius + b2.radius) {
+        // 1. Position Correction (Static Resolution to prevent sticking/tunneling)
+        const overlap = b1.radius + b2.radius - distance;
+        const nx = dx / distance; // Normal X
+        const ny = dy / distance; // Normal Y
+        const totalMass = b1.mass + b2.mass;
+        
+        const m1Ratio = b2.mass / totalMass;
+        const m2Ratio = b1.mass / totalMass;
+
+        b1.x -= nx * overlap * m1Ratio;
+        b1.y -= ny * overlap * m1Ratio;
+        b2.x += nx * overlap * m2Ratio;
+        b2.y += ny * overlap * m2Ratio;
+
+        // 2. Impulse Resolution (Dynamic Resolution)
+        // Relative velocity
+        const rvx = b2.vx - b1.vx;
+        const rvy = b2.vy - b1.vy;
+
+        // Relative velocity along normal
+        const velAlongNormal = rvx * nx + rvy * ny;
+
+        // Do not resolve if velocities are separating
+        if (velAlongNormal > 0) return;
+
+        // Impulse scalar
+        let j = -(1 + config.restitution) * velAlongNormal;
+        j /= (1 / b1.mass + 1 / b2.mass);
+
+        // Apply impulse
+        const impulseX = j * nx;
+        const impulseY = j * ny;
+
+        b1.vx -= (1 / b1.mass) * impulseX;
+        b1.vy -= (1 / b1.mass) * impulseY;
+        b2.vx += (1 / b2.mass) * impulseX;
+        b2.vy += (1 / b2.mass) * impulseY;
+    }
+}
+
+function init() {
+    resize();
+    window.addEventListener('resize', resize);
+    
+    // Input Listeners
+    canvas.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    
+    // UI Listeners
+    gravSlider.addEventListener('input', e => {
+        config.gravity = parseFloat(e.target.value);
+        gravVal.textContent = config.gravity.toFixed(2);
+    });
+    restSlider.addEventListener('input', e => {
+        config.restitution = parseFloat(e.target.value);
+        restVal.textContent = config.restitution.toFixed(2);
+    });
+    fricSlider.addEventListener('input', e => {
+        config.friction = parseFloat(e.target.value);
+        fricVal.textContent = config.friction.toFixed(3);
+    });
+    resetBtn.addEventListener('click', () => {
+        balls = [];
+    });
+    collisionBtn.addEventListener('click', () => {
+        config.collisionsEnabled = !config.collisionsEnabled;
+        collisionBtn.textContent = `Collisions: ${config.collisionsEnabled ? 'ON' : 'OFF'}`;
+        collisionBtn.classList.toggle('active', config.collisionsEnabled);
+    });
+
+    requestAnimationFrame(loop);
+}
+
+function resize() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+}
+
+function onMouseDown(e) {
+    isDragging = true;
+    dragStart = { x: e.clientX, y: e.clientY };
+    dragCurrent = { x: e.clientX, y: e.clientY };
+}
+
+function onMouseMove(e) {
+    if (isDragging) {
+        dragCurrent = { x: e.clientX, y: e.clientY };
+    }
+}
+
+function onMouseUp(e) {
+    if (isDragging) {
+        const dx = dragStart.x - e.clientX;
+        const dy = dragStart.y - e.clientY;
+        const radius = 10 + Math.random() * 25;
+        const color = `hsl(${Math.random() * 360}, 70%, 60%)`;
+        // Velocity is scaled by drag distance
+        const vx = dx * 0.15;
+        const vy = dy * 0.15;
+        balls.push(new Ball(dragStart.x, dragStart.y, vx, vy, radius, color));
+    }
+    isDragging = false;
+}
+
+function loop() {
+    ctx.clearRect(0, 0, width, height);
+
+    // Update and draw balls
+    for (let i = 0; i < balls.length; i++) {
+        const b1 = balls[i];
+        b1.update();
+        b1.draw();
+
+        // Collision detection
+        if (config.collisionsEnabled) {
+            for (let j = i + 1; j < balls.length; j++) {
+                resolveCollision(b1, balls[j]);
+            }
+        }
+    }
+
+    // Draw drag line
+    if (isDragging) {
+        ctx.beginPath();
+        ctx.moveTo(dragStart.x, dragStart.y);
+        ctx.lineTo(dragCurrent.x, dragCurrent.y);
+        ctx.strokeStyle = 'rgba(0, 212, 255, 0.5)';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        
+        // Draw preview ball
+        ctx.beginPath();
+        ctx.arc(dragStart.x, dragStart.y, 15, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.stroke();
+    }
+
+    ballCountEl.textContent = balls.length;
+    requestAnimationFrame(loop);
+}
+
+init();
+
+</script>
+</body>
+</html>

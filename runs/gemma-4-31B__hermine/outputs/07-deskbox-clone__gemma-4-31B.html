@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>desk.box – Die smarte Bürosoftware für die Landwirtschaft</title>
+    <style>
+        :root {
+            --primary: #4CAF50;
+            --primary-dark: #388E3C;
+            --secondary: #2c3e50;
+            --accent: #fbc02d;
+            --text-dark: #333;
+            --text-light: #666;
+            --bg-light: #f8f9fa;
+            --white: #ffffff;
+            --border: #ddd;
+            --shadow: 0 4px 6px rgba(0,0,0,0.1);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-dark);
+            background-color: var(--white);
+            overflow-x: hidden;
+        }
+
+        /* Utility */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            text-align: center;
+            border: none;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+        }
+
+        .btn-outline:hover {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        /* Header */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: var(--white);
+            box-shadow: var(--shadow);
+            height: 80px;
+            display: flex;
+            align-items: center;
+        }
+
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--primary);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-menu {
+            display: flex;
+            list-style: none;
+            gap: 30px;
+            align-items: center;
+        }
+
+        .nav-item {
+            position: relative;
+        }
+
+        .nav-link {
+            text-decoration: none;
+            color: var(--text-dark);
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+        }
+
+        .nav-link:hover {
+            color: var(--primary);
+        }
+
+        .caret {
+            width: 10px;
+            height: 10px;
+            border-left: 2px solid currentColor;
+            border-bottom: 2px solid currentColor;
+            transform: rotate(-45deg);
+            margin-top: 4px;
+        }
+
+        .dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            box-shadow: var(--shadow);
+            min-width: 200px;
+            border-radius: 4px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+            transition: var(--transition);
+            list-style: none;
+            padding: 10px 0;
+        }
+
+        .nav-item:hover .dropdown {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .dropdown li a {
+            padding: 10px 20px;
+            display: block;
+            text-decoration: none;
+            color: var(--text-dark);
+            font-size: 14px;
+        }
+
+        .dropdown li a:hover {
+            background: var(--bg-light);
+            color: var(--primary);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .login-link {
+            text-decoration: none;
+            color: var(--text-dark);
+            font-weight: 500;
+        }
+
+        .hamburger {
+            display: none;
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-size: 24px;
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 80px 0;
+            background: linear-gradient(135deg, #fdfdfd 0%, #f0f7f0 100%);
+        }
+
+        .hero-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .hero-content h1 {
+            font-size: 48px;
+            line-height: 1.2;
+            margin-bottom: 24px;
+            color: var(--secondary);
+        }
+
+        .trust-badges {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            background: white;
+            border: 1px solid var(--border);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-light);
+        }
+
+        .badge svg {
+            width: 14px;
+            height: 14px;
+            fill: var(--primary);
+        }
+
+        .hero-content p {
+            font-size: 18px;
+            color: var(--text-light);
+            margin-bottom: 32px;
+        }
+
+        .hero-btns {
+            display: flex;
+            gap: 16px;
+        }
+
+        .hero-visuals {
+            position: relative;
+        }
+
+        .visual-container {
+            background: #ddd;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            position: relative;
+            overflow: hidden;
+            aspect-ratio: 16/10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #888;
+            font-weight: bold;
+            border: 8px solid white;
+        }
+
+        .play-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            background: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 0 0 15px rgba(76, 175, 80, 0.2);
+            transition: var(--transition);
+        }
+
+        .play-overlay:hover {
+            transform: translate(-50%, -50%) scale(1.1);
+            background: var(--primary-dark);
+        }
+
+        .play-overlay svg {
+            width: 30px;
+            height: 30px;
+            fill: white;
+            margin-left: 5px;
+        }
+
+        .person-cutout {
+            position: absolute;
+            bottom: -20px;
+            left: -40px;
+            width: 300px;
+            height: 400px;
+            background: #ccc;
+            border-radius: 20px 20px 0 0;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 5px solid white;
+            box-shadow: var(--shadow);
+            font-size: 14px;
+            text-align: center;
+            padding: 20px;
+        }
+
+        /* Features Row */
+        .features-bar {
+            padding: 60px 0;
+            background: var(--secondary);
+            color: white;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+        }
+
+        .feature-bullet {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            font-size: 15px;
+        }
+
+        .feature-bullet svg {
+            width: 20px;
+            height: 20px;
+            fill: var(--primary);
+            flex-shrink: 0;
+        }
+
+        /* Main Features Section */
+        .main-features {
+            padding: 100px 0;
+            text-align: center;
+        }
+
+        .section-title {
+            font-size: 36px;
+            margin-bottom: 50px;
+            color: var(--secondary);
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 24px;
+        }
+
+        .feature-card {
+            padding: 40px 24px;
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            transition: var(--transition);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            box-shadow: var(--shadow);
+            border-color: var(--primary);
+        }
+
+        .card-icon {
+            width: 64px;
+            height: 64px;
+            background: #e8f5e9;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .card-icon svg {
+            width: 32px;
+            height: 32px;
+            fill: var(--primary);
+        }
+
+        .feature-card h3 {
+            margin-bottom: 12px;
+            font-size: 20px;
+        }
+
+        .feature-card p {
+            color: var(--text-light);
+            font-size: 14px;
+            margin-bottom: 20px;
+            flex-grow: 1;
+        }
+
+        .learn-more {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        /* Testimonials */
+        .testimonials {
+            padding: 100px 0;
+            background: var(--bg-light);
+        }
+
+        .testimonial-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+        }
+
+        .testimonial-card {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            position: relative;
+        }
+
+        .quote-icon {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 30px;
+            height: 30px;
+            fill: #eee;
+        }
+
+        .testimonial-card p {
+            font-style: italic;
+            color: var(--text-light);
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .testimonial-card .author {
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--secondary);
+        }
+
+        /* Blog Section */
+        .blog {
+            padding: 100px 0;
+        }
+
+        .blog-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+
+        .blog-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            transition: var(--transition);
+        }
+
+        .blog-card:hover {
+            box-shadow: var(--shadow);
+        }
+
+        .blog-img {
+            width: 100%;
+            height: 200px;
+            background: #eee;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #aaa;
+            font-weight: bold;
+        }
+
+        .blog-content {
+            padding: 24px;
+        }
+
+        .blog-content h4 {
+            margin-bottom: 12px;
+            font-size: 18px;
+            color: var(--secondary);
+        }
+
+        .blog-content p {
+            font-size: 14px;
+            color: var(--text-light);
+            margin-bottom: 20px;
+        }
+
+        /* Final CTA Band */
+        .cta-band {
+            background: var(--primary);
+            color: white;
+            padding: 80px 0;
+            text-align: center;
+        }
+
+        .cta-band h2 {
+            font-size: 36px;
+            margin-bottom: 24px;
+        }
+
+        .cta-band .btn {
+            background: white;
+            color: var(--primary);
+            font-size: 18px;
+            padding: 16px 40px;
+        }
+
+        .cta-band .btn:hover {
+            background: #f0f0f0;
+        }
+
+        /* Footer */
+        footer {
+            background: #1a252f;
+            color: #bdc3c7;
+            padding: 80px 0 30px;
+        }
+
+        .footer-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 40px;
+            margin-bottom: 60px;
+        }
+
+        .footer-col h4 {
+            color: white;
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+
+        .footer-col ul {
+            list-style: none;
+        }
+
+        .footer-col ul li {
+            margin-bottom: 10px;
+        }
+
+        .footer-col ul li a {
+            color: #bdc3c7;
+            text-decoration: none;
+            font-size: 14px;
+            transition: var(--transition);
+        }
+
+        .footer-col ul li a:hover {
+            color: var(--primary);
+        }
+
+        .contact-info {
+            font-size: 14px;
+            line-height: 2;
+        }
+
+        .social-links {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .social-icon {
+            width: 36px;
+            height: 36px;
+            background: #2c3e50;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+
+        .social-icon:hover {
+            background: var(--primary);
+        }
+
+        .social-icon svg {
+            width: 18px;
+            height: 18px;
+            fill: white;
+        }
+
+        .cert-badges {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .cert-badge {
+            width: 60px;
+            height: 60px;
+            background: #2c3e50;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            text-align: center;
+            padding: 5px;
+            border: 1px solid #34495e;
+        }
+
+        .footer-bottom {
+            border-top: 1px solid #2c3e50;
+            padding-top: 30px;
+            text-align: center;
+            font-size: 13px;
+        }
+
+        /* Responsive */
+        @media (max-width: 992px) {
+            .hero-grid {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+            .hero-btns {
+                justify-content: center;
+            }
+            .hero-content h1 {
+                font-size: 36px;
+            }
+            .trust-badges {
+                justify-content: center;
+            }
+            .person-cutout {
+                display: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .nav-menu {
+                display: none;
+                position: absolute;
+                top: 80px;
+                left: 0;
+                width: 100%;
+                background: white;
+                flex-direction: column;
+                padding: 20px;
+                box-shadow: var(--shadow);
+                text-align: center;
+            }
+
+            .nav-menu.active {
+                display: flex;
+            }
+
+            .hamburger {
+                display: block;
+            }
+
+            .header-actions .login-link {
+                display: none;
+            }
+
+            .nav-item {
+                width: 100%;
+            }
+
+            .dropdown {
+                position: static;
+                opacity: 1;
+                visibility: visible;
+                transform: none;
+                box-shadow: none;
+                text-align: center;
+                padding: 10px 0;
+                display: none;
+            }
+
+            .nav-item.open .dropdown {
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="container header-container">
+            <a href="#" class="logo">
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="22" x2="9" y2="9"></line></svg>
+                desk.box
+            </a>
+            
+            <nav>
+                <ul class="nav-menu" id="navMenu">
+                    <li class="nav-item">
+                        <a class="nav-link">Funktionen <span class="caret"></span></a>
+                        <ul class="dropdown">
+                            <li><a href="#">Schreibtisch</a></li>
+                            <li><a href="#">Banking</a></li>
+                            <li><a href="#">Aktenschrank</a></li>
+                            <li><a href="#">Faktura</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link">Preise <span class="caret"></span></a>
+                        <ul class="dropdown">
+                            <li><a href="#">Tarife</a></li>
+                            <li><a href="#">Vergleich</a></li>
+                            <li><a href="#">FAQ</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link">Service <span class="caret"></span></a>
+                        <ul class="dropdown">
+                            <li><a href="#">Support</a></li>
+                            <li><a href="#">Schulungen</a></li>
+                            <li><a href="#">Kontakt</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="header-actions">
+                <a href="#" class="login-link">Login</a>
+                <a href="#" class="btn btn-primary">Jetzt testen</a>
+                <button class="hamburger" id="hamburgerBtn">☰</button>
+            </div>
+        </div>
+    </header>
+
+    <section class="hero">
+        <div class="container hero-grid">
+            <div class="hero-content">
+                <div class="trust-badges">
+                    <div class="badge">
+                        <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-4 4-4-4z"/></svg>
+                        GoBD zertifiziert
+                    </div>
+                    <div class="badge">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                        Server in Deutschland
+                    </div>
+                    <div class="badge">
+                        <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8l8 5 8-5v10zm-8 0z"/></svg>
+                        E-Rechnung
+                    </div>
+                </div>
+                <h1>desk.box – Die smarte Bürosoftware für die Landwirtschaft</h1>
+                <p>Digitalisiere deinen landwirtschaftlichen Betrieb effizient und sicher. Von der Faktura über das Banking bis zur GoBD-konformen Archivierung – alles in einer Lösung.</p>
+                <div class="hero-btns">
+                    <a href="#" class="btn btn-outline">Kostenlos beraten lassen</a>
+                    <a href="#" class="btn btn-primary">Jetzt kostenlos testen</a>
+                </div>
+            </div>
+            <div class="hero-visuals">
+                <div class="person-cutout">
+                    <strong>Produkt-Experte</strong><br>Wir helfen Ihnen bei der Einrichtung!
+                </div>
+                <div class="visual-container">
+                    <span>Produkt-Screenshot Placeholder</span>
+                    <div class="play-overlay">
+                        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="features-bar">
+        <div class="container">
+            <div class="features-grid">
+                <div class="feature-bullet">
+                    <svg viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+                    Direkte Schnittstelle zu deinem Steuerbüro
+                </div>
+                <div class="feature-bullet">
+                    <svg viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+                    E-Rechnung inklusive
+                </div>
+                <div class="feature-bullet">
+                    <svg viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+                    Vollständiges Banking
+                </div>
+                <div class="feature-bullet">
+                    <svg viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+                    Intelligente Volltextsuche durch alle Dokumente
+                </div>
+                <div class="feature-bullet">
+                    <svg viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+                    Alle deine Betriebe auf einen Blick
+                </div>
+                <div class="feature-bullet">
+                    <svg viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+                    Einfacher Workflow
+                </div>
+                <div class="feature-bullet">
+                    <svg viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+                    Alle Dokumente in deiner Hosentasche
+                </div>
+                <div class="feature-bullet">
+                    <svg viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+                    Sichere und gesetzeskonforme Archivierung
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="main-features">
+        <div class="container">
+            <h2 class="section-title">Das bietet dir desk.box</h2>
+            <div class="cards-grid">
+                <div class="feature-card">
+                    <div class="card-icon">
+                        <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8l8 5 8-5v10z"/></svg>
+                    </div>
+                    <h3>Schreibtisch</h3>
+                    <p>Zentrale Verwaltung aller Dokumente und Aufgaben für Ihren Betrieb.</p>
+                    <a href="#" class="learn-more">Mehr erfahren &rarr;</a>
+                </div>
+                <div class="feature-card">
+                    <div class="card-icon">
+                        <svg viewBox="0 0 24 24"><path d="M11.8 10.9c2.2-2.3 5.8-2.3 8 0v6h-16v-6c2.2-2.3 5.8-2.3 8 0zM12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/></svg>
+                    </div>
+                    <h3>Banking</h3>
+                    <p>Direkte Bankanbindung für automatischen Abgleich und einfache Buchung.</p>
+                    <a href="#" class="learn-more">Mehr erfahren &rarr;</a>
+                </div>
+                <div class="feature-card">
+                    <div class="card-icon">
+                        <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                    </div>
+                    <h3>Aktenschrank</h3>
+                    <p>Revisionssichere Archivierung Ihrer Belege gemäß GoBD.</p>
+                    <a href="#" class="learn-more">Mehr erfahren &rarr;</a>
+                </div>
+                <div class="feature-card">
+                    <div class="card-icon">
+                        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l4.59-4.59L18 10l-6 6z"/></svg>
+                    </div>
+                    <h3>Faktura</h3>
+                    <p>Rechnungen erstellen, versenden und verwalten in wenigen Klicks.</p>
+                    <a href="#" class="learn-more">Mehr erfahren &rarr;</a>
+                </div>
+                <div class="feature-card">
+                    <div class="card-icon">
+                        <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                    </div>
+                    <h3>Adressbuch</h3>
+                    <p>Alle Kontakte, Lieferanten und Kunden zentral an einem Ort.</p>
+                    <a href="#" class="learn-more">Mehr erfahren &rarr;</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="testimonials">
+        <div class="container">
+            <h2 class="section-title" style="text-align: center;">Was unsere Kunden sagen</h2>
+            <div class="testimonial-grid">
+                <div class="testimonial-card">
+                    <svg class="quote-icon" viewBox="0 0 24 24"><path d="M14.017 21L14.017 18C14.017 16.895 14.917 16 16.017 16H19V14H16.017C14.917 14 14.017 13.105 14.017 12L14.017 9C14.017 7.895 14.917 7 16.017 7H19V5H16.017C14.917 5 14.017 4.105 14.017 3L14.017 0H10L10 21H14.017ZM6.017 21L6.017 18C6.017 16.895 6.917 16 8.017 16H11V14H8.017C6.917 14 6.017 13.105 6.017 12L6.017 9C6.017 7.895 6.917 7 8.017 7H11V5H8.017C6.917 5 6.017 4.105 6.017 3L6.017 0H2L2 21H6.017Z"/></svg>
+                    <p>"Endlich habe ich Ordnung in meinen Unterlagen. Die E-Rechnung spart mir täglich Zeit."</p>
+                    <div class="author">Nico Ahlmann, Hof Ahlmann Groß Tessin</div>
+                </div>
+                <div class="testimonial-card">
+                    <svg class="quote-icon" viewBox="0 0 24 24"><path d="M14.017 21L14.017 18C14.017 16.895 14.917 16 16.017 16H19V14H16.017C14.917 14 14.017 13.105 14.017 12L14.017 9C14.017 7.895 14.917 7 16.017 7H19V5H16.017C14.917 5 14.017 4.105 14.017 3L14.017 0H10L10 21H14.017ZM6.017 21L6.017 18C6.017 16.895 6.917 16 8.017 16H11V14H8.017C6.917 14 6.017 13.105 6.017 12L6.017 9C6.017 7.895 6.917 7 8.017 7H11V5H8.017C6.917 5 6.017 4.105 6.017 3L6.017 0H2L2 21H6.017Z"/></svg>
+                    <p>"Die Zusammenarbeit mit meinem Steuerberater ist durch die direkte Schnittstelle enorm vereinfacht worden."</p>
+                    <div class="author">Maria Schmidt, Landwirtschaftlicher Betrieb Schmidt</div>
+                </div>
+                <div class="testimonial-card">
+                    <svg class="quote-icon" viewBox="0 0 24 24"><path d="M14.017 21L14.017 18C14.017 16.895 14.917 16 16.017 16H19V14H16.017C14.917 14 14.017 13.105 14.017 12L14.017 9C14.017 7.895 14.917 7 16.017 7H19V5H16.017C14.917 5 14.017 4.105 14.017 3L14.017 0H10L10 21H14.017ZM6.017 21L6.017 18C6.017 16.895 6.917 16 8.017 16H11V14H8.017C6.917 14 6.017 13.105 6.017 12L6.017 9C6.017 7.895 6.917 7 8.017 7H11V5H8.017C6.917 5 6.017 4.105 6.017 3L6.017 0H2L2 21H6.017Z"/></svg>
+                    <p>"Intelligente Suche und einfache Bedienung. Genau das, was ein moderner Betrieb braucht."</p>
+                    <div class="author">Hans Müller, Agrar-Service Müller</div>
+                </div>
+                <div class="testimonial-card">
+                    <svg class="quote-icon" viewBox="0 0 24 24"><path d="M14.017 21L14.017 18C14.017 16.895 14.917 16 16.017 16H19V14H16.017C14.917 14 14.017 13.105 14.017 12L14.017 9C14.017 7.895 14.917 7 16.017 7H19V5H16.017C14.917 5 14.017 4.105 14.017 3L14.017 0H10L10 21H14.017ZM6.017 21L6.017 18C6.017 16.895 6.917 16 8.017 16H11V14H8.017C6.917 14 6.017 13.105 6.017 12L6.017 9C6.017 7.895 6.917 7 8.017 7H11V5H8.017C6.917 5 6.017 4.105 6.017 3L6.017 0H2L2 21H6.017Z"/></svg>
+                    <p>"Sicher, schnell und zuverlässig. Ich fühle mich mit meinen Daten in Deutschland bestens aufgehoben."</p>
+                    <div class="author">Klaus Weber, Hof Weber</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="blog">
+        <div class="container">
+            <h2 class="section-title" style="text-align: center;">Aktuelles aus der Landwirtschaft</h2>
+            <div class="blog-grid">
+                <div class="blog-card">
+                    <div class="blog-img">Blog Bild 1</div>
+                    <div class="blog-content">
+                        <h4>Die neue E-Rechnungs-Pflicht</h4>
+                        <p>Was Landwirte jetzt wissen müssen, um rechtzeitig auf die digitale Fakturierung umzustellen.</p>
+                        <a href="#" class="learn-more">Weiterlesen &rarr;</a>
+                    </div>
+                </div>
+                <div class="blog-card">
+                    <div class="blog-img">Blog Bild 2</div>
+                    <div class="blog-content">
+                        <h4>Effizientes Banking im Betrieb</h4>
+                        <p>Tipps und Tricks, wie Sie Ihre Finanztransaktionen automatisieren und Zeit sparen.</p>
+                        <a href="#" class="learn-more">Weiterlesen &rarr;</a>
+                    </div>
+                </div>
+                <div class="blog-card">
+                    <div class="blog-img">Blog Bild 3</div>
+                    <div class="blog-content">
+                        <h4>GoBD-Konformität einfach erklärt</h4>
+                        <p>Warum eine revisionssichere Archivierung wichtig ist und wie desk.box dabei hilft.</p>
+                        <a href="#" class="learn-more">Weiterlesen &rarr;</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="cta-band">
+        <div class="container">
+            <h2>60 Tage kostenlos testen</h2>
+            <p style="margin-bottom: 30px; font-size: 18px;">Überzeugen Sie sich selbst von der smarten Bürosoftware für Ihren Betrieb.</p>
+            <a href="#" class="btn">Jetzt registrieren</a>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-col">
+                    <a href="#" class="logo" style="color: white; margin-bottom: 20px;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="22" x2="9" y2="9"></line></svg>
+                        desk.box
+                    </a>
+                    <p style="font-size: 14px; margin-bottom: 20px;">Die smarte Bürosoftware für die Landwirtschaft. Effizient, sicher und gesetzeskonform.</p>
+                    <div class="cert-badges">
+                        <div class="cert-badge">GoBD<br>Zertifikat</div>
+                        <div class="cert-badge">ISO 27001</div>
+                    </div>
+                </div>
+                <div class="footer-col">
+                    <h4>Kontakt</h4>
+                    <div class="contact-info">
+                        <div>Telefon: +49(0)431 / 530 154 18</div>
+                        <div>Email: support(at)deskbox-office.de</div>
+                        <div>Supportzeiten: Mo bis Fr: 08:00 - 16:00 Uhr</div>
+                    </div>
+                    <div class="social-links">
+                        <a href="#" class="social-icon" title="LinkedIn"><svg viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-8h3v8zm0-10h-3v-2h3v2zm7 10h-3v-8h3v8zm0-10h-3v-2h3v2z"/></svg></a>
+                        <a href="#" class="social-icon" title="Instagram"><svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.919-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.402c-4.206 0-7.602-3.397-7.602-7.602s3.395-7.602 7.602-7.602 7.602 3.395 7.602 7.602-3.396 7.602-7.602 7.602z"/></svg></a>
+                        <a href="#" class="social-icon" title="YouTube"><svg viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.93C19.574 2.5 12 2.5 12 2.5s-7.574 0-9.376.475A3.016 3.016 0 0 0 .502 6.186C0 8.08 0 12 0 12s0 3.92 0.502 5.814a3.016 3.016 0 0 0 2.122 2.93C4.426 21.5 12 21.5 12 21.5s7.574 0 9.376-.475a3.016 3.016 0 0 0 2.122-2.93C24 15.92 24 12 24 12s0-3.92-.502-5.814zM9.556 12l6 3.5v-7l-6 3.5z"/></svg></a>
+                        <a href="#" class="social-icon" title="Facebook"><svg viewBox="0 0 24 24"><path d="M24 12.073C24 6.999 18.523 3 12 3s-12 3.999-12 9.073c0 4.761 3.903 8.633 9 8.633s9-3.872 9-8.633zm-11.5 6.75C8.1 18.7 6 16.5 6 13.8s2.1-4.9 4.5-4.9 4.5 2.1 4.5 4.9-2.1 4.9-4.5 4.9zm11.5-6.75c0-2.5-2.1-4.5-4.5-4.5s-4.5 2-4.5 4.5 2.1 4.5 4.5 4.5 4.5-2 4.5-4.5z"/></svg></a>
+                        <a href="#" class="social-icon" title="WhatsApp"><svg viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.066 3.223l-.56 2.055 2.112-.556c.758.36 1.63.566 2.55.566.55 0 1.092-.034 1.61-.097.537-.063 1.047-.24 1.522-.481.475-.24.913-.54 1.313-.904.4-.364.757-.779 1.073-1.255.316-.476.583-1.02 0-1.844-.583-0.824-1.45-1.33-2.332-1.33-.882 0-1.754.507-2.333 1.33-.579.823-0.883 1.82-0.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-0.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1.63.21-2.333 1.33-.579.823-.883 1.82-.883 2.817 0 1.097.24 2.03.69 2.813.45 0.783 1.02 1.4 1.72 1.82.7 0.42 1.51.63 2.33.63 0.82 0 1.63-.21 2.33-.63.7-.42 1.27-1.04 1.72-1.82.45-.783.69-1.716.69-2.813 0-1.097-.24-2.03-.69-2.813-.45-.783-1.02-1.4-1.72-1.82-.7-.42-1.51-.63-2.33-.63-.82 0-1
