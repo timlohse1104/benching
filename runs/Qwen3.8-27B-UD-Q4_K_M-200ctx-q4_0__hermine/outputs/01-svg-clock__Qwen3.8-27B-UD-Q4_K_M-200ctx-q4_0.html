@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Tempus — Analog Clock</title>
+<style>
+  :root{
+    --bg:#0b1013;
+    --ivory:#f2ede2;
+    --muted:#8b98a3;
+    --amber:#ffb454;
+    --teal:#5eead4;
+    --mono:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    min-height:100svh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    background:var(--bg);
+    color:var(--ivory);
+    font-family:var(--mono);
+    position:relative;
+    padding:32px 16px;
+  }
+  body::before{
+    content:"";
+    position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:
+      radial-gradient(1100px 700px at 50% 30%, rgba(255,180,84,.065), transparent 62%),
+      radial-gradient(900px 640px at 50% 62%, rgba(94,234,212,.05), transparent 65%),
+      repeating-radial-gradient(circle at 50% 46%, rgba(255,255,255,.015) 0 1px, transparent 1px 84px);
+    animation:drift 16s ease-in-out infinite alternate;
+  }
+  body::after{
+    content:"";
+    position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:radial-gradient(120% 92% at 50% 45%, transparent 55%, rgba(0,0,0,.55) 100%);
+  }
+  @keyframes drift{from{transform:translateY(-10px)}to{transform:translateY(12px)}}
+
+  .corner{
+    position:fixed;z-index:2;
+    font-size:.6rem;letter-spacing:.3em;text-transform:uppercase;
+    color:rgba(226,232,238,.32);
+    animation:rise 1s .9s cubic-bezier(.2,.8,.2,1) both;
+  }
+  .corner.tl{top:22px;left:26px}
+  .corner.br{bottom:22px;right:26px}
+
+  .stage{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;text-align:center}
+
+  .wordmark{
+    font-family:var(--serif);font-style:italic;font-weight:500;
+    font-size:1.6rem;letter-spacing:.02em;color:var(--ivory);
+    animation:rise .8s .05s cubic-bezier(.2,.8,.2,1) both;
+  }
+  .wordmark b{color:var(--amber);font-weight:500}
+
+  .eyebrow{
+    display:flex;align-items:center;gap:.7em;
+    margin-top:.55rem;
+    font-size:.68rem;letter-spacing:.42em;text-transform:uppercase;
+    color:var(--muted);
+    animation:rise .8s .15s cubic-bezier(.2,.8,.2,1) both;
+  }
+  .eyebrow .sep{opacity:.35}
+  .dot{
+    width:7px;height:7px;border-radius:50%;
+    background:var(--teal);
+    box-shadow:0 0 10px var(--teal);
+    animation:breathe 2s ease-in-out infinite;
+  }
+  @keyframes breathe{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.75)}}
+
+  .clock-wrap{
+    position:relative;
+    margin:1.9rem 0 .5rem;
+    animation:rise .9s .25s cubic-bezier(.2,.8,.2,1) both;
+  }
+  .clock-wrap::before{
+    content:"";
+    position:absolute;inset:-16%;
+    background:radial-gradient(closest-side, rgba(255,180,84,.16), rgba(94,234,212,.06) 55%, transparent 78%);
+    filter:blur(20px);
+    opacity:.55;
+    transition:opacity .6s ease, transform .6s ease;
+  }
+  .clock-wrap:hover::before{opacity:1;transform:scale(1.06)}
+  .clock{
+    position:relative;display:block;
+    width:clamp(320px, 72vmin, 480px);
+    height:auto;
+    transition:transform .7s cubic-bezier(.2,.8,.2,1);
+  }
+  .clock-wrap:hover .clock{transform:scale(1.012)}
+
+  #hourHand,#minHand,#secHand{
+    transform-box:view-box;
+    transform-origin:200px 200px;
+  }
+  #secHand{transition:transform .3s cubic-bezier(.3,1.8,.4,1)}
+  #minHand{transition:transform .45s cubic-bezier(.4,0,.2,1)}
+  #hourHand{transition:transform .6s cubic-bezier(.4,0,.2,1)}
+
+  #numerals text{
+    font-family:var(--serif);
+    font-size:30px;
+    fill:#7d8b96;
+    text-anchor:middle;
+    dominant-baseline:central;
+  }
+  #numerals .n12{fill:var(--amber);opacity:.9}
+  .brand{font-family:var(--mono);font-size:11px;letter-spacing:.5em;fill:#66757f;text-anchor:middle}
+  .sub{font-family:var(--mono);font-size:8px;letter-spacing:.35em;fill:#4a5761;text-anchor:middle}
+
+  .digital{
+    margin-top:1.5rem;
+    font-size:clamp(2.1rem, 7vw, 3.2rem);
+    font-weight:600;
+    letter-spacing:.06em;
+    font-variant-numeric:tabular-nums;
+    animation:rise .8s .45s cubic-bezier(.2,.8,.2,1) both;
+  }
+  .digital .colon{color:#5b6a76;margin:0 .06em}
+  #ss{color:var(--amber)}
+  #ss.pulse{animation:pulse .35s ease-out}
+  @keyframes pulse{from{opacity:.2}to{opacity:1}}
+
+  .dateline{
+    margin-top:.75rem;
+    font-family:var(--serif);font-style:italic;
+    font-size:1.02rem;letter-spacing:.04em;
+    color:var(--muted);
+    animation:rise .8s .6s cubic-bezier(.2,.8,.2,1) both;
+  }
+
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation:none!important;transition:none!important}
+  }
+</style>
+</head>
+<body>
+
+<div class="corner tl" aria-hidden="true">Nº 001 · Analog / SVG</div>
+<div class="corner br" aria-hidden="true">60 Ticks · 24 H</div>
+
+<main class="stage">
+  <p class="wordmark">Tempus<b>.</b></p>
+  <p class="eyebrow"><span class="dot" aria-hidden="true"></span> Local Time <span class="sep">/</span> <span id="tz">GMT</span></p>
+
+  <div class="clock-wrap">
+    <svg id="clock" viewBox="0 0 400 400" role="img" aria-label="Analog clock showing the current time">
+      <defs>
+        <linearGradient id="bezel" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#3a4650"/>
+          <stop offset=".5" stop-color="#1b232a"/>
+          <stop offset="1" stop-color="#2c363f"/>
+        </linearGradient>
+        <radialGradient id="face" cx="50%" cy="42%" r="72%">
+          <stop offset="0" stop-color="#1a232b"/>
+          <stop offset=".75" stop-color="#121a21"/>
+          <stop offset="1" stop-color="#0d141a"/>
+        </radialGradient>
+        <radialGradient id="innerShade" cx="50%" cy="50%" r="50%">
+          <stop offset=".72" stop-color="#000" stop-opacity="0"/>
+          <stop offset="1" stop-color="#000" stop-opacity=".34"/>
+        </radialGradient>
+        <radialGradient id="glass" cx="50%" cy="26%" r="62%">
+          <stop offset="0" stop-color="#ffffff" stop-opacity=".09"/>
+          <stop offset=".5" stop-color="#ffffff" stop-opacity=".03"/>
+          <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+        </radialGradient>
+        <filter id="hshadow" filterUnits="userSpaceOnUse" x="0" y="0" width="400" height="400">
+          <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#000000" flood-opacity="0.5"/>
+        </filter>
+      </defs>
+
+      <circle cx="200" cy="200" r="197" fill="url(#bezel)"/>
+      <circle cx="200" cy="200" r="197" fill="none" stroke="#000" stroke-opacity=".35" stroke-width="1.5"/>
+      <circle cx="200" cy="200" r="181" fill="url(#face)"/>
+      <circle cx="200" cy="200" r="181" fill="none" stroke="#ffffff" stroke-opacity=".05"/>
+
+      <g id="ticks"></g>
+
+      <g id="numerals">
+        <text class="n12" x="200" y="72">12</text>
+        <text x="328" y="200">3</text>
+        <text x="200" y="328">6</text>
+        <text x="72" y="200">9</text>
+      </g>
+      <text class="brand" x="200" y="147">TEMPUS</text>
+      <text class="sub" x="200" y="263">SVG · 60 TICKS</text>
+
+      <circle cx="200" cy="200" r="181" fill="url(#innerShade)" pointer-events="none"/>
+
+      <g id="hands" filter="url(#hshadow)">
+        <g id="hourHand">
+          <rect x="196.5" y="116" width="7" height="104" rx="3.5" fill="#f4efe3"/>
+        </g>
+        <g id="minHand">
+          <rect x="197.75" y="76" width="4.5" height="144" rx="2.25" fill="#e9e4d6"/>
+        </g>
+        <g id="secHand">
+          <rect x="199.2" y="58" width="1.6" height="160" fill="#ffb454"/>
+          <circle cx="200" cy="222" r="6" fill="#ffb454"/>
+        </g>
+      </g>
+
+      <circle cx="200" cy="200" r="8.5" fill="#f4efe3"/>
+      <circle cx="200" cy="200" r="3.2" fill="#ffb454"/>
+      <circle cx="200" cy="200" r="181" fill="url(#glass)" pointer-events="none"/>
+    </svg>
+  </div>
+
+  <p class="digital" aria-label="Current time">
+    <span id="hh">--</span><span class="colon">:</span><span id="mm">--</span><span class="colon">:</span><span id="ss">--</span>
+  </p>
+  <p class="dateline" id="date"></p>
+</main>
+
+<script>
+(function(){
+  "use strict";
+  var NS = "http://www.w3.org/2000/svg";
+
+  /* ---- build 60 tick marks: hour ticks long, minute ticks short ---- */
+  var ticksG = document.getElementById("ticks");
+  for (var i = 0; i < 60; i++) {
+    var a = i * 6 * Math.PI / 180;
+    var isHour = i % 5 === 0;
+    var r1 = isHour ? 158 : 168;
+    var r2 = 178;
+    var line = document.createElementNS(NS, "line");
+    line.setAttribute("x1", (200 + r1 * Math.sin(a)).toFixed(2));
+    line.setAttribute("y1", (200 - r1 * Math.cos(a)).toFixed(2));
+    line.setAttribute("x2", (200 + r2 * Math.sin(a)).toFixed(2));
+    line.setAttribute("y2", (200 - r2 * Math.cos(a)).toFixed(2));
+    line.setAttribute("stroke", i === 0 ? "#ffb454" : (isHour ? "#e9e4d6" : "#45525d"));
+    line.setAttribute("stroke-width", isHour ? "4" : "2");
+    line.setAttribute("stroke-linecap", "round");
+    ticksG.appendChild(line);
+  }
+
+  /* ---- elements ---- */
+  var hH  = document.getElementById("hourHand");
+  var mH  = document.getElementById("minHand");
+  var sH  = document.getElementById("secHand");
+  var hhE = document.getElementById("hh");
+  var mmE = document.getElementById("mm");
+  var ssE = document.getElementById("ss");
+  var dateE = document.getElementById("date");
+  var tzE = document.getElementById("tz");
+
+  var lastH = 0, lastM = 0, lastS = 0;
+
+  function pad(n){ return (n < 10 ? "0" : "") + n; }
+
+  /* forward-only rotation: keep cumulative degrees so hands never spin backwards */
+  function fwd(cur, target){
+    return cur + ((target - (cur % 360) + 360) % 360);
+  }
+
+  function fmtTz(){
+    var m = -new Date().getTimezoneOffset();
+    var sign = m < 0 ? "\u2212" : "+";
+    var a = Math.abs(m);
+    var h = Math.floor(a / 60);
+    var mm = a % 60;
+    return "GMT" + sign + h + (mm ? ":" + pad(mm) : "");
+  }
+  tzE.textContent = fmtTz();
+
+  function render(){
+    var now = new Date();
+    var s = now.getSeconds();
+    var m = now.getMinutes() + s / 60;
+    var h = (now.getHours() % 12) + m / 60;
+
+    lastS = fwd(lastS, s * 6);
+    lastM = fwd(lastM, m * 6);
+    lastH = fwd(lastH, h * 30);
+
+    sH.style.transform = "rotate(" + lastS + "deg)";
+    mH.style.transform = "rotate(" + lastM + "deg)";
+    hH.style.transform = "rotate(" + lastH + "deg)";
+
+    hhE.textContent = pad(now.getHours());
+    mmE.textContent = pad(now.getMinutes());
+    ssE.textContent = pad(s);
+
+    ssE.classList.remove("pulse");
+    void ssE.offsetWidth;
+    ssE.classList.add("pulse");
+
+    dateE.textContent = now.toLocaleDateString(undefined, {
+      weekday: "long", day: "numeric", month: "long", year: "numeric"
+    });
+  }
+
+  /* tick once per second, aligned to the wall-clock second boundary */
+  function loop(){
+    render();
+    setTimeout(loop, 1000 - (Date.now() % 1000) + 2);
+  }
+  loop();
+})();
+</script>
+</body>
+</html>

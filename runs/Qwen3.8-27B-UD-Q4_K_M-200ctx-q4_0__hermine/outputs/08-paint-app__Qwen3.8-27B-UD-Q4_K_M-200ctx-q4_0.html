@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>Slate — Paint Studio</title>
+<style>
+  :root{
+    --ink:#16212e;
+    --ink-soft:#5c6b7d;
+    --line:#dde4ec;
+    --panel:#ffffff;
+    --bg:#edf1f6;
+    --accent:#0f5ae0;
+    --accent-deep:#0b4ac4;
+    --danger:#d33a3a;
+    --font-display: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+    --font-ui: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body{ height:100%; }
+  body{
+    margin:0;
+    display:flex;
+    font-family:var(--font-ui);
+    color:var(--ink);
+    background-color:var(--bg);
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(22,33,46,.06) 1px, transparent 1.6px),
+      linear-gradient(180deg, rgba(255,255,255,.75), rgba(255,255,255,0) 340px);
+    background-size:22px 22px, 100% 100%;
+  }
+  .app{
+    width:100%;
+    max-width:1320px;
+    margin:0 auto;
+    min-height:100%;
+    padding:16px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:10px 14px 10px 16px;
+    box-shadow:0 1px 2px rgba(22,33,46,.05);
+    animation:rise .35s ease both;
+  }
+  .brand{ display:flex; align-items:center; gap:12px; min-width:0; }
+  .brand .logo{ flex-shrink:0; display:block; }
+  .brand h1{
+    margin:0;
+    font:700 21px/1 var(--font-display);
+    letter-spacing:-.01em;
+  }
+  .brand .tag{
+    font:600 9.5px/1.3 var(--font-ui);
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    border-left:1px solid var(--line);
+    padding-left:12px;
+    margin-left:2px;
+    white-space:nowrap;
+  }
+  .actions{ display:flex; align-items:center; gap:8px; }
+  .vsep{ width:1px; height:22px; background:var(--line); margin:0 4px; }
+
+  .btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    font:600 12.5px/1 var(--font-ui);
+    color:var(--ink);
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:9px 13px;
+    cursor:pointer;
+    transition:transform .15s ease, box-shadow .15s ease, background .15s ease, border-color .15s ease, color .15s ease;
+    user-select:none;
+  }
+  .btn svg{ width:15px; height:15px; flex-shrink:0; }
+  .btn:hover{
+    border-color:#b9c6d4;
+    background:#f6f9fc;
+    transform:translateY(-1px);
+    box-shadow:0 5px 12px -6px rgba(22,33,46,.28);
+  }
+  .btn:active{ transform:translateY(0); box-shadow:none; }
+  .btn:disabled{ opacity:.35; pointer-events:none; }
+  .btn-danger:hover{ color:var(--danger); border-color:#e6bdbd; background:#fdf6f6; }
+  .btn-primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .btn-primary:hover{ background:var(--accent-deep); border-color:var(--accent-deep); box-shadow:0 7px 16px -6px rgba(15,90,224,.55); }
+
+  /* ---------- Workspace ---------- */
+  .workspace{ display:flex; gap:12px; flex:1; min-height:0; }
+
+  .toolbar{
+    flex:0 0 242px;
+    width:242px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:12px;
+    display:flex;
+    flex-direction:column;
+    animation:rise .35s .06s ease both;
+  }
+  .group{ padding:15px 16px; border-bottom:1px solid var(--line); }
+  .group:last-child{ border-bottom:0; }
+  .group-label{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    font:600 10px/1 var(--font-ui);
+    letter-spacing:.15em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin-bottom:12px;
+    user-select:none;
+  }
+  .mono{ font-family:var(--font-mono); font-size:12px; color:var(--ink); letter-spacing:0; text-transform:none; font-weight:600; }
+
+  .tool-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .tool{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+    padding:13px 6px 11px;
+    background:#fbfcfe;
+    border:1px solid var(--line);
+    border-radius:10px;
+    cursor:pointer;
+    color:var(--ink-soft);
+    font:600 11px/1 var(--font-ui);
+    transition:transform .15s ease, box-shadow .15s ease, background .15s ease, border-color .15s ease, color .15s ease;
+    user-select:none;
+  }
+  .tool svg{ width:20px; height:20px; }
+  .tool:hover{
+    transform:translateY(-1px);
+    border-color:#b9c6d4;
+    color:var(--ink);
+    box-shadow:0 6px 14px -8px rgba(22,33,46,.3);
+  }
+  .tool.is-active{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:#fff;
+    box-shadow:0 7px 18px -7px rgba(15,90,224,.6);
+  }
+
+  .size-row{ display:flex; align-items:center; gap:12px; }
+  .size-dot{
+    display:inline-block;
+    flex-shrink:0;
+    border-radius:50%;
+    border:1px solid rgba(22,33,46,.2);
+    background:var(--ink);
+    transition:width .12s ease, height .12s ease, background .12s ease;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    flex:1;
+    width:100%;
+    height:28px;
+    background:transparent;
+    cursor:pointer;
+    --fill:17%;
+  }
+  input[type=range]::-webkit-slider-runnable-track{
+    height:4px; border-radius:99px;
+    background:linear-gradient(90deg, var(--accent) 0%, var(--accent) var(--fill), #dbe3ec var(--fill));
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:16px; height:16px; margin-top:-6px;
+    border-radius:50%;
+    background:#fff;
+    border:2px solid var(--accent);
+    box-shadow:0 1px 4px rgba(22,33,46,.3);
+    transition:transform .12s ease;
+  }
+  input[type=range]:hover::-webkit-slider-thumb{ transform:scale(1.18); }
+  input[type=range]::-moz-range-track{ height:4px; border-radius:99px; background:#dbe3ec; }
+  input[type=range]::-moz-range-progress{ height:4px; border-radius:99px; background:var(--accent); }
+  input[type=range]::-moz-range-thumb{
+    width:13px; height:13px; border-radius:50%;
+    background:#fff; border:2px solid var(--accent);
+    box-shadow:0 1px 4px rgba(22,33,46,.3);
+  }
+
+  .color-row{ display:flex; align-items:center; gap:12px; }
+  input[type=color]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:40px; height:32px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:2px;
+    background:#fff;
+    cursor:pointer;
+    transition:transform .12s ease, border-color .12s ease;
+  }
+  input[type=color]:hover{ transform:scale(1.06); border-color:#b9c6d4; }
+  input[type=color]::-webkit-color-swatch-wrapper{ padding:2px; }
+  input[type=color]::-webkit-color-swatch{ border:none; border-radius:5px; }
+  input[type=color]::-moz-color-swatch{ border:none; border-radius:5px; }
+  .color-meta{ display:flex; flex-direction:column; gap:4px; min-width:0; }
+  .color-meta .lbl{ font:600 9px/1 var(--font-ui); letter-spacing:.15em; text-transform:uppercase; color:var(--ink-soft); }
+  .swatches{
+    display:grid;
+    grid-template-columns:repeat(6, 1fr);
+    gap:8px;
+    margin-top:13px;
+  }
+  .swatch{
+    width:24px; height:24px;
+    padding:0;
+    border-radius:7px;
+    border:1px solid rgba(22,33,46,.16);
+    cursor:pointer;
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .swatch:hover{ transform:scale(1.2); box-shadow:0 4px 10px -4px rgba(22,33,46,.4); }
+  .swatch.is-active{ outline:2px solid var(--accent); outline-offset:2px; }
+
+  /* ---------- Stage ---------- */
+  .stage{
+    flex:1;
+    min-width:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    border:1px solid #d3dce6;
+    border-radius:12px;
+    background:
+      radial-gradient(circle at 1px 1px, rgba(22,33,46,.08) 1px, transparent 1.5px),
+      #e6ebf2;
+    background-size:18px 18px, auto;
+    animation:rise .35s .12s ease both;
+  }
+  .canvas-frame{
+    width:100%;
+    max-width:960px;
+    margin:auto;
+    background:#fff;
+    border:2px solid #1b2735;
+    border-radius:8px;
+    box-shadow:0 20px 44px -20px rgba(22,33,46,.4);
+  }
+  .canvas-wrap{ position:relative; }
+  #board{
+    display:block;
+    width:100%;
+    height:auto;
+    border-radius:6px;
+    cursor:none;
+    touch-action:none;
+    user-select:none;
+  }
+  #ring{
+    position:absolute;
+    display:none;
+    border:1.5px solid rgba(27,39,53,.65);
+    border-radius:50%;
+    background:rgba(255,255,255,.06);
+    box-shadow:0 0 0 1px rgba(255,255,255,.55);
+    pointer-events:none;
+  }
+  #ring.eraser{ border-style:dashed; border-color:rgba(27,39,53,.5); }
+
+  /* ---------- Status bar ---------- */
+  .statusbar{
+    display:flex;
+    align-items:center;
+    gap:18px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:9px 15px;
+    font:500 11.5px/1 var(--font-ui);
+    color:var(--ink-soft);
+    animation:rise .35s .18s ease both;
+  }
+  .stat{ display:inline-flex; align-items:center; gap:7px; white-space:nowrap; }
+  .stat .k{ font-size:9px; letter-spacing:.15em; text-transform:uppercase; color:#93a1b1; }
+  .stat b{ font-family:var(--font-mono); font-weight:600; font-size:11.5px; color:var(--ink); }
+  .chip{
+    display:inline-block;
+    width:12px; height:12px;
+    border-radius:3px;
+    border:1px solid rgba(22,33,46,.25);
+    background:var(--ink);
+  }
+  .grow{ flex:1; }
+  .hint{ font-size:10.5px; color:#93a1b1; white-space:nowrap; }
+
+  /* ---------- Toast ---------- */
+  #toast{
+    position:fixed;
+    left:50%;
+    bottom:26px;
+    transform:translate(-50%, 14px);
+    background:var(--ink);
+    color:#fff;
+    font:500 12.5px/1 var(--font-ui);
+    padding:11px 17px;
+    border-radius:9px;
+    box-shadow:0 12px 28px rgba(22,33,46,.35);
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .25s ease, transform .25s ease;
+    z-index:50;
+  }
+  #toast.show{ opacity:1; transform:translate(-50%, 0); }
+
+  button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+
+  @keyframes rise{ from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:none; } }
+
+  @media (max-width: 940px){
+    .workspace{ flex-direction:column; }
+    .toolbar{ width:100%; flex:0 0 auto; flex-direction:row; flex-wrap:wrap; }
+    .group{ flex:1 1 220px; border-bottom:0; border-right:1px solid var(--line); }
+    .group:last-child{ border-right:0; }
+  }
+  @media (max-width: 720px){
+    .btn .lbl{ display:none; }
+    .btn{ padding:9px 10px; }
+    .hint, .brand .tag{ display:none; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{ animation:none !important; transition:none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <svg class="logo" width="32" height="32" viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="1" y="1" width="30" height="30" rx="8" fill="#16212e"/>
+        <path d="M8 21.5c5 .8 3.4-6.4 7.6-8.9 3-1.7 5.6-.6 4.7 2.2-1.3 3.9-7.2 3.4-6.2 7.2.6 2.3-3.6 2.9-6.1 2.4" fill="none" stroke="#5b8cff" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="24.5" cy="9" r="2" fill="#ffd60a"/>
+      </svg>
+      <h1>Slate</h1>
+      <span class="tag">Paint<br>Studio</span>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn btn-danger" id="clear" title="Clear the canvas">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+        </svg>
+        <span class="lbl">Clear</span>
+      </button>
+      <button type="button" class="btn btn-primary" id="save" title="Download the canvas as a PNG file">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>
+        </svg>
+        <span class="lbl">Save as PNG</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <aside class="toolbar" aria-label="Drawing tools">
+
+      <section class="group">
+        <div class="group-label"><span>Tools</span></div>
+        <div class="tool-grid">
+          <button type="button" class="tool is-active" data-tool="brush" aria-pressed="true" title="Brush (B)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/>
+              <path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-1.35 2.24-2.5 1.79-.3-1.56.3-2.7 1.2-3.61l4.3-1.2z"/>
+            </svg>
+            <span>Brush</span>
+          </button>
+          <button type="button" class="tool" data-tool="eraser" aria-pressed="false" title="Eraser (E)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/>
+              <path d="M22 21H7"/><path d="m5 11 9 9"/>
+            </svg>
+            <span>Eraser</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="group">
+        <div class="group-label"><span>Brush size</span><span class="mono" id="sizeVal">12 px</span></div>
+        <div class="size-row">
+          <span class="size-dot" id="sizeDot" aria-hidden="true"></span>
+          <input type="range" id="size" min="1" max="64" value="12" aria-label="Brush size in pixels">
+        </div>
+      </section>
+
+      <section class="group">
+        <div class="group-label"><span>Color</span></div>
+        <div class="color-row">
+          <input type="color" id="color" value="#111827" aria-label="Pick a custom color">
+          <div class="color-meta">
+            <span class="lbl">Selected</span>
+            <span class="mono" id="hexVal">#111827</span>
+          </div>
+        </div>
+        <div class="swatches" id="swatches">
+          <button type="button" class="swatch" data-color="#111827" style="background:#111827" aria-label="Charcoal"></button>
+          <button type="button" class="swatch" data-color="#f5f5f4" style="background:#f5f5f4" aria-label="Paper white"></button>
+          <button type="button" class="swatch" data-color="#ef233c" style="background:#ef233c" aria-label="Vermilion"></button>
+          <button type="button" class="swatch" data-color="#ff8811" style="background:#ff8811" aria-label="Tangerine"></button>
+          <button type="button" class="swatch" data-color="#ffd60a" style="background:#ffd60a" aria-label="Saffron"></button>
+          <button type="button" class="swatch" data-color="#43aa8b" style="background:#43aa8b" aria-label="Sage"></button>
+          <button type="button" class="swatch" data-color="#0ea5a4" style="background:#0ea5a4" aria-label="Teal"></button>
+          <button type="button" class="swatch" data-color="#1d6fd6" style="background:#1d6fd6" aria-label="Cobalt"></button>
+          <button type="button" class="swatch" data-color="#5a189a" style="background:#5a189a" aria-label="Aubergine"></button>
+          <button type="button" class="swatch" data-color="#c81d6e" style="background:#c81d6e" aria-label="Magenta"></button>
+          <button type="button" class="swatch" data-color="#8d5524" style="background:#8d5524" aria-label="Umber"></button>
+          <button type="button" class="swatch" data-color="#9ca3af" style="background:#9ca3af" aria-label="Stone gray"></button>
+        </div>
+      </section>
+
+      <section class="group">
+        <div class="group-label"><span>History</span></div>
+        <div class="tool-grid">
+          <button type="button" class="btn" id="undo" title="Undo (Ctrl+Z)" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>
+            </svg>
+            <span class="lbl">Undo</span>
+          </button>
+          <button type="button" class="btn" id="redo" title="Redo (Ctrl+Shift+Z)" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>
+            </svg>
+            <span class="lbl">Redo</span>
+          </button>
+        </div>
+      </section>
+
+    </aside>
+
+    <section class="stage" aria-label="Drawing stage">
+      <div class="canvas-frame">
+        <div class="canvas-wrap" id="wrap">
+          <canvas id="board" width="960" height="640" aria-label="Drawing canvas"></canvas>
+          <div id="ring" aria-hidden="true"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="statusbar">
+    <span class="stat"><span class="k">Tool</span><b id="stTool">Brush</b></span>
+    <span class="stat"><span class="k">Size</span><b id="stSize">12 px</b></span>
+    <span class="stat"><span class="k">Color</span><i class="chip" id="stColorChip"></i><b id="stColorHex">#111827</b></span>
+    <span class="stat"><span class="k">Canvas</span><b>960 × 640</b></span>
+    <span class="grow"></span>
+    <span class="stat"><span class="k">Cursor</span><b id="stXY">—</b></span>
+    <span class="hint">Ctrl+Z undo · [ / ] size · B brush · E eraser</span>
+  </footer>
+
+</div>
+
+<div id="toast" role="status"></div>
+
+<script>
+(function(){
+  'use strict';
+
+  var canvas = document.getElementById('board');
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+  var BG = '#ffffff';
+
+  var wrap = document.getElementById('wrap');
+  var ring = document.getElementById('ring');
+  var sizeInput = document.getElementById('size');
+  var sizeVal = document.getElementById('sizeVal');
+  var sizeDot = document.getElementById('sizeDot');
+  var colorInput = document.getElementById('color');
+  var hexVal = document.getElementById('hexVal');
+  var undoBtn = document.getElementById('undo');
+  var redoBtn = document.getElementById('redo');
+  var stTool = document.getElementById('stTool');
+  var stSize = document.getElementById('stSize');
+  var stChip = document.getElementById('stColorChip');
+  var stHex = document.getElementById('stColorHex');
+  var stXY = document.getElementById('stXY');
+  var toastEl = document.getElementById('toast');
+
+  var toolBtns = Array.prototype.slice.call(document.querySelectorAll('.tool'));
+  var swatches = Array.prototype.slice.call(document.querySelectorAll('.swatch'));
+
+  var tool = 'brush';
+  var brushSize = 12;
+  var color = '#111827';
+  var drawing = false;
+  var last = null, lastMid = null, activePointer = null;
+  var toastTimer = null;
+
+  /* ----- initial background ----- */
+  ctx.fillStyle = BG;
+  ctx.fillRect(0, 0, W, H);
+
+  /* ----- history ----- */
+  var MAX = 30;
+  var undoStack = [], redoStack = [];
+  function snap(){ return ctx.getImageData(0, 0, W, H); }
+  undoStack.push(snap());
+
+  function updateHistoryUI(){
+    undoBtn.disabled = undoStack.length <= 1;
+    redoBtn.disabled = redoStack.length === 0;
+  }
+  function pushHistory(){
+    undoStack.push(snap());
+    if (undoStack.length > MAX) undoStack.shift();
+    redoStack.length = 0;
+    updateHistoryUI();
+  }
+  function undo(){
+    if (drawing || undoStack.length <= 1) return;
+    redoStack.push(undoStack.pop());
+    ctx.putImageData(undoStack[undoStack.length - 1], 0, 0);
+    updateHistoryUI();
+  }
+  function redo(){
+    if (drawing || redoStack.length === 0) return;
+    var s = redoStack.pop();
+    undoStack.push(s);
+    ctx.putImageData(s, 0, 0);
+    updateHistoryUI();
+  }
+
+  /* ----- stroke rendering ----- */
+  function strokeColor(){ return tool === 'eraser' ? BG : color; }
+  function applyStroke(){
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = brushSize;
+    ctx.strokeStyle = strokeColor();
+    ctx.fillStyle = strokeColor();
+  }
+  function toCanvas(e){
+    var r = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - r.left) * (W / r.width),
+      y: (e.clientY - r.top) * (H / r.height)
+    };
+  }
+
+  canvas.addEventListener('pointerdown', function(e){
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    try { canvas.setPointerCapture(e.pointerId); } catch(err) {}
+    activePointer = e.pointerId;
+    drawing = true;
+    var p = toCanvas(e);
+    last = p; lastMid = p;
+    applyStroke();
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, brushSize / 2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  canvas.addEventListener('pointermove', function(e){
+    moveRing(e);
+    var r = canvas.getBoundingClientRect();
+    stXY.textContent =
+      Math.round((e.clientX - r.left) * (W / r.width)) + ', ' +
+      Math.round((e.clientY - r.top) * (H / r.height));
+    if (!drawing || e.pointerId !== activePointer) return;
+    var p = toCanvas(e);
+    var mid = { x: (last.x + p.x) / 2, y: (last.y + p.y) / 2 };
+    applyStroke();
+    ctx.beginPath();
+    ctx.moveTo(lastMid.x, lastMid.y);
+    ctx.quadraticCurveTo(last.x, last.y, mid.x, mid.y);
+    ctx.stroke();
+    last = p;
+    lastMid = mid;
+  });
+
+  function endStroke(e){
+    if (!drawing) return;
+    if (e && e.pointerId !== undefined && e.pointerId !== activePointer) return;
+    drawing = false;
+    pushHistory();
+  }
+  canvas.addEventListener('pointerup', endStroke);
+  canvas.addEventListener('pointercancel', endStroke);
+  canvas.addEventListener('pointerleave', function(){
+    ring.style.display = 'none';
+    stXY.textContent = '—';
+  });
+  canvas.addEventListener('pointerenter', function(e){
+    ring.style.display = 'block';
+    moveRing(e);
+  });
+
+  function moveRing(e){
+    var cr = canvas.getBoundingClientRect();
+    var wr = wrap.getBoundingClientRect();
+    var scale = cr.width / W;
+    var s = Math.max(brushSize * scale, 5);
+    ring.style.width = s + 'px';
+    ring.style.height = s + 'px';
+    ring.style.left = (e.clientX - wr.left - s / 2) + 'px';
+    ring.style.top = (e.clientY - wr.top - s / 2) + 'px';
+    ring.classList.toggle('eraser', tool === 'eraser');
+  }
+
+  /* ----- controls ----- */
+  function setTool(t){
+    tool = t;
+    toolBtns.forEach(function(b){
+      var on = b.getAttribute('data-tool') === t;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    stTool.textContent = (t === 'brush') ? 'Brush' : 'Eraser';
+    ring.classList.toggle('eraser', t === 'eraser');
+    sizeDot.style.background = strokeColor();
+  }
+  toolBtns.forEach(function(b){
+    b.addEventListener('click', function(){ setTool(b.getAttribute('data-tool')); });
+  });
+
+  function setSize(v){
+    brushSize = Math.min(64, Math.max(1, Math.round(v)));
+    sizeInput.value = brushSize;
+    var pct = ((brushSize - 1) / 63) * 100;
+    sizeInput.style.setProperty('--fill', pct + '%');
+    sizeVal.textContent = brushSize + ' px';
+    stSize.textContent = brushSize + ' px';
+    var d = Math.min(brushSize, 34);
+    sizeDot.style.width = d + 'px';
+    sizeDot.style.height = d + 'px';
+    sizeDot.style.background = strokeColor();
+  }
+  sizeInput.addEventListener('input', function(){ setSize(sizeInput.value); });
+
+  function setColor(c){
+    color = c;
+    colorInput.value = c;
+    hexVal.textContent = c;
+    stChip.style.background = c;
+    stHex.textContent = c;
+    swatches.forEach(function(s){
+      s.classList.toggle('is-active', s.getAttribute('data-color') === c);
+    });
+    sizeDot.style.background = strokeColor();
+  }
+  colorInput.addEventListener('input', function(){ setColor(colorInput.value); });
+  swatches.forEach(function(s){
+    s.addEventListener('click', function(){ setColor(s.getAttribute('data-color')); });
+  });
+
+  document.getElementById('clear').addEventListener('click', function(){
+    ctx.fillStyle = BG;
+    ctx.fillRect(0, 0, W, H);
+    pushHistory();
+    toast('Canvas cleared — Ctrl+Z to undo');
+  });
+
+  document.getElementById('save').addEventListener('click', function(){
+    var a = document.createElement('a');
+    var d = new Date();
+    function pad(n){ return (n < 10 ? '0' : '') + n; }
+    a.download = 'slate-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) +
+                 '-' + pad(d.getHours()) + pad(d.getMinutes()) + '.png';
+    a.href = canvas.toDataURL('image/png');
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    toast('Saved as PNG');
+  });
+
+  undoBtn.addEventListener('click', undo);
+  redoBtn.addEventListener('click', redo);
+
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ toastEl.classList.remove('show'); }, 2200);
+  }
+
+  window.addEventListener('keydown', function(e){
+    var k = (e.key || '').toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && k === 'z'){
+      e.preventDefault();
+      if (e.shiftKey) redo(); else undo();
+    } else if ((e.ctrlKey || e.metaKey) && k === 'y'){
+      e.preventDefault();
+      redo();
+    } else if (e.ctrlKey || e.metaKey || e.altKey){
+      return;
+    } else if (k === 'b'){
+      setTool('brush');
+    } else if (k === 'e'){
+      setTool('eraser');
+    } else if (k === '['){
+      setSize(brushSize - 2);
+    } else if (k === ']'){
+      setSize(brushSize + 2);
+    }
+  });
+
+  /* ----- init ----- */
+  setTool('brush');
+  setSize(12);
+  setColor('#111827');
+  updateHistoryUI();
+})();
+</script>
+</body>
+</html>

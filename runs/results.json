@@ -1,6 +1,6 @@
 {
   "aggregate": true,
-  "timestamp": "2026-08-21T10-57-55Z",
+  "timestamp": "2026-08-21T11-09-54Z",
   "dry_run": false,
   "prompts": [
     {
@@ -152,9 +152,419 @@
       "uid": "Qwen3.6-35B-A3B__hermine::Qwen3.6-35B-A3B",
       "run_dir": "Qwen3.6-35B-A3B__hermine",
       "run_timestamp": "2026-08-21T10-57-55Z"
+    },
+    {
+      "id": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "label": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "provider": "openai/llamacpp",
+      "is_local": true,
+      "kind": "hermine",
+      "api_base": "http://172.30.48.1:8081/v1",
+      "model_name": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "uid": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine::Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "run_dir": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine",
+      "run_timestamp": "2026-08-21T11-09-54Z"
     }
   ],
   "cells": [
+    {
+      "prompt_id": "01-svg-clock",
+      "model_id": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "model_label": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "provider": "openai/llamacpp",
+      "is_local": true,
+      "is_dry_run": false,
+      "kind": "hermine",
+      "status": "ok",
+      "html_file": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/outputs/01-svg-clock__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.html",
+      "raw_file": null,
+      "thumbnail": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/thumbnails/01-svg-clock__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.png",
+      "latency_ms": 199359,
+      "prompt_tokens": 268,
+      "completion_tokens": 16479,
+      "total_tokens": 16747,
+      "cost_usd": null,
+      "looks_like_html": true,
+      "validation": {
+        "status": "ok",
+        "has_doctype": true,
+        "has_html": true,
+        "has_head": true,
+        "has_body": true,
+        "parse_issues": [],
+        "runtime_issues": [],
+        "thumbnail": "thumbnails/01-svg-clock__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.png"
+      },
+      "error": null,
+      "run_dir": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine",
+      "model_uid": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine::Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0"
+    },
+    {
+      "prompt_id": "02-fractal-tree",
+      "model_id": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "model_label": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "provider": "openai/llamacpp",
+      "is_local": true,
+      "is_dry_run": false,
+      "kind": "hermine",
+      "status": "warnings",
+      "html_file": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/outputs/02-fractal-tree__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.html",
+      "raw_file": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/outputs/02-fractal-tree__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.raw.txt",
+      "thumbnail": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/thumbnails/02-fractal-tree__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.png",
+      "latency_ms": 436102,
+      "prompt_tokens": 342,
+      "completion_tokens": 32000,
+      "total_tokens": 32342,
+      "cost_usd": null,
+      "looks_like_html": false,
+      "validation": {
+        "status": "warnings",
+        "has_doctype": false,
+        "has_html": true,
+        "has_head": true,
+        "has_body": true,
+        "parse_issues": [
+          {
+            "kind": "missing_doctype",
+            "message": "Document is missing <!DOCTYPE html>.",
+            "line": null,
+            "col": null
+          },
+          {
+            "kind": "parse_error",
+            "message": "expected-doctype-but-got-eof",
+            "line": 1,
+            "col": 0
+          }
+        ],
+        "runtime_issues": [],
+        "thumbnail": "thumbnails/02-fractal-tree__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.png"
+      },
+      "error": null,
+      "run_dir": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine",
+      "model_uid": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine::Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0"
+    },
+    {
+      "prompt_id": "03-tower-defense",
+      "model_id": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "model_label": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "provider": "openai/llamacpp",
+      "is_local": true,
+      "is_dry_run": false,
+      "kind": "hermine",
+      "status": "warnings",
+      "html_file": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/outputs/03-tower-defense__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.html",
+      "raw_file": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/outputs/03-tower-defense__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.raw.txt",
+      "thumbnail": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/thumbnails/03-tower-defense__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.png",
+      "latency_ms": 438964,
+      "prompt_tokens": 241,
+      "completion_tokens": 32000,
+      "total_tokens": 32241,
+      "cost_usd": null,
+      "looks_like_html": false,
+      "validation": {
+        "status": "warnings",
+        "has_doctype": false,
+        "has_html": true,
+        "has_head": true,
+        "has_body": true,
+        "parse_issues": [
+          {
+            "kind": "missing_doctype",
+            "message": "Document is missing <!DOCTYPE html>.",
+            "line": null,
+            "col": null
+          },
+          {
+            "kind": "parse_error",
+            "message": "expected-doctype-but-got-eof",
+            "line": 1,
+            "col": 0
+          }
+        ],
+        "runtime_issues": [],
+        "thumbnail": "thumbnails/03-tower-defense__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.png"
+      },
+      "error": null,
+      "run_dir": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine",
+      "model_uid": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine::Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0"
+    },
+    {
+      "prompt_id": "04-particle-simulation",
+      "model_id": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "model_label": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "provider": "openai/llamacpp",
+      "is_local": true,
+      "is_dry_run": false,
+      "kind": "hermine",
+      "status": "ok",
+      "html_file": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/outputs/04-particle-simulation__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.html",
+      "raw_file": null,
+      "thumbnail": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/thumbnails/04-particle-simulation__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.png",
+      "latency_ms": 287373,
+      "prompt_tokens": 295,
+      "completion_tokens": 25083,
+      "total_tokens": 25378,
+      "cost_usd": null,
+      "looks_like_html": true,
+      "validation": {
+        "status": "ok",
+        "has_doctype": true,
+        "has_html": true,
+        "has_head": true,
+        "has_body": true,
+        "parse_issues": [],
+        "runtime_issues": [],
+        "thumbnail": "thumbnails/04-particle-simulation__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.png"
+      },
+      "error": null,
+      "run_dir": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine",
+      "model_uid": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine::Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0"
+    },
+    {
+      "prompt_id": "05-game-of-life",
+      "model_id": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "model_label": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "provider": "openai/llamacpp",
+      "is_local": true,
+      "is_dry_run": false,
+      "kind": "hermine",
+      "status": "warnings",
+      "html_file": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/outputs/05-game-of-life__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.html",
+      "raw_file": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/outputs/05-game-of-life__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.raw.txt",
+      "thumbnail": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/thumbnails/05-game-of-life__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.png",
+      "latency_ms": 417656,
+      "prompt_tokens": 326,
+      "completion_tokens": 32000,
+      "total_tokens": 32326,
+      "cost_usd": null,
+      "looks_like_html": false,
+      "validation": {
+        "status": "warnings",
+        "has_doctype": false,
+        "has_html": true,
+        "has_head": true,
+        "has_body": true,
+        "parse_issues": [
+          {
+            "kind": "missing_doctype",
+            "message": "Document is missing <!DOCTYPE html>.",
+            "line": null,
+            "col": null
+          },
+          {
+            "kind": "parse_error",
+            "message": "expected-doctype-but-got-eof",
+            "line": 1,
+            "col": 0
+          }
+        ],
+        "runtime_issues": [],
+        "thumbnail": "thumbnails/05-game-of-life__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.png"
+      },
+      "error": null,
+      "run_dir": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine",
+      "model_uid": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine::Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0"
+    },
+    {
+      "prompt_id": "06-physics-sandbox",
+      "model_id": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "model_label": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "provider": "openai/llamacpp",
+      "is_local": true,
+      "is_dry_run": false,
+      "kind": "hermine",
+      "status": "ok",
+      "html_file": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/outputs/06-physics-sandbox__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.html",
+      "raw_file": null,
+      "thumbnail": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/thumbnails/06-physics-sandbox__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.png",
+      "latency_ms": 308926,
+      "prompt_tokens": 341,
+      "completion_tokens": 26462,
+      "total_tokens": 26803,
+      "cost_usd": null,
+      "looks_like_html": true,
+      "validation": {
+        "status": "ok",
+        "has_doctype": true,
+        "has_html": true,
+        "has_head": true,
+        "has_body": true,
+        "parse_issues": [],
+        "runtime_issues": [],
+        "thumbnail": "thumbnails/06-physics-sandbox__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.png"
+      },
+      "error": null,
+      "run_dir": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine",
+      "model_uid": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine::Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0"
+    },
+    {
+      "prompt_id": "07-deskbox-clone",
+      "model_id": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "model_label": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "provider": "openai/llamacpp",
+      "is_local": true,
+      "is_dry_run": false,
+      "kind": "hermine",
+      "status": "warnings",
+      "html_file": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/outputs/07-deskbox-clone__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.html",
+      "raw_file": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/outputs/07-deskbox-clone__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.raw.txt",
+      "thumbnail": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/thumbnails/07-deskbox-clone__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.png",
+      "latency_ms": 432505,
+      "prompt_tokens": 824,
+      "completion_tokens": 32000,
+      "total_tokens": 32824,
+      "cost_usd": null,
+      "looks_like_html": false,
+      "validation": {
+        "status": "warnings",
+        "has_doctype": false,
+        "has_html": true,
+        "has_head": true,
+        "has_body": true,
+        "parse_issues": [
+          {
+            "kind": "missing_doctype",
+            "message": "Document is missing <!DOCTYPE html>.",
+            "line": null,
+            "col": null
+          },
+          {
+            "kind": "parse_error",
+            "message": "expected-doctype-but-got-eof",
+            "line": 1,
+            "col": 0
+          }
+        ],
+        "runtime_issues": [],
+        "thumbnail": "thumbnails/07-deskbox-clone__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.png"
+      },
+      "error": null,
+      "run_dir": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine",
+      "model_uid": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine::Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0"
+    },
+    {
+      "prompt_id": "08-paint-app",
+      "model_id": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "model_label": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "provider": "openai/llamacpp",
+      "is_local": true,
+      "is_dry_run": false,
+      "kind": "hermine",
+      "status": "ok",
+      "html_file": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/outputs/08-paint-app__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.html",
+      "raw_file": null,
+      "thumbnail": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/thumbnails/08-paint-app__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.png",
+      "latency_ms": 358575,
+      "prompt_tokens": 342,
+      "completion_tokens": 28791,
+      "total_tokens": 29133,
+      "cost_usd": null,
+      "looks_like_html": true,
+      "validation": {
+        "status": "ok",
+        "has_doctype": true,
+        "has_html": true,
+        "has_head": true,
+        "has_body": true,
+        "parse_issues": [],
+        "runtime_issues": [],
+        "thumbnail": "thumbnails/08-paint-app__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.png"
+      },
+      "error": null,
+      "run_dir": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine",
+      "model_uid": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine::Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0"
+    },
+    {
+      "prompt_id": "09-violin-3d",
+      "model_id": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "model_label": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "provider": "openai/llamacpp",
+      "is_local": true,
+      "is_dry_run": false,
+      "kind": "hermine",
+      "status": "warnings",
+      "html_file": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/outputs/09-violin-3d__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.html",
+      "raw_file": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/outputs/09-violin-3d__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.raw.txt",
+      "thumbnail": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/thumbnails/09-violin-3d__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.png",
+      "latency_ms": 459736,
+      "prompt_tokens": 359,
+      "completion_tokens": 32000,
+      "total_tokens": 32359,
+      "cost_usd": null,
+      "looks_like_html": false,
+      "validation": {
+        "status": "warnings",
+        "has_doctype": false,
+        "has_html": true,
+        "has_head": true,
+        "has_body": true,
+        "parse_issues": [
+          {
+            "kind": "missing_doctype",
+            "message": "Document is missing <!DOCTYPE html>.",
+            "line": null,
+            "col": null
+          },
+          {
+            "kind": "parse_error",
+            "message": "expected-doctype-but-got-eof",
+            "line": 1,
+            "col": 0
+          }
+        ],
+        "runtime_issues": [],
+        "thumbnail": "thumbnails/09-violin-3d__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.png"
+      },
+      "error": null,
+      "run_dir": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine",
+      "model_uid": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine::Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0"
+    },
+    {
+      "prompt_id": "10-markdown-editor",
+      "model_id": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "model_label": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0",
+      "provider": "openai/llamacpp",
+      "is_local": true,
+      "is_dry_run": false,
+      "kind": "hermine",
+      "status": "warnings",
+      "html_file": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/outputs/10-markdown-editor__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.html",
+      "raw_file": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/outputs/10-markdown-editor__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.raw.txt",
+      "thumbnail": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine/thumbnails/10-markdown-editor__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.png",
+      "latency_ms": 432273,
+      "prompt_tokens": 381,
+      "completion_tokens": 32000,
+      "total_tokens": 32381,
+      "cost_usd": null,
+      "looks_like_html": false,
+      "validation": {
+        "status": "warnings",
+        "has_doctype": false,
+        "has_html": true,
+        "has_head": true,
+        "has_body": true,
+        "parse_issues": [
+          {
+            "kind": "missing_doctype",
+            "message": "Document is missing <!DOCTYPE html>.",
+            "line": null,
+            "col": null
+          },
+          {
+            "kind": "parse_error",
+            "message": "expected-doctype-but-got-eof",
+            "line": 1,
+            "col": 0
+          }
+        ],
+        "runtime_issues": [],
+        "thumbnail": "thumbnails/10-markdown-editor__Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0.png"
+      },
+      "error": null,
+      "run_dir": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine",
+      "model_uid": "Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0__hermine::Qwen3.8-27B-UD-Q4_K_M-200ctx-q4_0"
+    },
     {
       "prompt_id": "01-svg-clock",
       "model_id": "Qwen3.6-35B-A3B",
@@ -3372,14 +3782,14 @@
     }
   ],
   "summary": {
-    "total": 90,
+    "total": 100,
     "total_cost_usd": 0.0,
     "status_counts": {
-      "ok": 68,
-      "broken": 16,
-      "warnings": 6
+      "ok": 72,
+      "warnings": 12,
+      "broken": 16
     },
-    "model_count": 9,
-    "run_count": 9
+    "model_count": 10,
+    "run_count": 10
   }
 }

@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Particle Field — Interactive Canvas Simulation</title>
+<style>
+  :root{
+    --mono: ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans: "Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    --ink:#eaf1f8;
+    --muted:#8ea1b8;
+    --faint:#5c6f85;
+    --line:rgba(148,163,184,.16);
+    --panel:rgba(11,16,24,.74);
+  }
+  body[data-mode="attract"]{ --acc:#67e8f9; --acc-soft:rgba(103,232,249,.14); --acc-glow:rgba(103,232,249,.45); }
+  body[data-mode="repel"]{ --acc:#fbbf24; --acc-soft:rgba(251,191,36,.14); --acc-glow:rgba(251,191,36,.45); }
+
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0; overflow:hidden; color:var(--ink); font-family:var(--sans);
+    background:
+      radial-gradient(1100px 700px at 72% 18%, rgba(34,58,86,.55), transparent 60%),
+      radial-gradient(900px 620px at 12% 88%, rgba(28,48,58,.5), transparent 60%),
+      linear-gradient(#0a0f16, #060a10);
+  }
+
+  canvas#scene{ position:fixed; inset:0; display:block; cursor:crosshair; z-index:1; }
+
+  .vignette{
+    position:fixed; inset:0; z-index:2; pointer-events:none;
+    background:radial-gradient(130% 100% at 50% 42%, transparent 52%, rgba(2,4,8,.62) 100%);
+  }
+
+  .brand,.hud,.panel,.hint{ user-select:none; }
+
+  /* ---------- title block ---------- */
+  .brand{ position:fixed; top:24px; left:26px; z-index:5; pointer-events:none; }
+  .kicker{
+    display:inline-flex; align-items:center; gap:8px;
+    font:600 10px/1 var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--acc);
+    transition:color .3s;
+  }
+  .kicker::before{
+    content:""; width:6px; height:6px; border-radius:50%; background:var(--acc);
+    animation:pulse 2.2s ease-out infinite;
+  }
+  @keyframes pulse{
+    0%{ box-shadow:0 0 0 0 var(--acc-glow); }
+    70%{ box-shadow:0 0 0 9px rgba(0,0,0,0); }
+    100%{ box-shadow:0 0 0 0 rgba(0,0,0,0); }
+  }
+  .brand h1{
+    margin:10px 0 0; font:800 42px/.92 var(--sans); letter-spacing:-.025em; color:#f2f7fc;
+    text-shadow:0 2px 24px rgba(0,0,0,.55);
+  }
+  .brand h1 em{ font-style:normal; color:var(--acc); transition:color .3s; }
+
+  /* ---------- FPS HUD ---------- */
+  .hud{
+    position:fixed; top:24px; right:26px; z-index:5;
+    display:flex; align-items:baseline; gap:7px; padding:9px 13px;
+    background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+    font:600 12px var(--mono); font-variant-numeric:tabular-nums;
+  }
+  .hud .dot{
+    position:relative; top:-1px; width:7px; height:7px; border-radius:50%;
+    background:#34d399; box-shadow:0 0 8px currentColor; transition:background .3s;
+  }
+  .hud .dot.good{ background:#34d399; color:#34d399; }
+  .hud .dot.ok{ background:#fbbf24; color:#fbbf24; }
+  .hud .dot.bad{ background:#f87171; color:#f87171; }
+  .hud .unit{ font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:var(--faint); }
+  .hud .sep{ width:1px; height:11px; background:var(--line); align-self:center; }
+
+  /* ---------- control panel ---------- */
+  .panel{
+    position:fixed; right:26px; bottom:26px; z-index:6; width:272px;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    box-shadow:0 24px 60px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.04);
+    backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+  }
+  .panel-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px 14px; border-bottom:1px solid var(--line);
+  }
+  .panel-head h2{
+    margin:0; font:700 11px var(--mono); letter-spacing:.22em; text-transform:uppercase; color:#a9bccf;
+  }
+  #collapse{
+    width:24px; height:24px; display:grid; place-items:center; padding:0;
+    background:transparent; border:1px solid var(--line); border-radius:6px; color:var(--muted);
+    cursor:pointer; transition:transform .3s ease, color .2s, border-color .2s;
+  }
+  #collapse:hover{ color:var(--acc); border-color:var(--acc); }
+  .panel.collapsed #collapse{ transform:rotate(180deg); }
+
+  .panel-body{
+    padding:14px; display:grid; gap:14px; overflow:hidden;
+    max-height:440px; opacity:1;
+    transition:max-height .35s ease, opacity .25s ease, padding .35s ease;
+  }
+  .panel.collapsed .panel-body{ max-height:0; opacity:0; padding-top:0; padding-bottom:0; }
+
+  .ctl label{
+    display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;
+    font:600 10px var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--muted);
+  }
+  .ctl output{ color:var(--ink); font-size:11px; letter-spacing:.04em; font-variant-numeric:tabular-nums; }
+
+  input[type="range"]{
+    -webkit-appearance:none; appearance:none; width:100%; height:4px; margin:0;
+    border-radius:2px; outline:none; cursor:pointer;
+    background:linear-gradient(to right, var(--acc) var(--fill,50%), rgba(148,163,184,.2) var(--fill,50%));
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:14px; height:14px; border-radius:50%;
+    background:#0b1018; border:2px solid var(--acc);
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  input[type="range"]:hover::-webkit-slider-thumb,
+  input[type="range"]:focus-visible::-webkit-slider-thumb{
+    transform:scale(1.2); box-shadow:0 0 12px var(--acc-glow);
+  }
+  input[type="range"]::-moz-range-thumb{
+    width:12px; height:12px; border-radius:50%; background:#0b1018; border:2px solid var(--acc);
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  input[type="range"]:hover::-moz-range-thumb{ transform:scale(1.2); box-shadow:0 0 12px var(--acc-glow); }
+  input[type="range"]:focus-visible{ outline:1px solid var(--acc); outline-offset:4px; }
+
+  .seg, .actions{ display:grid; gap:6px; }
+  .seg{ grid-template-columns:1fr 1fr; }
+  .actions{ grid-template-columns:repeat(3,1fr); }
+  .seg button, .actions button{
+    padding:9px 4px; font:700 10px var(--mono); letter-spacing:.14em; text-transform:uppercase;
+    color:var(--muted); background:rgba(148,163,184,.07);
+    border:1px solid var(--line); border-radius:7px; cursor:pointer;
+    transition:color .18s, border-color .18s, background .18s, transform .18s, box-shadow .18s;
+  }
+  .seg button:hover, .actions button:hover{
+    color:var(--acc); border-color:var(--acc); transform:translateY(-1px);
+  }
+  .seg button:active, .actions button:active{ transform:translateY(0); }
+  .seg button.active{
+    color:var(--acc); border-color:var(--acc); background:var(--acc-soft);
+    box-shadow:inset 0 0 14px var(--acc-soft);
+  }
+  .actions button.active{ color:var(--acc); border-color:var(--acc); background:var(--acc-soft); }
+
+  /* ---------- hint ---------- */
+  .hint{
+    position:fixed; left:26px; bottom:24px; z-index:5; pointer-events:none;
+    font:500 11px var(--mono); letter-spacing:.05em; color:var(--faint);
+  }
+  kbd{
+    font:inherit; padding:1px 6px; margin:0 1px; border-radius:4px; color:#a9bccf;
+    border:1px solid rgba(148,163,184,.32); border-bottom-width:2px; background:rgba(148,163,184,.08);
+  }
+
+  @media (max-width:640px){
+    .brand h1{ font-size:30px; }
+    .panel{ right:14px; bottom:14px; width:min(272px, calc(100vw - 28px)); }
+    .hud{ top:14px; right:14px; }
+    .hint{ display:none; }
+  }
+</style>
+</head>
+<body data-mode="attract">
+
+<canvas id="scene"></canvas>
+<div class="vignette" aria-hidden="true"></div>
+
+<header class="brand">
+  <span class="kicker">Real-time · Canvas 2D</span>
+  <h1>Particle<br><em>Field</em></h1>
+</header>
+
+<div class="hud" role="status" aria-label="Performance">
+  <span class="dot good" id="fpsDot"></span>
+  <span id="fpsNum">--</span><span class="unit">fps</span>
+  <span class="sep"></span>
+  <span id="ptsNum">700</span><span class="unit">pts</span>
+</div>
+
+<p class="hint">move to steer · click to burst · <kbd>space</kbd> pause · <kbd>h</kbd> panel</p>
+
+<aside class="panel" id="panel" aria-label="Simulation controls">
+  <div class="panel-head">
+    <h2>Controls</h2>
+    <button id="collapse" type="button" aria-label="Toggle panel" title="Toggle panel (H)">
+      <svg viewBox="0 0 10 6" width="10" height="6" aria-hidden="true"><path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+  <div class="panel-body">
+    <div class="ctl">
+      <label for="count">Particles <output id="count-val">700</output></label>
+      <input id="count" type="range" min="300" max="2400" step="10" value="700">
+    </div>
+    <div class="ctl">
+      <label for="gravity">Gravity <output id="gravity-val">0.020</output></label>
+      <input id="gravity" type="range" min="0" max="0.12" step="0.002" value="0.02">
+    </div>
+    <div class="ctl">
+      <label for="drift">Drift <output id="drift-val">0.80</output></label>
+      <input id="drift" type="range" min="0" max="2" step="0.05" value="0.8">
+    </div>
+    <div class="ctl">
+      <label for="force">Cursor force <output id="force-val">1.00</output></label>
+      <input id="force" type="range" min="0" max="3" step="0.05" value="1">
+    </div>
+    <div class="ctl">
+      <label for="trail">Trail fade <output id="trail-val">0.12</output></label>
+      <input id="trail" type="range" min="0.03" max="0.5" step="0.01" value="0.12">
+    </div>
+    <div class="seg" role="group" aria-label="Cursor mode">
+      <button id="modeAttract" type="button" data-mode="attract" aria-pressed="true">Attract</button>
+      <button id="modeRepel" type="button" data-mode="repel" aria-pressed="false">Repel</button>
+    </div>
+    <div class="actions">
+      <button id="pause" type="button">Pause</button>
+      <button id="burst" type="button">Burst</button>
+      <button id="recolor" type="button">Recolor</button>
+    </div>
+  </div>
+</aside>
+
+<script>
+(function(){
+  'use strict';
+
+  var TAU = Math.PI * 2;
+  var canvas = document.getElementById('scene');
+  var ctx = canvas.getContext('2d');
+  var fpsNum = document.getElementById('fpsNum');
+  var fpsDot = document.getElementById('fpsDot');
+  var ptsNum = document.getElementById('ptsNum');
+  var panel = document.getElementById('panel');
+
+  var params = { count:700, gravity:0.02, drift:0.8, force:1, trail:0.12, mode:'attract', paused:false };
+
+  var RADIUS = 150;
+  var R2 = RADIUS * RADIUS;
+  var MAXV = 7;
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+  var W = 0, H = 0;
+
+  var MODES = {
+    attract: { core:'rgba(125,235,252,0.95)', ring:'rgba(103,232,249,0.30)' },
+    repel:   { core:'rgba(252,211,77,0.95)',  ring:'rgba(251,191,36,0.30)' }
+  };
+
+  function resize(){
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width  = Math.max(1, Math.round(W * DPR));
+    canvas.height = Math.max(1, Math.round(H * DPR));
+    canvas.style.width  = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  /* ---------- particles ---------- */
+  var particles = [];
+  var hueBase = 190;
+
+  function newHue(){
+    return (hueBase + (Math.random() * 2 - 1) * 40 + 360) % 360;
+  }
+  function makeParticle(){
+    var a = Math.random() * TAU, s = 0.3 + Math.random() * 1.1, h = newHue();
+    return {
+      x: Math.random() * W, y: Math.random() * H,
+      vx: Math.cos(a) * s,  vy: Math.sin(a) * s,
+      r: 0.8 + Math.random() * 1.7,
+      bucket: Math.floor(h / 30) % 12
+    };
+  }
+  function setCount(n){
+    n = Math.max(0, Math.round(n));
+    while (particles.length < n) particles.push(makeParticle());
+    if (particles.length > n) particles.length = n;
+    ptsNum.textContent = String(particles.length);
+  }
+  function recolor(){
+    hueBase = Math.random() * 360;
+    for (var i = 0; i < particles.length; i++){
+      particles[i].bucket = Math.floor(newHue() / 30) % 12;
+    }
+  }
+  setCount(params.count);
+
+  var BUCKETS = 12, bucketColors = [];
+  for (var b = 0; b < BUCKETS; b++){
+    bucketColors.push('hsla(' + (b * 30 + 15) + ',75%,66%,0.85)');
+  }
+
+  /* ---------- pointer ---------- */
+  var mouse = { x:0, y:0, active:false };
+  var rings = [];
+
+  function burst(x, y){
+    rings.push({ x:x, y:y, r:12, a:0.8 });
+    var R = 280;
+    for (var i = 0; i < particles.length; i++){
+      var p = particles[i], dx = p.x - x, dy = p.y - y;
+      var d = Math.sqrt(dx * dx + dy * dy);
+      if (d < R && d > 0.001){
+        var f = (1 - d / R) * 9;
+        p.vx += dx / d * f; p.vy += dy / d * f;
+      }
+    }
+  }
+
+  canvas.addEventListener('pointermove', function(e){
+    mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true;
+  });
+  canvas.addEventListener('pointerdown', function(e){
+    mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true;
+    burst(e.clientX, e.clientY);
+  });
+  canvas.addEventListener('pointerleave', function(){ mouse.active = false; });
+
+  /* ---------- physics ---------- */
+  function flowAngle(x, y, t){
+    return (Math.sin(x * 0.0016 + t * 0.00035) + Math.cos(y * 0.0016 - t * 0.00028)) * Math.PI;
+  }
+
+  function step(t, dt){
+    var g = params.gravity * dt;
+    var df = params.drift * 0.045 * dt;
+    var dir = params.mode === 'attract' ? 1 : -1;
+    var ma = mouse.active, mx = mouse.x, my = mouse.y;
+    var fMul = params.force * 0.55 * dt;
+    var n = particles.length;
+
+    for (var i = 0; i < n; i++){
+      var p = particles[i];
+      var a = flowAngle(p.x, p.y, t);
+      p.vx += Math.cos(a) * df;
+      p.vy += Math.sin(a) * df;
+      p.vy += g;
+
+      if (ma){
+        var dx = mx - p.x, dy = my - p.y;
+        var d2 = dx * dx + dy * dy;
+        if (d2 < R2 && d2 > 0.01){
+          var d = Math.sqrt(d2);
+          var f = (1 - d / RADIUS) * fMul * dir;
+          p.vx += dx / d * f;
+          p.vy += dy / d * f;
+        }
+      }
+
+      p.vx *= 0.985; p.vy *= 0.985;
+      var sp2 = p.vx * p.vx + p.vy * p.vy;
+      if (sp2 > MAXV * MAXV){
+        var s = MAXV / Math.sqrt(sp2);
+        p.vx *= s; p.vy *= s;
+      }
+
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+
+      if (p.x < p.r){ p.x = p.r; p.vx = Math.abs(p.vx) * 0.75; }
+      else if (p.x > W - p.r){ p.x = W - p.r; p.vx = -Math.abs(p.vx) * 0.75; }
+      if (p.y < p.r){ p.y = p.r; p.vy = Math.abs(p.vy) * 0.75; }
+      else if (p.y > H - p.r){ p.y = H - p.r; p.vy = -Math.abs(p.vy) * 0.75; }
+    }
+  }
+
+  /* ---------- render ---------- */
+  function draw(){
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = 'rgba(0,0,0,' + params.trail + ')';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.globalCompositeOperation = 'lighter';
+    var n = particles.length;
+    for (var bk = 0; bk < BUCKETS; bk++){
+      var any = false;
+      for (var i = 0; i < n; i++){
+        var p = particles[i];
+        if (p.bucket === bk){
+          any = true;
+          ctx.moveTo(p.x + p.r, p.y);
+          ctx.arc(p.x, p.y, p.r, 0, TAU);
+        }
+      }
+      if (any){
+        ctx.fillStyle = bucketColors[bk];
+        ctx.fill();
+      }
+      ctx.beginPath();
+    }
+
+    ctx.globalCompositeOperation = 'source-over';
+    var m = MODES[params.mode];
+
+    for (var r = rings.length - 1; r >= 0; r--){
+      var rg = rings[r];
+      rg.r += 7; rg.a *= 0.9;
+      if (rg.a < 0.02){ rings.splice(r, 1); continue; }
+      ctx.strokeStyle = m.ring;
+      ctx.globalAlpha = rg.a / 0.8;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(rg.x, rg.y, rg.r, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    if (mouse.active){
+      ctx.strokeStyle = m.ring;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 6]);
+      ctx.beginPath();
+      ctx.arc(mouse.x, mouse.y, RADIUS, 0, TAU);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = m.core;
+      ctx.beginPath();
+      ctx.arc(mouse.x, mouse.y, 2.5, 0, TAU);
+      ctx.fill();
+    }
+  }
+
+  /* ---------- main loop + FPS ---------- */
+  var last = performance.now();
+  var frames = 0, fpsT = last;
+
+  function frame(now){
+    requestAnimationFrame(frame);
+    var dt = (now - last) / 16.667;
+    last = now;
+    if (dt > 3) dt = 3;
+
+    frames++;
+    if (now - fpsT >= 500){
+      var fps = Math.round(frames * 1000 / (now - fpsT));
+      fpsNum.textContent = String(fps);
+      fpsDot.className = 'dot ' + (fps >= 50 ? 'good' : fps >= 30 ? 'ok' : 'bad');
+      frames = 0; fpsT = now;
+    }
+
+    if (!params.paused){
+      step(now, dt);
+      draw();
+    }
+  }
+  requestAnimationFrame(frame);
+
+  /* ---------- controls ---------- */
+  function bindRange(id, key, dec){
+    var el = document.getElementById(id);
+    var out = document.getElementById(id + '-val');
+    function apply(){
+      var v = parseFloat(el.value);
+      params[key] = v;
+      out.textContent = v.toFixed(dec);
+      var min = parseFloat(el.min), max = parseFloat(el.max);
+      el.style.setProperty('--fill', (((v - min) / (max - min)) * 100).toFixed(1) + '%');
+      if (key === 'count') setCount(v);
+    }
+    el.addEventListener('input', apply);
+    apply();
+  }
+  bindRange('count',   'count',   0);
+  bindRange('gravity', 'gravity', 3);
+  bindRange('drift',   'drift',   2);
+  bindRange('force',   'force',   2);
+  bindRange('trail',   'trail',   2);
+
+  var modeBtns = [document.getElementById('modeAttract'), document.getElementById('modeRepel')];
+  function setMode(m){
+    params.mode = m;
+    document.body.setAttribute('data-mode', m);
+    for (var i = 0; i < modeBtns.length; i++){
+      var on = modeBtns[i].getAttribute('data-mode') === m;
+      modeBtns[i].classList.toggle('active', on);
+      modeBtns[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+  }
+  modeBtns.forEach(function(btn){
+    btn.addEventListener('click', function(){ setMode(btn.getAttribute('data-mode')); });
+  });
+  setMode('attract');
+
+  var pauseBtn = document.getElementById('pause');
+  function setPaused(v){
+    params.paused = v;
+    pauseBtn.textContent = v ? 'Resume' : 'Pause';
+    pauseBtn.classList.toggle('active', v);
+  }
+  pauseBtn.addEventListener('click', function(){ setPaused(!params.paused); });
+
+  document.getElementById('burst').addEventListener('click', function(){
+    burst(W / 2, H / 2);
+  });
+  document.getElementById('recolor').addEventListener('click', recolor);
+
+  document.getElementById('collapse').addEventListener('click', function(){
+    panel.classList.toggle('collapsed');
+  });
+
+  window.addEventListener('keydown', function(e){
+    var target = e.target;
+    if (target && target.closest && target.closest('input,button,select,textarea')) return;
+    if (e.code === 'Space'){
+      e.preventDefault();
+      setPaused(!params.paused);
+    } else if (e.key === 'h' || e.key === 'H'){
+      panel.classList.toggle('collapsed');
+    }
+  });
+})();
+</script>
+</body>
+</html>
